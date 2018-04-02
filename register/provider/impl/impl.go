@@ -44,6 +44,11 @@ func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *p
 	return nil, nil
 }
 
+func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (*pb.ResendVerifyCodeResp, error) {
+
+	return nil, nil
+}
+
 func (self *ProviderRegisterService) GetTrackerServer(ctx context.Context, req *pb.GetTrackerServerReq) (*pb.GetTrackerServerResp, error) {
 
 	return nil, nil

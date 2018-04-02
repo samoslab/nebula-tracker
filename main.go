@@ -5,9 +5,9 @@ import (
 	"log"
 	"net"
 
-	metadata_impl "./metadata/impl"
-	register_cimpl "./register/client/impl"
-	register_pimpl "./register/provider/impl"
+	metadata_impl "nebula-tracker/metadata/impl"
+	register_cimpl "nebula-tracker/register/client/impl"
+	register_pimpl "nebula-tracker/register/provider/impl"
 
 	pbm "github.com/spolabs/nebula/tracker/metadata/pb"
 	pbrc "github.com/spolabs/nebula/tracker/register/client/pb"
@@ -23,6 +23,7 @@ func main() {
 	}
 	grpcServer := grpc.NewServer()
 	pbrp.RegisterProviderRegisterServiceServer(grpcServer, register_pimpl.NewProviderRegisterService())
+
 	pbrc.RegisterClientRegisterServiceServer(grpcServer, register_cimpl.NewClientRegisterService())
 	pbm.RegisterMatadataServiceServer(grpcServer, metadata_impl.NewMatadataService())
 	grpcServer.Serve(lis)
