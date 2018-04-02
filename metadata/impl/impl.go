@@ -24,18 +24,67 @@ func NewMatadataService() *MatadataService {
 	return &MatadataService{}
 }
 
-const embed_metadata_max_file_size = 8192
+func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (*pb.MkFolderResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.MkFolderResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	hasher := sha256.New()
+	hasher.Write(req.NodeId)
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	hasher.Write([]byte(req.Path))
+	for _, f := range req.Folder {
+		hasher.Write([]byte(f))
+	}
+	if req.Interactive {
+		hasher.Write([]byte{1})
+	} else {
+		hasher.Write([]byte{0})
+	}
+	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+		return &pb.MkFolderResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	var parentId []byte
+	if req.Path != "" {
+		if req.Path[0] != '/' {
+			return &pb.MkFolderResp{Code: 6, ErrMsg: "filePath must start with slash /"}, nil
+		}
+		if len(req.Path) > 1 {
+			var found bool
+			found, parentId = db.FileOwnerIdOfFilePath(nodeIdStr, req.Path)
+			if !found {
+				return &pb.MkFolderResp{Code: 7, ErrMsg: "filepath is not exists"}, nil
+			}
+		}
+	}
+	db.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder)
+	return &pb.MkFolderResp{Code: 0}, nil
+}
+
+type resObj struct {
+	Code   uint32
+	ErrMsg string
+}
+
+func checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey) {
+	if nodeId == nil {
+		return &resObj{Code: 2, ErrMsg: "NodeId is required"}, nil
+	}
+	if len(nodeId) != 20 {
+		return &resObj{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
+	}
+	pubKey := db.ClientGetPubKey(nodeId)
+	if pubKey == nil {
+		return &resObj{Code: 4, ErrMsg: "this node id is not been registered"}, nil
+	}
+	return nil, pubKey
+}
 
 func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFileExistReq) (*pb.CheckFileExistResp, error) {
-	if req.NodeId == nil {
-		return &pb.CheckFileExistResp{Code: 2, ErrMsg: "NodeId is required"}, nil
-	}
-	if len(req.NodeId) != 20 {
-		return &pb.CheckFileExistResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
-	}
-	pubKey := db.ClientGetPubKey(req.NodeId)
-	if pubKey == nil {
-		return &pb.CheckFileExistResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.CheckFileExistResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
@@ -85,18 +134,40 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			log.Warnf("hash: %s size is %d, new upload file size is %d", hashStr, size, req.FileSize)
 		}
 		if !active {
-			return &pb.CheckFileExistResp{Code: 5, ErrMsg: "this file can not upload Because of laws and regulations"}, nil
+			return &pb.CheckFileExistResp{Code: 9, ErrMsg: "this file can not upload Because of laws and regulations"}, nil
 		}
 		if !done {
-			return &pb.CheckFileExistResp{Code: 5, ErrMsg: "this file is being uploaded by other user, please wait a moment to retry"}, nil
+			return &pb.CheckFileExistResp{Code: 10, ErrMsg: "this file is being uploaded by other user, please wait a moment to retry"}, nil
 		}
 		db.FileReuse(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId)
+		return &pb.CheckFileExistResp{Code: 0}, nil
 	} else {
-
+		if req.FileSize <= embed_metadata_max_file_size {
+			if req.FileSize != uint64(len(req.FileData)) {
+				return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
+			}
+			db.FileSaveTiny(nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
+			return &pb.CheckFileExistResp{Code: 0}, nil
+		}
+		resp := pb.CheckFileExistResp{Code: 1}
+		if req.FileSize <= multi_replica_max_file_size {
+			resp.StoreType = pb.FileStoreType_MultiReplica
+			resp.ReplicaCount = 5
+			// TODO set provider
+			db.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 5*req.FileSize)
+		} else {
+			resp.StoreType = pb.FileStoreType_ErasureCode
+			resp.DataPieceCount = 16  // TODO
+			resp.VerifyPieceCount = 8 // TODO
+			db.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
+		}
+		return &resp, nil
 	}
-	// TODO
-	return nil, nil
 }
+
+const embed_metadata_max_file_size = 8192
+
+const multi_replica_max_file_size = 1024 * 1024
 
 func fixFileName(name string) string {
 	pos := strings.LastIndex(name, ".")

@@ -57,19 +57,21 @@ func fileOwnerFileExists(tx *sql.Tx, nodeId string, parent []byte, name string) 
 	return nil, false
 }
 
-func FileReuse(nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte) {
-	tx, commit := beginTx()
-	defer rollback(tx, &commit)
-	incrementRefCount(tx, hash)
-	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, hash, size)
-	saveFileVersion(tx, ownerId, nodeId, hash)
-	checkErr(tx.Commit())
-	commit = true
-}
-
 func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, parentId []byte, modTime uint64, hash string, size uint64) []byte {
 	var lastInsertId []byte
 	err := tx.QueryRow("insert into FILE_OWNER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,FOLDER,NAME,PARENT_ID,MOD_TIME,HASH,SIZE) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7) RETURNING ID", nodeId, isFolder, name, parentId, time.Unix(int64(modTime), 0), hash, size).Scan(&lastInsertId)
 	checkErr(err)
 	return lastInsertId
+}
+
+func FileOwnerMkFolders(nodeId string, parent []byte, folders []string) error {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	modTime := uint64(time.Now().Unix())
+	for _, folder := range folders {
+		saveFileOwner(tx, nodeId, true, folder, parent, modTime, "", 0)
+	}
+	checkErr(tx.Commit())
+	commit = true
+	return nil
 }
