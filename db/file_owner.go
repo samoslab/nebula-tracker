@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -64,14 +65,78 @@ func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, parent
 	return lastInsertId
 }
 
-func FileOwnerMkFolders(nodeId string, parent []byte, folders []string) error {
+func FileOwnerMkFolders(nodeId string, parent []byte, folders []string) (firstDuplicationName string, err error) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	modTime := uint64(time.Now().Unix())
 	for _, folder := range folders {
-		saveFileOwner(tx, nodeId, true, folder, parent, modTime, "", 0)
+		saveFileOwner(tx, nodeId, true, folder, parent, modTime, "", 0) // TODO duplication of name
 	}
 	checkErr(tx.Commit())
 	commit = true
-	return nil
+	return "", nil
+}
+
+func fileOwnerListOfPathCount(tx *sql.Tx, nodeId string, parentId []byte) (total uint32) {
+	rows, err := tx.Query("SELECT count(1) FROM FILE_OWNER where NODE_ID=$1 and PARENT_ID=$2 and REMOVED=false", nodeId, parentId)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&total)
+		checkErr(err)
+		return
+	}
+	return 0
+}
+
+func fileOwnerListOfPath(tx *sql.Tx, nodeId string, parentId []byte, pageSize uint32, pageNum uint32, sortField string, asc bool) []*Fof {
+	sql := "SELECT FOLDER,NAME,MOD_TIME,HASH,SIZE FROM FILE_OWNER where NODE_ID=$1 and PARENT_ID=$2 and REMOVED=false order by FOLDER desc, "
+	sql += sortField
+	if asc {
+		sql += " asc"
+	} else {
+		sql += " desc"
+	}
+	sql += " LIMIT "
+	sql += strconv.Itoa(int(pageSize))
+	sql += " OFFSET "
+	sql += strconv.Itoa(int(pageNum*pageSize - pageSize))
+	rows, err := tx.Query(sql, nodeId, parentId)
+	checkErr(err)
+	defer rows.Close()
+	res := make([]*Fof, 0, pageSize)
+	for rows.Next() {
+		var isFolder bool
+		var modTime, size uint64
+		var hash []byte
+		var name string
+		err = rows.Scan(&isFolder, &name, &modTime, &hash, &size)
+		checkErr(err)
+		res = append(res, &Fof{IsFolder: isFolder, Name: name, ModTime: modTime, FileHash: hash, FileSize: size})
+	}
+	return res
+}
+
+type Fof struct {
+	IsFolder bool
+	Name     string
+	ModTime  uint64
+	FileHash []byte
+	FileSize uint64
+}
+
+func FileOwnerListOfPath(nodeId string, parentId []byte, pageSize uint32, pageNum uint32, sortField string, asc bool) (total uint32, fofs []*Fof) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	if pageNum == 0 {
+		pageNum = 1
+	}
+	total = fileOwnerListOfPathCount(tx, nodeId, parentId)
+	if total == 0 || (pageNum-1)*pageSize >= total {
+		return
+	}
+	fofs = fileOwnerListOfPath(tx, nodeId, parentId, pageSize, pageNum, sortField, asc)
+	checkErr(tx.Commit())
+	commit = true
+	return
 }

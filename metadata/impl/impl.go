@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"nebula-tracker/db"
 	"strconv"
 	"strings"
@@ -36,11 +37,6 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 	for _, f := range req.Folder {
 		hasher.Write([]byte(f))
 	}
-	if req.Interactive {
-		hasher.Write([]byte{1})
-	} else {
-		hasher.Write([]byte{0})
-	}
 	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
 		return &pb.MkFolderResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
 	}
@@ -58,7 +54,13 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 			}
 		}
 	}
-	db.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder)
+	firstDuplicationName, err := db.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder) //duplication of name
+	if firstDuplicationName != "" {
+		return &pb.MkFolderResp{Code: 8, ErrMsg: "duplication of folder name: " + firstDuplicationName}, nil
+	}
+	if err != nil {
+		return &pb.MkFolderResp{Code: 9, ErrMsg: "MkFolder Error: " + err.Error()}, nil
+	}
 	return &pb.MkFolderResp{Code: 0}, nil
 }
 
@@ -178,21 +180,290 @@ func fixFileName(name string) string {
 }
 
 func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.UploadFilePrepareReq) (*pb.UploadFilePrepareResp, error) {
-
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return nil, errors.New(checkRes.ErrMsg)
+	}
+	hasher := sha256.New()
+	hasher.Write(req.NodeId)
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	hasher.Write(req.FileHash)
+	hasher.Write(util_bytes.FromUint64(req.FileSize))
+	for _, p := range req.Piece {
+		hasher.Write(p.Hash)
+		hasher.Write(util_bytes.FromUint32(p.Size))
+	}
+	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+		return nil, err
+	}
+	// nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	// TODO set provider
 	return nil, nil
 }
 
 func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadFileDoneReq) (*pb.UploadFileDoneResp, error) {
-
-	return nil, nil
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.UploadFileDoneResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	hasher := sha256.New()
+	hasher.Write(req.NodeId)
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	hasher.Write([]byte(req.FilePath))
+	hasher.Write(req.FileHash)
+	hasher.Write(util_bytes.FromUint64(req.FileSize))
+	hasher.Write([]byte(req.FileName))
+	hasher.Write(util_bytes.FromUint64(req.FileModTime))
+	var storeVolume uint64
+	for _, p := range req.Partition {
+		for _, b := range p.Block {
+			hasher.Write(b.Hash)
+			hasher.Write(util_bytes.FromUint32(b.Size))
+			hasher.Write(util_bytes.FromUint32(b.BlockSeq))
+			if b.Checksum {
+				hasher.Write([]byte{1})
+			} else {
+				hasher.Write([]byte{0})
+			}
+			for _, by := range b.StoreNodeId {
+				hasher.Write(by)
+			}
+			// check size cheating, verify by auth
+			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
+		}
+	}
+	if req.Interactive {
+		hasher.Write([]byte{1})
+	} else {
+		hasher.Write([]byte{0})
+	}
+	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+		return &pb.UploadFileDoneResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	var parentId []byte
+	if req.FilePath != "" {
+		if req.FilePath[0] != '/' {
+			return &pb.UploadFileDoneResp{Code: 6, ErrMsg: "filePath must start with slash /"}, nil
+		}
+		if len(req.FilePath) > 1 {
+			var found bool
+			found, parentId = db.FileOwnerIdOfFilePath(nodeIdStr, req.FilePath)
+			if !found {
+				return &pb.UploadFileDoneResp{Code: 7, ErrMsg: "filepath is not exists"}, nil
+			}
+		}
+	}
+	fileName := req.FileName
+	existId, _ := db.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	if existId != nil {
+		if req.Interactive {
+			return &pb.UploadFileDoneResp{Code: 8, ErrMsg: "exist same name file or folder"}, nil
+		} else {
+			fileName = fixFileName(req.FileName)
+		}
+	}
+	//check available space
+	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
+	blocks, err := fromPartitions(req.Partition)
+	if err != nil {
+		return &pb.UploadFileDoneResp{Code: 9, ErrMsg: err.Error()}, nil
+	}
+	db.FileSaveDone(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId, len(req.Partition), blocks, storeVolume)
+	return &pb.UploadFileDoneResp{Code: 0}, nil
 }
 
 func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq) (*pb.ListFilesResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.ListFilesResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	if req.PageSize > 2000 {
+		return &pb.ListFilesResp{Code: 5, ErrMsg: "page size can not more than 2000"}, nil
+	}
+	hasher := sha256.New()
+	hasher.Write(req.NodeId)
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	hasher.Write([]byte(req.Path))
+	hasher.Write(util_bytes.FromUint32(req.PageSize))
+	hasher.Write(util_bytes.FromUint32(req.PageNum))
+	hasher.Write([]byte(req.SortType.String()))
+	if req.AscOrder {
+		hasher.Write([]byte{1})
+	} else {
+		hasher.Write([]byte{0})
+	}
+	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+		return &pb.ListFilesResp{Code: 6, ErrMsg: "Verify Sign failed"}, nil
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	var parentId []byte
+	if req.Path != "" {
+		if req.Path[0] != '/' {
+			return &pb.ListFilesResp{Code: 7, ErrMsg: "path must start with slash /"}, nil
+		}
+		if len(req.Path) > 1 {
+			var found bool
+			found, parentId = db.FileOwnerIdOfFilePath(nodeIdStr, req.Path)
+			if !found {
+				return &pb.ListFilesResp{Code: 8, ErrMsg: "path is not exists"}, nil
+			}
+		}
+	}
+	var sortField string
+	if req.SortType == pb.SortType_Name {
+		sortField = "NAME"
+	} else if req.SortType == pb.SortType_ModTime {
+		sortField = "MOD_TIME"
+	} else if req.SortType == pb.SortType_Size {
+		sortField = "SIZE"
+	} else {
+		return &pb.ListFilesResp{Code: 9, ErrMsg: "must specified sortType"}, nil
+	}
+	fofs := db.FileOwnerListOfPath(nodeIdStr, parentId, req.PageSize, req.PageNum, sortField, req.AscOrder)
+	return &pb.ListFilesResp{Code: 0, Fof: toFileOrFolderSlice(fofs)}, nil
+}
 
-	return nil, nil
+func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
+	if fofs == nil || len(fofs) == 0 {
+		return nil
+	}
+	res := make([]*pb.FileOrFolder, 0, len(fofs))
+	for _, fof := range fofs {
+		res = append(res, &pb.FileOrFolder{Folder: fof.IsFolder, Name: fof.Name, FileHash: fof.FileHash, FileSize: fof.FileSize, ModTime: fof.ModTime})
+	}
+	return res
 }
 
 func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveFileReq) (*pb.RetrieveFileResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.RetrieveFileResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	hasher := sha256.New()
+	hasher.Write(req.NodeId)
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	hasher.Write(req.FileHash)
+	hasher.Write(util_bytes.FromUint64(req.FileSize))
+	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+		return &pb.RetrieveFileResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
+	}
+	hash := base64.StdEncoding.EncodeToString(req.FileHash)
+	exist, active, fileData, partitionCount, blocks, size := db.FileRetrieve(hash)
+	if !exist {
+		return &pb.RetrieveFileResp{Code: 6, ErrMsg: "file not exist"}, nil
+	}
+	if !active {
+		return &pb.RetrieveFileResp{Code: 7, ErrMsg: "file offline Because of laws and regulations"}, nil
+	}
+	if size != req.FileSize {
+		return &pb.RetrieveFileResp{Code: 8, ErrMsg: "file data size is not equal fileSize"}, nil
+	}
+	if fileData != nil && len(fileData) > 0 {
+		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
+	}
+	return &pb.RetrieveFileResp{Code: 0, Partition: toPartitions(hash, blocks, partitionCount)}, nil
+}
 
-	return nil, nil
+const block_sep = ";"
+const block_node_id_sep = ","
+
+func fromPartitions(partitions []*pb.Partition) ([]string, error) {
+	if partitions == nil || len(partitions) == 0 {
+		return nil, nil
+	}
+	res := make([]string, 0, len(partitions))
+	for _, p := range partitions {
+		for _, b := range p.Block {
+			if b.StoreNodeId == nil || len(b.StoreNodeId) == 0 {
+				return nil, errors.New("empty store nodeId")
+			}
+			str := base64.StdEncoding.EncodeToString(b.Hash) + block_sep + strconv.Itoa(int(b.Size)) + block_sep + strconv.Itoa(int(b.BlockSeq)) + block_sep
+			if b.Checksum {
+				str += "1"
+			} else {
+				str += "0"
+			}
+			str += block_sep
+			first := true
+			for _, by := range b.StoreNodeId {
+				if first {
+					first = false
+				} else {
+					str += block_node_id_sep
+				}
+				str += base64.StdEncoding.EncodeToString(by)
+
+			}
+			res = append(res, str)
+		}
+	}
+	return res, nil
+}
+
+func toPartitions(fileHash string, blocks []string, partitionsCount int) []*pb.Partition {
+	if partitionsCount == 0 {
+		return nil
+	}
+	if len(blocks)%partitionsCount != 0 {
+		log.Errorf("parse file: %s block error, blocks length: %d, partitions count:%d", fileHash, len(blocks), partitionsCount)
+		return nil
+	}
+	var err error
+	var intVal int
+	slice := make([]*pb.Block, 0, len(blocks))
+	for _, str := range blocks {
+		arr := strings.Split(str, block_sep)
+		if len(arr) != 5 {
+			log.Errorf("parse file: %s block str %s length error", fileHash, str)
+			return nil
+		}
+		b := pb.Block{}
+		b.Hash, err = base64.StdEncoding.DecodeString(arr[0])
+		if err != nil {
+			log.Errorf("parse file: %s block str %s error: %s", fileHash, str, err.Error())
+			return nil
+		}
+		intVal, err = strconv.Atoi(arr[1])
+		if err != nil {
+			log.Errorf("parse file: %s block str %s error: %s", fileHash, str, err.Error())
+			return nil
+		}
+		b.Size = uint32(intVal)
+		intVal, err = strconv.Atoi(arr[2])
+		if err != nil {
+			log.Errorf("parse file: %s block str %s error: %s", fileHash, str, err.Error())
+			return nil
+		}
+		b.BlockSeq = uint32(intVal)
+		if arr[3] == "1" {
+			b.Checksum = true
+		} else if arr[3] == "0" {
+			b.Checksum = false
+		} else {
+			log.Errorf("parse file: %s block str %s error: %s", fileHash, str, err.Error())
+			return nil
+		}
+		nodeIds := strings.Split(arr[4], block_node_id_sep)
+		if nodeIds == nil || len(nodeIds) == 0 {
+			log.Errorf("parse file: %s block str %s error, no store nodeId", fileHash, str)
+			return nil
+		}
+		store := make([][]byte, 0, len(nodeIds))
+		for _, n := range nodeIds {
+			bytes, err := base64.StdEncoding.DecodeString(n)
+			if err != nil {
+				log.Errorf("parse file: %s block str %s error: %s", fileHash, str, err.Error())
+			}
+			store = append(store, bytes)
+		}
+		b.StoreNodeId = store
+		slice = append(slice, &b)
+	}
+	res := make([]*pb.Partition, 0, partitionsCount)
+	blockCount := len(blocks) / partitionsCount
+	for i := 0; i < partitionsCount; i++ {
+		res = append(res, &pb.Partition{Block: slice[i : i+blockCount]})
+	}
+	return res
 }

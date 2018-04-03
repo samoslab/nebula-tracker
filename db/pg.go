@@ -89,3 +89,24 @@ func (self NullTime) Value() (driver.Value, error) {
 	}
 	return self.Time, nil
 }
+
+type NullStrSlice struct {
+	StrSlice []string
+	Valid    bool
+}
+
+// Scan implements the Scanner interface.
+func (self *NullStrSlice) Scan(value interface{}) error {
+	var t []string
+	t, self.Valid = value.([]string)
+	self.StrSlice = t
+	return nil
+}
+
+// Value implements the driver Valuer interface.
+func (self NullStrSlice) Value() (driver.Value, error) {
+	if !self.Valid {
+		return nil, nil
+	}
+	return self.StrSlice, nil
+}

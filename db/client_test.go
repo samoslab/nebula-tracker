@@ -17,17 +17,17 @@ func TestDoClientSave(t *testing.T) {
 	nodeId := base64.StdEncoding.EncodeToString(sha1Sum([]byte("test node id")))
 	// t.Errorf("%s length: %d", nodeId, len(nodeId))
 	email := "testemail@testemail.com"
-	if doClientExistsNodeId(tx, nodeId) {
+	if existsNodeId(tx, nodeId) {
 		t.Errorf("Failed.")
 	}
-	if doClientExistsContactEmail(tx, email) {
+	if existsContactEmail(tx, email) {
 		t.Errorf("Failed.")
 	}
-	doClientSave(tx, nodeId, []byte("test-public-key"), email, "random")
-	if !doClientExistsNodeId(tx, nodeId) {
+	saveClient(tx, nodeId, []byte("test-public-key"), email, "random")
+	if !existsNodeId(tx, nodeId) {
 		t.Errorf("Failed.")
 	}
-	if !doClientExistsContactEmail(tx, email) {
+	if !existsContactEmail(tx, email) {
 		t.Errorf("Failed.")
 	}
 }
