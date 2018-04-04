@@ -35,9 +35,9 @@ func Test(t *testing.T) {
 	if !util_bytes.SameBytes(fileData, data) {
 		t.Errorf("Failed.")
 	}
-	fileSaveDone(tx, hash, 2, []string{"aaa", "bbb"}, 123123*2)
+	fileSaveDone(tx, hash, 2, []string{"aaa", "b\"bb"}, 123123*2)
 	exist, active, data, partitionCount, blocks, size = fileRetrieve(tx, hash)
 	if len(blocks) != 2 {
-		t.Errorf("Failed.")
+		t.Errorf("Failed. len: %d", len(blocks))
 	}
 }

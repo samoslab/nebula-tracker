@@ -78,10 +78,15 @@ func FileSaveStep1(nodeId string, hash string, size uint64, storeVolume uint64) 
 }
 
 func fileSaveDone(tx *sql.Tx, hash string, partitionCount int, blocks []string, storeVolume uint64) {
-	stmt, err := tx.Prepare("update FILE set PARTITION_COUNT=$2,BLOCKS=$3,DONE=true,LAST_MODIFIED=now(),STORE_VOLUME=$4 where HASH=$1")
+	stmt, err := tx.Prepare("update FILE set PARTITION_COUNT=$2,BLOCKS=" + arrayClause(len(blocks), 4) + ",DONE=true,LAST_MODIFIED=now(),STORE_VOLUME=$3 where HASH=$1")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(hash, partitionCount, blocks, storeVolume)
+	args := make([]interface{}, 3, len(blocks)+3)
+	args[0], args[1], args[2] = hash, partitionCount, storeVolume
+	for _, str := range blocks {
+		args = append(args, str)
+	}
+	rs, err := stmt.Exec(args...)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)

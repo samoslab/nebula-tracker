@@ -69,6 +69,24 @@ func inClause(count int, first int) string {
 	return buffer.String()
 }
 
+func arrayClause(count int, first int) string {
+	if count == 1 {
+		return fmt.Sprintf("ARRAY[$%d]", first)
+	} else if count == 0 {
+		panic("count can't be zero")
+	}
+	var buffer bytes.Buffer
+	buffer.WriteString("ARRAY[$")
+	buffer.WriteString(strconv.Itoa(first))
+	for i := 1; i < count; i++ {
+		buffer.WriteString(", $")
+		first++
+		buffer.WriteString(strconv.Itoa(first))
+	}
+	buffer.WriteString("]")
+	return buffer.String()
+}
+
 type NullTime struct {
 	Time  time.Time
 	Valid bool // Valid is true if Time is not NULL
@@ -97,9 +115,16 @@ type NullStrSlice struct {
 
 // Scan implements the Scanner interface.
 func (self *NullStrSlice) Scan(value interface{}) error {
-	var t []string
-	t, self.Valid = value.([]string)
-	self.StrSlice = t
+	if value == nil {
+		fmt.Println("nil")
+		return nil
+	}
+	var t []byte
+	t, self.Valid = value.([]byte)
+	asString := string(t)
+	fmt.Println(asString)
+	// self.StrSlice = t
+
 	return nil
 }
 
