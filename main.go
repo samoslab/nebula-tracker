@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 
+	"nebula-tracker/config"
+	"nebula-tracker/db"
 	metadata_impl "nebula-tracker/metadata/impl"
 	register_cimpl "nebula-tracker/register/client/impl"
 	register_pimpl "nebula-tracker/register/provider/impl"
@@ -22,8 +24,9 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	grpcServer := grpc.NewServer()
+	dbo := db.OpenDb(&config.GetTrackerConfig().Db)
+	defer dbo.Close()
 	pbrp.RegisterProviderRegisterServiceServer(grpcServer, register_pimpl.NewProviderRegisterService())
-
 	pbrc.RegisterClientRegisterServiceServer(grpcServer, register_cimpl.NewClientRegisterService())
 	pbm.RegisterMatadataServiceServer(grpcServer, metadata_impl.NewMatadataService())
 	grpcServer.Serve(lis)

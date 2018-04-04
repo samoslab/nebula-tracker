@@ -25,11 +25,7 @@ func NewMatadataService() *MatadataService {
 	return &MatadataService{}
 }
 
-func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (*pb.MkFolderResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
-	if checkRes != nil {
-		return &pb.MkFolderResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
-	}
+func verifySignMkFolderReq(req *pb.MkFolderReq, pubKey *rsa.PublicKey) error {
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -37,22 +33,21 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 	for _, f := range req.Folder {
 		hasher.Write([]byte(f))
 	}
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
+}
+
+func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (*pb.MkFolderResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.MkFolderResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	if err := verifySignMkFolderReq(req, pubKey); err != nil {
 		return &pb.MkFolderResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	var parentId []byte
-	if req.Path != "" {
-		if req.Path[0] != '/' {
-			return &pb.MkFolderResp{Code: 6, ErrMsg: "filePath must start with slash /"}, nil
-		}
-		if len(req.Path) > 1 {
-			var found bool
-			found, parentId = db.FileOwnerIdOfFilePath(nodeIdStr, req.Path)
-			if !found {
-				return &pb.MkFolderResp{Code: 7, ErrMsg: "filepath is not exists"}, nil
-			}
-		}
+	resobj, parentId := findPathId(nodeIdStr, req.Path)
+	if resobj != nil {
+		return &pb.MkFolderResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	firstDuplicationName, err := db.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder) //duplication of name
 	if firstDuplicationName != "" {
@@ -71,23 +66,19 @@ type resObj struct {
 
 func checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey) {
 	if nodeId == nil {
-		return &resObj{Code: 2, ErrMsg: "NodeId is required"}, nil
+		return &resObj{Code: 100, ErrMsg: "NodeId is required"}, nil
 	}
 	if len(nodeId) != 20 {
-		return &resObj{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
+		return &resObj{Code: 101, ErrMsg: "NodeId length must be 20"}, nil
 	}
 	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
-		return &resObj{Code: 4, ErrMsg: "this node id is not been registered"}, nil
+		return &resObj{Code: 102, ErrMsg: "this node id is not been registered"}, nil
 	}
 	return nil, pubKey
 }
 
-func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFileExistReq) (*pb.CheckFileExistResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
-	if checkRes != nil {
-		return &pb.CheckFileExistResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
-	}
+func verifySignCheckFileExistReq(req *pb.CheckFileExistReq, pubKey *rsa.PublicKey) error {
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -102,22 +93,21 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 	} else {
 		hasher.Write([]byte{0})
 	}
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
+}
+func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFileExistReq) (*pb.CheckFileExistResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.CheckFileExistResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+
+	if err := verifySignCheckFileExistReq(req, pubKey); err != nil {
 		return &pb.CheckFileExistResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	var parentId []byte
-	if req.FilePath != "" {
-		if req.FilePath[0] != '/' {
-			return &pb.CheckFileExistResp{Code: 6, ErrMsg: "filePath must start with slash /"}, nil
-		}
-		if len(req.FilePath) > 1 {
-			var found bool
-			found, parentId = db.FileOwnerIdOfFilePath(nodeIdStr, req.FilePath)
-			if !found {
-				return &pb.CheckFileExistResp{Code: 7, ErrMsg: "filepath is not exists"}, nil
-			}
-		}
+	resobj, parentId := findPathId(nodeIdStr, req.FilePath)
+	if resobj != nil {
+		return &pb.CheckFileExistResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	fileName := req.FileName
 	existId, _ := db.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
@@ -178,12 +168,7 @@ func fixFileName(name string) string {
 	}
 	return name[0:pos] + "_" + strconv.FormatInt(time.Now().Unix(), 10) + name[pos:]
 }
-
-func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.UploadFilePrepareReq) (*pb.UploadFilePrepareResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
-	if checkRes != nil {
-		return nil, errors.New(checkRes.ErrMsg)
-	}
+func verifySignUploadFilePrepareReq(req *pb.UploadFilePrepareReq, pubKey *rsa.PublicKey) error {
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -193,7 +178,15 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 		hasher.Write(p.Hash)
 		hasher.Write(util_bytes.FromUint32(p.Size))
 	}
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
+}
+func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.UploadFilePrepareReq) (*pb.UploadFilePrepareResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return nil, errors.New(checkRes.ErrMsg)
+	}
+
+	if err := verifySignUploadFilePrepareReq(req, pubKey); err != nil {
 		return nil, err
 	}
 	// nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
@@ -201,11 +194,7 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 	return nil, nil
 }
 
-func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadFileDoneReq) (*pb.UploadFileDoneResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
-	if checkRes != nil {
-		return &pb.UploadFileDoneResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
-	}
+func verifySignUploadFileDoneReq(req *pb.UploadFileDoneReq, pubKey *rsa.PublicKey) (storeVolume uint64, err error) {
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -214,7 +203,6 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	hasher.Write(util_bytes.FromUint64(req.FileSize))
 	hasher.Write([]byte(req.FileName))
 	hasher.Write(util_bytes.FromUint64(req.FileModTime))
-	var storeVolume uint64
 	for _, p := range req.Partition {
 		for _, b := range p.Block {
 			hasher.Write(b.Hash)
@@ -237,22 +225,23 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	} else {
 		hasher.Write([]byte{0})
 	}
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+	err = rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
+	return
+}
+
+func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadFileDoneReq) (*pb.UploadFileDoneResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.UploadFileDoneResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	storeVolume, err := verifySignUploadFileDoneReq(req, pubKey)
+	if err != nil {
 		return &pb.UploadFileDoneResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	var parentId []byte
-	if req.FilePath != "" {
-		if req.FilePath[0] != '/' {
-			return &pb.UploadFileDoneResp{Code: 6, ErrMsg: "filePath must start with slash /"}, nil
-		}
-		if len(req.FilePath) > 1 {
-			var found bool
-			found, parentId = db.FileOwnerIdOfFilePath(nodeIdStr, req.FilePath)
-			if !found {
-				return &pb.UploadFileDoneResp{Code: 7, ErrMsg: "filepath is not exists"}, nil
-			}
-		}
+	resobj, parentId := findPathId(nodeIdStr, req.FilePath)
+	if resobj != nil {
+		return &pb.UploadFileDoneResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	fileName := req.FileName
 	existId, _ := db.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
@@ -272,15 +261,7 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	db.FileSaveDone(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId, len(req.Partition), blocks, storeVolume)
 	return &pb.UploadFileDoneResp{Code: 0}, nil
 }
-
-func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq) (*pb.ListFilesResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
-	if checkRes != nil {
-		return &pb.ListFilesResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
-	}
-	if req.PageSize > 2000 {
-		return &pb.ListFilesResp{Code: 5, ErrMsg: "page size can not more than 2000"}, nil
-	}
+func verifySignListFilesReq(req *pb.ListFilesReq, pubKey *rsa.PublicKey) error {
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -293,22 +274,25 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 	} else {
 		hasher.Write([]byte{0})
 	}
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
+}
+
+func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq) (*pb.ListFilesResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.ListFilesResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	if req.PageSize > 2000 {
+		return &pb.ListFilesResp{Code: 5, ErrMsg: "page size can not more than 2000"}, nil
+	}
+
+	if err := verifySignListFilesReq(req, pubKey); err != nil {
 		return &pb.ListFilesResp{Code: 6, ErrMsg: "Verify Sign failed"}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	var parentId []byte
-	if req.Path != "" {
-		if req.Path[0] != '/' {
-			return &pb.ListFilesResp{Code: 7, ErrMsg: "path must start with slash /"}, nil
-		}
-		if len(req.Path) > 1 {
-			var found bool
-			found, parentId = db.FileOwnerIdOfFilePath(nodeIdStr, req.Path)
-			if !found {
-				return &pb.ListFilesResp{Code: 8, ErrMsg: "path is not exists"}, nil
-			}
-		}
+	resobj, parentId := findPathId(nodeIdStr, req.Path)
+	if resobj != nil {
+		return &pb.ListFilesResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	var sortField string
 	if req.SortType == pb.SortType_Name {
@@ -320,8 +304,8 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 	} else {
 		return &pb.ListFilesResp{Code: 9, ErrMsg: "must specified sortType"}, nil
 	}
-	fofs := db.FileOwnerListOfPath(nodeIdStr, parentId, req.PageSize, req.PageNum, sortField, req.AscOrder)
-	return &pb.ListFilesResp{Code: 0, Fof: toFileOrFolderSlice(fofs)}, nil
+	total, fofs := db.FileOwnerListOfPath(nodeIdStr, parentId, req.PageSize, req.PageNum, sortField, req.AscOrder)
+	return &pb.ListFilesResp{Code: 0, TotalRecord: total, Fof: toFileOrFolderSlice(fofs)}, nil
 }
 
 func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
@@ -335,17 +319,21 @@ func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
 	return res
 }
 
-func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveFileReq) (*pb.RetrieveFileResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
-	if checkRes != nil {
-		return &pb.RetrieveFileResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
-	}
+func verifySignRetrieveFileReq(req *pb.RetrieveFileReq, pubKey *rsa.PublicKey) error {
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
 	hasher.Write(req.FileHash)
 	hasher.Write(util_bytes.FromUint64(req.FileSize))
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
+}
+
+func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveFileReq) (*pb.RetrieveFileResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.RetrieveFileResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	if err := verifySignRetrieveFileReq(req, pubKey); err != nil {
 		return &pb.RetrieveFileResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
 	}
 	hash := base64.StdEncoding.EncodeToString(req.FileHash)
@@ -363,6 +351,55 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
 	}
 	return &pb.RetrieveFileResp{Code: 0, Partition: toPartitions(hash, blocks, partitionCount)}, nil
+}
+
+func verifySignRemoveReq(req *pb.RemoveReq, pubKey *rsa.PublicKey) error {
+	hasher := sha256.New()
+	hasher.Write(req.NodeId)
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	hasher.Write([]byte(req.Path))
+	if req.Recursive {
+		hasher.Write([]byte{1})
+	} else {
+		hasher.Write([]byte{0})
+	}
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
+}
+func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb.RemoveResp, error) {
+	checkRes, pubKey := checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.RemoveResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	if err := verifySignRemoveReq(req, pubKey); err != nil {
+		return &pb.RemoveResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	resobj, pathId := findPathId(nodeIdStr, req.Path)
+	if resobj != nil {
+		return &pb.RemoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
+	}
+	if pathId == nil {
+		// error
+	}
+	if !db.FileOwnerRemove(nodeIdStr, pathId, req.Recursive) {
+		// TODO
+	}
+	return nil, nil
+}
+
+func findPathId(nodeId string, path string) (res *resObj, pathId []byte) {
+	if path == "" || path == "/" {
+		return
+	}
+	if path[0] != '/' {
+		return &resObj{Code: 200, ErrMsg: "path must start with slash /"}, nil
+	}
+	var found bool
+	found, pathId = db.FileOwnerIdOfFilePath(nodeId, path)
+	if !found {
+		return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
+	}
+	return
 }
 
 const block_sep = ";"

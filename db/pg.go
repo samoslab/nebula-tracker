@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"nebula-tracker/config"
@@ -121,10 +123,21 @@ func (self *NullStrSlice) Scan(value interface{}) error {
 	}
 	var t []byte
 	t, self.Valid = value.([]byte)
-	asString := string(t)
-	fmt.Println(asString)
-	// self.StrSlice = t
+	if len(t) < 4 {
+		return nil
+	}
+	str := string(t)
+	fmt.Println(str)
 
+	l := len(str)
+	if str[0:2] != `{"` || str[l-2:l] != `"}` {
+		panic(errors.New(str + " format wrong"))
+	}
+	self.StrSlice = strings.Split(str[2:l-2], `","`)
+	// for i, _ := range self.StrSlice {
+	// self.StrSlice[i] = strings.Replace(self.StrSlice[i], `\"`, `"`, -1)
+	// self.StrSlice[i] = strings.Replace(self.StrSlice[i], `\\`, `\`, -1)
+	// }
 	return nil
 }
 

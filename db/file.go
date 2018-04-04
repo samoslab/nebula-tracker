@@ -45,7 +45,7 @@ func FileReuse(nodeId string, hash string, name string, size uint64, modTime uin
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	incrementRefCount(tx, hash)
-	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, hash, size)
+	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
 	saveFileVersion(tx, ownerId, nodeId, hash)
 	checkErr(tx.Commit())
 	commit = true
@@ -63,7 +63,7 @@ func FileSaveTiny(nodeId string, hash string, fileData []byte, name string, size
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	fileSave(tx, nodeId, hash, size, fileData, true, size*3)
-	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, hash, size)
+	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
 	saveFileVersion(tx, ownerId, nodeId, hash)
 	checkErr(tx.Commit())
 	commit = true
@@ -99,7 +99,7 @@ func FileSaveDone(nodeId string, hash string, name string, size uint64, modTime 
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	fileSaveDone(tx, hash, partitionCount, blocks, storeVolume)
-	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, hash, size)
+	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
 	saveFileVersion(tx, ownerId, nodeId, hash)
 	checkErr(tx.Commit())
 	commit = true
