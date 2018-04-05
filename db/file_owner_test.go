@@ -62,4 +62,8 @@ func TestFileOwner(t *testing.T) {
 	if len(fofs) != 1 || fofs[0].Name != "test-folder2" {
 		t.Errorf("Failed.")
 	}
+	folder := fileOwnerMkFolders(tx, nodeId, id1, []string{"test1", "test-folder2", "test2"}, uint64(time.Now().Unix()))
+	if folder != "test-folder2" {
+		t.Errorf("Failed.")
+	}
 }

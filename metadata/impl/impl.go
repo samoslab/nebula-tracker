@@ -49,12 +49,9 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 	if resobj != nil {
 		return &pb.MkFolderResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
-	firstDuplicationName, err := db.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder) //duplication of name
+	firstDuplicationName := db.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder)
 	if firstDuplicationName != "" {
 		return &pb.MkFolderResp{Code: 8, ErrMsg: "duplication of folder name: " + firstDuplicationName}, nil
-	}
-	if err != nil {
-		return &pb.MkFolderResp{Code: 9, ErrMsg: "MkFolder Error: " + err.Error()}, nil
 	}
 	return &pb.MkFolderResp{Code: 0}, nil
 }

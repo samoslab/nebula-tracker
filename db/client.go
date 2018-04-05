@@ -88,23 +88,23 @@ func existsContactEmail(tx *sql.Tx, contactEmail string) bool {
 	return false
 }
 
-func ClientGetRandomCode(nodeId string) (found bool, emailVerified bool, randomCode string, sendTime time.Time) {
+func ClientGetRandomCode(nodeId string) (found bool, email string, emailVerified bool, randomCode string, sendTime time.Time) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	found, emailVerified, randomCode, sendTime = getRandomCode(tx, nodeId)
+	found, email, emailVerified, randomCode, sendTime = getRandomCode(tx, nodeId)
 	checkErr(tx.Commit())
 	commit = true
 	return
 }
 
-func getRandomCode(tx *sql.Tx, nodeId string) (found bool, emailVerified bool, randomCode string, sendTime time.Time) {
-	rows, err := tx.Query("SELECT EMAIL_VERIFIED,RANDOM_CODE,SEND_TIME FROM CLIENT where NODE_ID=$1 and REMOVED=false", nodeId)
+func getRandomCode(tx *sql.Tx, nodeId string) (found bool, email string, emailVerified bool, randomCode string, sendTime time.Time) {
+	rows, err := tx.Query("SELECT EMAIL_VERIFIED,CONTACT_EMAIL,RANDOM_CODE,SEND_TIME FROM CLIENT where NODE_ID=$1 and REMOVED=false", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
 		var sendTimeNullable NullTime
 		var randomCodeNullable sql.NullString
-		err = rows.Scan(&emailVerified, &randomCodeNullable, &sendTimeNullable)
+		err = rows.Scan(&emailVerified, &email, &randomCodeNullable, &sendTimeNullable)
 		checkErr(err)
 		if randomCodeNullable.Valid {
 			randomCode = randomCodeNullable.String

@@ -8,10 +8,10 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
-	math_rand "math/rand"
 	"time"
 
 	"nebula-tracker/db"
+	"nebula-tracker/register/random"
 
 	log "github.com/sirupsen/logrus"
 	pb "github.com/spolabs/nebula/tracker/register/client/pb"
@@ -20,21 +20,6 @@ import (
 	util_bytes "github.com/spolabs/nebula/util/bytes"
 	util_hash "github.com/spolabs/nebula/util/hash"
 )
-
-var mathRand *math_rand.Rand
-
-func init() {
-	mathRand = math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
-}
-
-func RandomString(strlen int) string {
-	const chars = "abcdefghijkmnpqrstuvwxyz0123456789"
-	result := make([]byte, strlen)
-	for i := range result {
-		result[i] = chars[mathRand.Intn(len(chars))]
-	}
-	return string(result)
-}
 
 type ClientRegisterService struct {
 	PubKey      *rsa.PublicKey
@@ -63,7 +48,7 @@ func (self *ClientRegisterService) decrypt(data []byte) ([]byte, error) {
 }
 
 func (self *ClientRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (*pb.RegisterResp, error) {
-	if req.NodeId == nil {
+	if req.NodeId == nil || len(req.NodeId) == 0 {
 		return &pb.RegisterResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
 	if len(req.NodeId) != 20 {
@@ -87,7 +72,7 @@ func (self *ClientRegisterService) Register(ctx context.Context, req *pb.Registe
 	if err != nil {
 		return &pb.RegisterResp{Code: 8, ErrMsg: "Public Key can not be parsed"}, nil
 	}
-	if req.ContactEmailEnc == nil {
+	if req.ContactEmailEnc == nil || len(req.ContactEmailEnc) == 0 {
 		return &pb.RegisterResp{Code: 9, ErrMsg: "ContactEmailEnc is required"}, nil
 	}
 	contactEmail, err := self.decrypt(req.ContactEmailEnc)
@@ -97,20 +82,28 @@ func (self *ClientRegisterService) Register(ctx context.Context, req *pb.Registe
 	if db.ClientExistsContactEmail(string(contactEmail)) {
 		return &pb.RegisterResp{Code: 11, ErrMsg: "This Contact Email is already registered"}, nil
 	}
-	randomCode := RandomString(8)
+	randomCode := random.RandomStr(8)
 	db.ClientRegister(nodeIdStr, publicKey, pubKey, string(contactEmail), randomCode)
-	self.sendVerifyCodeToContactEmail(nodeIdStr, randomCode)
+	self.sendVerifyCodeToContactEmail(nodeIdStr, string(contactEmail), randomCode)
 	return &pb.RegisterResp{Code: 0}, nil
 }
 
-func (self *ClientRegisterService) sendVerifyCodeToContactEmail(nodeId string, randomCode string) {
+func (self *ClientRegisterService) sendVerifyCodeToContactEmail(nodeId string, email string, randomCode string) {
 	// TODO
 }
 
-func (self *ClientRegisterService) reGenerateVerifyCode(nodeId string) {
-	randomCode := RandomString(8)
+func (self *ClientRegisterService) reGenerateVerifyCode(nodeId string, email string) {
+	randomCode := random.RandomStr(8)
 	db.ClientUpdateVerifyCode(nodeId, randomCode)
-	self.sendVerifyCodeToContactEmail(nodeId, randomCode)
+	self.sendVerifyCodeToContactEmail(nodeId, email, randomCode)
+}
+
+func verifySignVerifyContactEmailReq(req *pb.VerifyContactEmailReq, pubKey *rsa.PublicKey) error {
+	hasher := sha256.New()
+	hasher.Write(req.NodeId)
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	hasher.Write([]byte(req.VerifyCode))
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
 }
 
 func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *pb.VerifyContactEmailReq) (*pb.VerifyContactEmailResp, error) {
@@ -124,15 +117,12 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 	if pubKey == nil {
 		return &pb.VerifyContactEmailResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.VerifyCode))
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+
+	if err := verifySignVerifyContactEmailReq(req, pubKey); err != nil {
 		return &pb.VerifyContactEmailResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	found, emailVerified, randomCode, sendTime := db.ClientGetRandomCode(nodeIdStr)
+	found, contactEmail, emailVerified, randomCode, sendTime := db.ClientGetRandomCode(nodeIdStr)
 	if !found {
 		return &pb.VerifyContactEmailResp{Code: 6, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -140,29 +130,41 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 		return &pb.VerifyContactEmailResp{Code: 7, ErrMsg: "already verified contact email"}, nil
 	}
 	if req.VerifyCode != randomCode {
-		self.reGenerateVerifyCode(nodeIdStr)
+		self.reGenerateVerifyCode(nodeIdStr, contactEmail)
 		return &pb.VerifyContactEmailResp{Code: 8, ErrMsg: "wrong verified code, will send verify email again"}, nil
 	}
 	if subM := time.Now().Sub(sendTime).Minutes(); subM > 120 {
-		self.reGenerateVerifyCode(nodeIdStr)
+		self.reGenerateVerifyCode(nodeIdStr, contactEmail)
 		return &pb.VerifyContactEmailResp{Code: 9, ErrMsg: "verify code expired, will send verify email again"}, nil
 	}
 	db.ClientUpdateEmailVerified(nodeIdStr)
 	return &pb.VerifyContactEmailResp{Code: 0}, nil
 }
 
+func verifySignResendVerifyCodeReq(req *pb.ResendVerifyCodeReq, pubKey *rsa.PublicKey) error {
+	hasher := sha256.New()
+	hasher.Write(req.NodeId)
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
+}
 func (self *ClientRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (*pb.ResendVerifyCodeResp, error) {
 	pubKey := db.ClientGetPubKey(req.NodeId)
 	if pubKey == nil {
 		return nil, errors.New("this node id is not been registered")
 	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	if err := rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign); err != nil {
+
+	if err := verifySignResendVerifyCodeReq(req, pubKey); err != nil {
 		return nil, err
 	}
-	self.reGenerateVerifyCode(base64.StdEncoding.EncodeToString(req.NodeId))
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	found, contactEmail, emailVerified, _, _ := db.ClientGetRandomCode(nodeIdStr)
+	if !found {
+		return nil, errors.New("this node id is not been registered")
+	}
+	if emailVerified {
+		return nil, errors.New("already virefied！")
+	}
+	self.reGenerateVerifyCode(nodeIdStr, contactEmail)
 	return &pb.ResendVerifyCodeResp{Success: true}, nil
 }
 

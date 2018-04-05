@@ -86,17 +86,30 @@ func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, parent
 	return lastInsertId
 }
 
-func FileOwnerMkFolders(nodeId string, parent []byte, folders []string) (firstDuplicationName string, err error) {
+func FileOwnerMkFolders(nodeId string, parent []byte, folders []string) (firstDuplicationName string) {
+	modTime := uint64(time.Now().Unix())
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	modTime := uint64(time.Now().Unix())
-	hash := &sql.NullString{}
-	for _, folder := range folders {
-		saveFileOwner(tx, nodeId, true, folder, parent, modTime, hash, 0) // TODO duplication of name
-	}
+	firstDuplicationName = fileOwnerMkFolders(tx, nodeId, parent, folders, modTime)
 	checkErr(tx.Commit())
 	commit = true
-	return "", nil
+	return
+}
+
+func fileOwnerMkFolders(tx *sql.Tx, nodeId string, parent []byte, folders []string, modTime uint64) (firstDuplicationName string) {
+	defer func() {
+		if r := recover(); r != nil {
+			if e, ok := r.(error); !ok || strings.Index(e.Error(), "violates unique constraint") == -1 {
+				panic(r)
+			}
+		}
+	}()
+	hash := &sql.NullString{}
+	for _, folder := range folders {
+		firstDuplicationName = folder
+		saveFileOwner(tx, nodeId, true, folder, parent, modTime, hash, 0) // TODO duplication of name
+	}
+	return ""
 }
 
 func fileOwnerListOfPathCount(tx *sql.Tx, nodeId string, parent []byte) (total uint32) {
