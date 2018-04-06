@@ -187,7 +187,9 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	}
 	// TODO
 	randomCode := random.RandomStr(8)
-	db.ProviderRegister(nodeIdStr, publicKey, pubKey, string(billEmail), encryptKey, string(walletAddress), randomCode)
+	db.ProviderRegister(nodeIdStr, publicKey, pubKey, string(billEmail), encryptKey, string(walletAddress), storageVolume, req.UpBandwidth,
+		req.DownBandwidth, req.TestUpBandwidth, req.TestDownBandwidth, req.Availability,
+		req.Port, string(host), string(dynamicDomain), randomCode)
 	self.sendVerifyCodeToBillEmail(nodeIdStr, string(billEmail), randomCode)
 	return &pb.RegisterResp{Code: 0}, nil
 }

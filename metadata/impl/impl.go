@@ -347,7 +347,13 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 	if fileData != nil && len(fileData) > 0 {
 		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
 	}
-	return &pb.RetrieveFileResp{Code: 0, Partition: toPartitions(hash, blocks, partitionCount)}, nil
+	parts := toPartitions(hash, blocks, partitionCount)
+	return &pb.RetrieveFileResp{Code: 0, Partition: toRetrievePartition(parts)}, nil
+}
+
+func toRetrievePartition(parts []*pb.Partition) []*pb.RetrievePartition {
+	//TODO
+	return nil
 }
 
 func verifySignRemoveReq(req *pb.RemoveReq, pubKey *rsa.PublicKey) error {
