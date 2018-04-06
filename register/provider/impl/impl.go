@@ -8,11 +8,18 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"math"
 	"nebula-tracker/db"
 	"nebula-tracker/register/random"
+	"nebula-tracker/register/sendmail"
+	"net"
+	"regexp"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc/peer"
 
 	"golang.org/x/net/context"
 
@@ -43,14 +50,48 @@ func (self *ProviderRegisterService) decrypt(data []byte) ([]byte, error) {
 	return rsa.DecryptPKCS1v15(rand.Reader, self.PriKey, data)
 }
 
+func getClientIp(ctx context.Context) (string, error) {
+	pr, ok := peer.FromContext(ctx)
+	if !ok {
+		return "", fmt.Errorf("get client ip failed")
+	}
+	if pr.Addr == net.Addr(nil) {
+		return "", fmt.Errorf("client ip peer.Addr is nil")
+	}
+	fmt.Println(pr.Addr.String())
+	addSlice := strings.Split(pr.Addr.String(), ":")
+	return addSlice[0], nil
+}
+
 func (self *ProviderRegisterService) GetPublicKey(ctx context.Context, req *pb.GetPublicKeyReq) (*pb.GetPublicKeyResp, error) {
-	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes}, nil
+	ip, err := getClientIp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes, Ip: ip}, nil
 }
 
 func verifySignRegisterReq(req *pb.RegisterReq, pubKey *rsa.PublicKey) error {
-
-	// TODO
-	return nil
+	hasher := sha256.New()
+	hasher.Write(util_bytes.FromUint64(req.Timestamp))
+	hasher.Write(req.NodeIdEnc)
+	hasher.Write(req.PublicKeyEnc)
+	hasher.Write(req.EncryptKeyEnc)
+	hasher.Write(req.WalletAddressEnc)
+	hasher.Write(req.BillEmailEnc)
+	hasher.Write(util_bytes.FromUint64(req.MainStorageVolume))
+	hasher.Write(util_bytes.FromUint64(req.UpBandwidth))
+	hasher.Write(util_bytes.FromUint64(req.DownBandwidth))
+	hasher.Write(util_bytes.FromUint64(req.TestUpBandwidth))
+	hasher.Write(util_bytes.FromUint64(req.TestDownBandwidth))
+	hasher.Write(util_bytes.FromUint64(math.Float64bits(req.Availability)))
+	hasher.Write(util_bytes.FromUint32(req.Port))
+	hasher.Write(req.HostEnc)
+	hasher.Write(req.DynamicDomainEnc)
+	for _, val := range req.ExtraStorageVolume {
+		hasher.Write(util_bytes.FromUint64(val))
+	}
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
 }
 
 func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (*pb.RegisterResp, error) {
@@ -79,32 +120,81 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if err != nil {
 		return &pb.RegisterResp{Code: 8, ErrMsg: "Public Key can not be parsed"}, nil
 	}
+	if err = verifySignRegisterReq(req, pubKey); err != nil {
+		return &pb.RegisterResp{Code: 9, ErrMsg: "verify sign failed: " + err.Error()}, nil
+	}
 	if req.BillEmailEnc == nil || len(req.BillEmailEnc) == 0 {
-		return &pb.RegisterResp{Code: 9, ErrMsg: "BillEmailEnc is required"}, nil
+		return &pb.RegisterResp{Code: 10, ErrMsg: "BillEmailEnc is required"}, nil
 	}
 	billEmail, err := self.decrypt(req.BillEmailEnc)
 	if err != nil {
-		return &pb.RegisterResp{Code: 10, ErrMsg: "decrypt BillEmailEnc error: " + err.Error()}, nil
+		return &pb.RegisterResp{Code: 11, ErrMsg: "decrypt BillEmailEnc error: " + err.Error()}, nil
+	}
+	email_re := regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	if !email_re.MatchString(string(billEmail)) {
+		return &pb.RegisterResp{Code: 12, ErrMsg: "Bill Email is invalid."}, nil
 	}
 	if db.ProviderExistsBillEmail(string(billEmail)) {
-		return &pb.RegisterResp{Code: 11, ErrMsg: "This Bill Email is already registered"}, nil
+		return &pb.RegisterResp{Code: 13, ErrMsg: "This Bill Email is already registered"}, nil
 	}
 	if req.EncryptKeyEnc == nil || len(req.EncryptKeyEnc) == 0 {
-		return &pb.RegisterResp{Code: 12, ErrMsg: "EncryptKeyEnc is required"}, nil
+		return &pb.RegisterResp{Code: 14, ErrMsg: "EncryptKeyEnc is required"}, nil
 	}
 	encryptKey, err := self.decrypt(req.EncryptKeyEnc)
 	if err != nil {
-		return &pb.RegisterResp{Code: 13, ErrMsg: "decrypt EncryptKeyEnc error: " + err.Error()}, nil
+		return &pb.RegisterResp{Code: 15, ErrMsg: "decrypt EncryptKeyEnc error: " + err.Error()}, nil
 	}
-	// TODDO
+	if req.WalletAddressEnc == nil || len(req.WalletAddressEnc) == 0 {
+		return &pb.RegisterResp{Code: 16, ErrMsg: "WalletAddressEnc is required"}, nil
+	}
+	walletAddress, err := self.decrypt(req.WalletAddressEnc)
+	if err != nil {
+		return &pb.RegisterResp{Code: 17, ErrMsg: "decrypt WalletAddressEnc error: " + err.Error()}, nil
+	}
+	if req.MainStorageVolume < 10000000000 {
+		return &pb.RegisterResp{Code: 18, ErrMsg: "storage volume is too low"}, nil
+	}
+	if req.UpBandwidth < 1000000 || req.TestUpBandwidth < 500000 {
+		return &pb.RegisterResp{Code: 19, ErrMsg: "upload bandwidth is too low"}, nil
+	}
+	if req.DownBandwidth < 4000000 || req.TestDownBandwidth < 2000000 {
+		return &pb.RegisterResp{Code: 20, ErrMsg: "download bandwidth is too low"}, nil
+	}
+	if req.Availability < 0.98 {
+		return &pb.RegisterResp{Code: 21, ErrMsg: "availability must more than 98%."}, nil
+	}
+	if req.Port < 1 || req.Port > 65535 {
+		return &pb.RegisterResp{Code: 22, ErrMsg: "port must between 1 to 65535."}, nil
+	}
+	host, err := self.decrypt(req.HostEnc)
+	if err != nil {
+		return &pb.RegisterResp{Code: 23, ErrMsg: "decrypt HostEnc error: " + err.Error()}, nil
+	}
+	dynamicDomain, err := self.decrypt(req.DynamicDomainEnc)
+	if err != nil {
+		return &pb.RegisterResp{Code: 24, ErrMsg: "decrypt DynamicDomainEnc error: " + err.Error()}, nil
+	}
+	if (host == nil || len(host) == 0) && (dynamicDomain == nil || len(dynamicDomain) == 0) {
+		return &pb.RegisterResp{Code: 24, ErrMsg: "host is required"}, nil
+	}
+	storageVolume := []uint64{req.MainStorageVolume}
+	if req.ExtraStorageVolume != nil && len(req.ExtraStorageVolume) > 0 {
+		storageVolume = make([]uint64, 1, 1+len(req.ExtraStorageVolume))
+		storageVolume[0] = req.MainStorageVolume
+		for i, v := range req.ExtraStorageVolume {
+			storageVolume[i+1] = v
+		}
+	}
+	// TODO
 	randomCode := random.RandomStr(8)
-	db.ProviderRegister(nodeIdStr, publicKey, pubKey, string(billEmail), encryptKey, randomCode)
+	db.ProviderRegister(nodeIdStr, publicKey, pubKey, string(billEmail), encryptKey, string(walletAddress), randomCode)
 	self.sendVerifyCodeToBillEmail(nodeIdStr, string(billEmail), randomCode)
 	return &pb.RegisterResp{Code: 0}, nil
 }
 
 func (self *ProviderRegisterService) sendVerifyCodeToBillEmail(nodeId string, email string, randomCode string) {
-	// TODO
+	sendmail.Send(email, "Nebula Provider Register Bill Email Verify Code", fmt.Sprintf("verify code is %s, sent at %s",
+		randomCode, time.Now().UTC().Format("2006-01-02 15:04:05 UTC")))
 }
 
 func (self *ProviderRegisterService) reGenerateVerifyCode(nodeId string, email string) {

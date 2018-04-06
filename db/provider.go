@@ -11,10 +11,15 @@ import (
 	cache "github.com/patrickmn/go-cache"
 )
 
-func ProviderRegister(nodeId string, pubKeyBytes []byte, pubKey *rsa.PublicKey, contactEmail string, encryptKey []byte, randomCode string) {
+func ProviderRegister(nodeId string, pubKeyBytes []byte, pubKey *rsa.PublicKey, contactEmail string,
+	encryptKey []byte, walletAddress string, storageVolume []uint64, upBandwidth uint64,
+	downBandwidth uint64, testUpBandwidth uint64, testDownBandwidth uint64, availability float64,
+	port uint32, host string, dynamicDomain string, randomCode string) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	saveProvider(tx, nodeId, pubKeyBytes, contactEmail, encryptKey, randomCode)
+	saveProvider(tx, nodeId, pubKeyBytes, contactEmail, encryptKey, walletAddress, storageVolume, upBandwidth,
+		downBandwidth, testUpBandwidth, testDownBandwidth, availability,
+		port, host, dynamicDomain, randomCode)
 	checkErr(tx.Commit())
 	commit = true
 	pubKeyCache.Set(nodeId, pubKey, cache.DefaultExpiration)
@@ -60,11 +65,22 @@ func getProviderPubKeyBytes(tx *sql.Tx, nodeId string) []byte {
 	return nil
 }
 
-func saveProvider(tx *sql.Tx, nodeId string, pubKeyBytes []byte, contactEmail string, encryptKey []byte, randomCode string) {
-	stmt, err := tx.Prepare("insert into PROVIDER(NODE_ID,PUBLIC_KEY,BILL_EMAIL,EMAIL_VERIFIED,ENCRYPT_KEY,CREATION,LAST_MODIFIED,RANDOM_CODE,SEND_TIME,ACTIVE,REMOVED) values ($1, $2, $3, false, $4, now(), now(), $5, now(), false, false)")
+func saveProvider(tx *sql.Tx, nodeId string, pubKeyBytes []byte, contactEmail string, encryptKey []byte,
+	walletAddress string, storageVolume []uint64, upBandwidth uint64,
+	downBandwidth uint64, testUpBandwidth uint64, testDownBandwidth uint64, availability float64,
+	port uint32, host string, dynamicDomain string, randomCode string) {
+	stmt, err := tx.Prepare("insert into PROVIDER(NODE_ID,PUBLIC_KEY,BILL_EMAIL,EMAIL_VERIFIED,ENCRYPT_KEY,WALLET_ADDRESS,CREATION,LAST_MODIFIED,RANDOM_CODE,SEND_TIME,ACTIVE,REMOVED,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME) values ($1, $2, $3, false, $4, $5, now(), now(), $6, now(), false, false,$7,$8,$9,$10,$11,$12,$13,$14," + arrayClause(len(storageVolume), 15) + ")")
 	defer stmt.Close()
 	checkErr(err)
-	_, err = stmt.Exec(nodeId, pubKeyBytes, contactEmail, encryptKey, randomCode)
+	args := make([]interface{}, 14, len(storageVolume)+14)
+	args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10],
+		args[11], args[12], args[13] = nodeId, pubKeyBytes, contactEmail, encryptKey, walletAddress,
+		randomCode, upBandwidth, downBandwidth, testUpBandwidth, testDownBandwidth, availability,
+		port, host, dynamicDomain
+	for _, val := range storageVolume {
+		args = append(args, val)
+	}
+	_, err = stmt.Exec(args...)
 	checkErr(err)
 }
 

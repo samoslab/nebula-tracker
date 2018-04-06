@@ -8,10 +8,12 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"time"
 
 	"nebula-tracker/db"
 	"nebula-tracker/register/random"
+	"nebula-tracker/register/sendmail"
 
 	log "github.com/sirupsen/logrus"
 	pb "github.com/spolabs/nebula/tracker/register/client/pb"
@@ -89,7 +91,8 @@ func (self *ClientRegisterService) Register(ctx context.Context, req *pb.Registe
 }
 
 func (self *ClientRegisterService) sendVerifyCodeToContactEmail(nodeId string, email string, randomCode string) {
-	// TODO
+	sendmail.Send(email, "Nebula Client Register Contact Email Verify Code", fmt.Sprintf("verify code is %s, sent at %s",
+		randomCode, time.Now().UTC().Format("2006-01-02 15:04:05 UTC")))
 }
 
 func (self *ClientRegisterService) reGenerateVerifyCode(nodeId string, email string) {

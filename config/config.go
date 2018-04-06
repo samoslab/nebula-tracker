@@ -14,6 +14,7 @@ var trackerConfig *TrackerConfig
 type TrackerConfig struct {
 	Db       Db
 	Server   Server
+	Smtps    Smtps
 	TestMode bool `default:"false"`
 }
 
@@ -31,7 +32,14 @@ type Db struct {
 
 type Server struct {
 	ListenIp   string `default:"127.0.0.1"`
-	ListenPort int    `default:"6666"`
+	ListenPort int    `default:"6677"`
+}
+
+type Smtps struct {
+	Host     string `default:"smtp.163.com"`
+	Port     int    `default:"465"`
+	Username string `default:"silveradmin@163.com"`
+	Password string `default:"unknown"`
 }
 
 func GetTrackerConfig() *TrackerConfig {
