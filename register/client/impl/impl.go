@@ -101,7 +101,12 @@ func (self *ClientRegisterService) reGenerateVerifyCode(nodeId string, email str
 	self.sendVerifyCodeToContactEmail(nodeId, email, randomCode)
 }
 
+const verify_sign_expired = 15
+
 func verifySignVerifyContactEmailReq(req *pb.VerifyContactEmailReq, pubKey *rsa.PublicKey) error {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return errors.New("auth info expired， please check your system time")
+	}
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -145,6 +150,9 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 }
 
 func verifySignResendVerifyCodeReq(req *pb.ResendVerifyCodeReq, pubKey *rsa.PublicKey) error {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return errors.New("auth info expired， please check your system time")
+	}
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -165,7 +173,7 @@ func (self *ClientRegisterService) ResendVerifyCode(ctx context.Context, req *pb
 		return nil, errors.New("this node id is not been registered")
 	}
 	if emailVerified {
-		return nil, errors.New("already virefied！")
+		return nil, errors.New("already verified！")
 	}
 	self.reGenerateVerifyCode(nodeIdStr, contactEmail)
 	return &pb.ResendVerifyCodeResp{Success: true}, nil

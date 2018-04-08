@@ -170,24 +170,104 @@ func updateProviderVerifyCode(tx *sql.Tx, nodeId string, randomCode string) {
 	}
 }
 
-var providerCache = cache.New(20*time.Minute, 10*time.Minute)
+// var providerCache = cache.New(20*time.Minute, 10*time.Minute)
 
 func ProviderGetPubKey(nodeId []byte) *rsa.PublicKey {
 	nodeIdStr := base64.StdEncoding.EncodeToString(nodeId)
-	pubKey, found := providerCache.Get(nodeIdStr)
-	if found {
-		b, ok := pubKey.(*rsa.PublicKey)
-		if !ok {
-			panic(errors.New("Error type get from cache"))
-		}
-		return b
-	} else {
-		pubKeyBytes := getPublicKeyBytes(nodeIdStr)
-		pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
-		if err != nil {
-			panic(err)
-		}
-		providerCache.Set(nodeIdStr, pubKey, cache.DefaultExpiration)
-		return pubKey
+	// pubKey, found := providerCache.Get(nodeIdStr)
+	// if found {
+	// 	b, ok := pubKey.(*rsa.PublicKey)
+	// 	if !ok {
+	// 		panic(errors.New("Error type get from cache"))
+	// 	}
+	// 	return b
+	// } else {
+	pubKeyBytes := getPublicKeyBytes(nodeIdStr)
+	pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
+	if err != nil {
+		panic(err)
 	}
+	// providerCache.Set(nodeIdStr, pubKey, cache.DefaultExpiration)
+	return pubKey
+	// }
+}
+
+type ProviderInfo struct {
+	NodeId            string
+	NodeIdBytes       []byte
+	PublicKey         []byte
+	BillEmail         string
+	EncryptKey        []byte
+	WalletAddress     string
+	UpBandwidth       uint64
+	DownBandwidth     uint64
+	TestUpBandwidth   uint64
+	TestDownBandwidth uint64
+	Availability      float64
+	Port              uint32
+	Host              string
+	DynamicDomain     string
+	StorageVolume     []uint64
+}
+
+func ProviderFindOne(nodeId string) (p *ProviderInfo) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	p = providerFindOne(tx, nodeId)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func providerFindOne(tx *sql.Tx, nodeId string) *ProviderInfo {
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME where NODE_ID=$1", nodeId)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		return scanProviderInfo(rows)
+	}
+	return nil
+}
+
+func scanProviderInfo(rows *sql.Rows) *ProviderInfo {
+	var pi ProviderInfo
+	var host, dynamicDomain sql.NullString
+	var storageVolume NullUint64Slice
+	err := rows.Scan(&pi.NodeId, &pi.PublicKey, &pi.BillEmail, &pi.EncryptKey, &pi.WalletAddress, &pi.UpBandwidth, &pi.DownBandwidth, &pi.TestUpBandwidth, &pi.TestDownBandwidth,
+		&pi.Availability, &pi.Port, &host, &dynamicDomain, storageVolume)
+	checkErr(err)
+	if host.Valid {
+		pi.Host = host.String
+	}
+	if dynamicDomain.Valid {
+		pi.DynamicDomain = dynamicDomain.String
+	}
+	if storageVolume.Valid {
+		pi.StorageVolume = storageVolume.Uint64Slice
+	}
+	pi.NodeIdBytes, err = base64.StdEncoding.DecodeString(pi.NodeId)
+	if err != nil {
+		panic(err)
+	}
+	return &pi
+}
+
+func ProviderFindAll() (slice []ProviderInfo) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	slice = providerFindAll(tx)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func providerFindAll(tx *sql.Tx) []ProviderInfo {
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
+	checkErr(err)
+	defer rows.Close()
+	res := make([]ProviderInfo, 0, 16)
+	for rows.Next() {
+		res = append(res, *scanProviderInfo(rows))
+	}
+	return res
 }

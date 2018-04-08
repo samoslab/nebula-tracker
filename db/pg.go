@@ -118,7 +118,6 @@ type NullStrSlice struct {
 // Scan implements the Scanner interface.
 func (self *NullStrSlice) Scan(value interface{}) error {
 	if value == nil {
-		fmt.Println("nil")
 		return nil
 	}
 	var t []byte
@@ -127,17 +126,16 @@ func (self *NullStrSlice) Scan(value interface{}) error {
 		return nil
 	}
 	str := string(t)
-	fmt.Println(str)
 
 	l := len(str)
 	if str[0:2] != `{"` || str[l-2:l] != `"}` {
 		panic(errors.New(str + " format wrong"))
 	}
 	self.StrSlice = strings.Split(str[2:l-2], `","`)
-	// for i, _ := range self.StrSlice {
-	// self.StrSlice[i] = strings.Replace(self.StrSlice[i], `\"`, `"`, -1)
-	// self.StrSlice[i] = strings.Replace(self.StrSlice[i], `\\`, `\`, -1)
-	// }
+	for i, _ := range self.StrSlice {
+		self.StrSlice[i] = strings.Replace(self.StrSlice[i], `\"`, `"`, -1)
+		self.StrSlice[i] = strings.Replace(self.StrSlice[i], `\\`, `\`, -1)
+	}
 	return nil
 }
 
@@ -147,4 +145,36 @@ func (self NullStrSlice) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return self.StrSlice, nil
+}
+
+type NullUint64Slice struct {
+	Uint64Slice []uint64
+	Valid       bool
+}
+
+// Scan implements the Scanner interface.
+func (self *NullUint64Slice) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	var t []byte
+	t, self.Valid = value.([]byte)
+	if len(t) < 2 {
+		return nil
+	}
+	str := string(t)
+	l := len(str)
+	if str[0:1] != `{` || str[l-1:l] != `}` {
+		panic(errors.New(str + " format wrong"))
+	}
+	strSlice := strings.Split(str[1:l-1], `,`)
+	self.Uint64Slice = make([]uint64, len(strSlice))
+	var err error
+	for i, _ := range strSlice {
+		self.Uint64Slice[i], err = strconv.ParseUint(strSlice[i], 10, 0)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return nil
 }

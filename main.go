@@ -9,6 +9,7 @@ import (
 	"nebula-tracker/config"
 	"nebula-tracker/db"
 	metadata_impl "nebula-tracker/metadata/impl"
+	chooser "nebula-tracker/metadata/provider_chooser"
 	register_cimpl "nebula-tracker/register/client/impl"
 	register_pimpl "nebula-tracker/register/provider/impl"
 
@@ -28,6 +29,8 @@ func main() {
 	}
 	dbo := db.OpenDb(&conf.Db)
 	defer dbo.Close()
+	chooser.StartAutoUpdate()
+	defer chooser.StopAutoUpdate()
 	grpcServer := grpc.NewServer()
 	pbrp.RegisterProviderRegisterServiceServer(grpcServer, register_pimpl.NewProviderRegisterService())
 	pbrc.RegisterClientRegisterServiceServer(grpcServer, register_cimpl.NewClientRegisterService())

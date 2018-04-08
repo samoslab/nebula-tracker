@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -107,7 +108,7 @@ func fileOwnerMkFolders(tx *sql.Tx, nodeId string, parent []byte, folders []stri
 	hash := &sql.NullString{}
 	for _, folder := range folders {
 		firstDuplicationName = folder
-		saveFileOwner(tx, nodeId, true, folder, parent, modTime, hash, 0) // TODO duplication of name
+		saveFileOwner(tx, nodeId, true, folder, parent, modTime, hash, 0)
 	}
 	return ""
 }
@@ -200,8 +201,27 @@ func FileOwnerListOfPath(nodeId string, parentId []byte, pageSize uint32, pageNu
 	return
 }
 
-func FileOwnerRemove(nodeId string, pathId []byte, recursive bool) bool {
+func FileOwnerRemove(nodeId string, pathId []byte, recursive bool) (res bool) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	if recursive || fileOwnerListOfPathCount(tx, nodeId, pathId) == 0 {
+		fileOwnerRemove(tx, nodeId, pathId)
+		res = true
+	}
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
 
-	// TODO
-	return false
+func fileOwnerRemove(tx *sql.Tx, nodeId string, pathId []byte) {
+	stmt, err := tx.Prepare("update FILE_OWNER set REMOVED=true where ID=$1 and NODE_ID=$2")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(pathId, nodeId)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	if cnt == 0 {
+		panic(errors.New("no record found"))
+	}
 }

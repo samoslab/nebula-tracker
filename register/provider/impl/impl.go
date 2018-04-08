@@ -19,10 +19,12 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
 	"golang.org/x/net/context"
 
+	provider_pb "github.com/spolabs/nebula/provider/pb"
 	pb "github.com/spolabs/nebula/tracker/register/provider/pb"
 	util_bytes "github.com/spolabs/nebula/util/bytes"
 	util_hash "github.com/spolabs/nebula/util/hash"
@@ -72,6 +74,9 @@ func (self *ProviderRegisterService) GetPublicKey(ctx context.Context, req *pb.G
 }
 
 func verifySignRegisterReq(req *pb.RegisterReq, pubKey *rsa.PublicKey) error {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return errors.New("auth info expired， please check your system time")
+	}
 	hasher := sha256.New()
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
 	hasher.Write(req.NodeIdEnc)
@@ -175,7 +180,24 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 		return &pb.RegisterResp{Code: 24, ErrMsg: "decrypt DynamicDomainEnc error: " + err.Error()}, nil
 	}
 	if (host == nil || len(host) == 0) && (dynamicDomain == nil || len(dynamicDomain) == 0) {
-		return &pb.RegisterResp{Code: 24, ErrMsg: "host is required"}, nil
+		return &pb.RegisterResp{Code: 25, ErrMsg: "host is required"}, nil
+	}
+	var hostStr string
+	if host != nil && len(host) > 0 {
+		hostStr = string(host)
+	} else if dynamicDomain != nil && len(dynamicDomain) > 0 {
+		hostStr = string(dynamicDomain)
+	}
+	providerAddr := fmt.Sprintf("%s:%d", hostStr, req.Port)
+	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+	if err != nil {
+		return &pb.RegisterResp{Code: 26, ErrMsg: "can not connect, error: " + err.Error()}, nil
+	}
+	defer conn.Close()
+	psc := provider_pb.NewProviderServiceClient(conn)
+	err = pingProvider(psc)
+	if err != nil {
+		return &pb.RegisterResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
 	}
 	storageVolume := []uint64{req.MainStorageVolume}
 	if req.ExtraStorageVolume != nil && len(req.ExtraStorageVolume) > 0 {
@@ -185,13 +207,19 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 			storageVolume[i+1] = v
 		}
 	}
-	// TODO
 	randomCode := random.RandomStr(8)
 	db.ProviderRegister(nodeIdStr, publicKey, pubKey, string(billEmail), encryptKey, string(walletAddress), storageVolume, req.UpBandwidth,
 		req.DownBandwidth, req.TestUpBandwidth, req.TestDownBandwidth, req.Availability,
 		req.Port, string(host), string(dynamicDomain), randomCode)
 	self.sendVerifyCodeToBillEmail(nodeIdStr, string(billEmail), randomCode)
 	return &pb.RegisterResp{Code: 0}, nil
+}
+
+func pingProvider(client provider_pb.ProviderServiceClient) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err := client.Ping(ctx, &provider_pb.PingReq{})
+	return err
 }
 
 func (self *ProviderRegisterService) sendVerifyCodeToBillEmail(nodeId string, email string, randomCode string) {
@@ -205,7 +233,12 @@ func (self *ProviderRegisterService) reGenerateVerifyCode(nodeId string, email s
 	self.sendVerifyCodeToBillEmail(nodeId, email, randomCode)
 }
 
+const verify_sign_expired = 15
+
 func verifySignVerifyVerifyBillEmailReq(req *pb.VerifyBillEmailReq, pubKey *rsa.PublicKey) error {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return errors.New("auth info expired， please check your system time")
+	}
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -248,6 +281,9 @@ func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *p
 	return &pb.VerifyBillEmailResp{Code: 0}, nil
 }
 func verifySignResendVerifyCodeReq(req *pb.ResendVerifyCodeReq, pubKey *rsa.PublicKey) error {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return errors.New("auth info expired， please check your system time")
+	}
 	hasher := sha256.New()
 	hasher.Write(req.NodeId)
 	hasher.Write(util_bytes.FromUint64(req.Timestamp))
@@ -268,7 +304,7 @@ func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *
 		return nil, errors.New("this node id is not been registered")
 	}
 	if emailVerified {
-		return nil, errors.New("already virefied！")
+		return nil, errors.New("already verified！")
 	}
 	self.reGenerateVerifyCode(nodeIdStr, billEmail)
 	return &pb.ResendVerifyCodeResp{Success: true}, nil
