@@ -13,10 +13,10 @@ import (
 	register_cimpl "nebula-tracker/register/client/impl"
 	register_pimpl "nebula-tracker/register/provider/impl"
 
-	pbcc "github.com/spolabs/nebula/tracker/collector/client/pb"
-	pbm "github.com/spolabs/nebula/tracker/metadata/pb"
-	pbrc "github.com/spolabs/nebula/tracker/register/client/pb"
-	pbrp "github.com/spolabs/nebula/tracker/register/provider/pb"
+	pbcc "github.com/samoslab/nebula/tracker/collector/client/pb"
+	pbm "github.com/samoslab/nebula/tracker/metadata/pb"
+	pbrc "github.com/samoslab/nebula/tracker/register/client/pb"
+	pbrp "github.com/samoslab/nebula/tracker/register/provider/pb"
 
 	"google.golang.org/grpc"
 )

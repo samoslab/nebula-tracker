@@ -21,11 +21,11 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/spolabs/nebula/provider/node"
-	provider_pb "github.com/spolabs/nebula/provider/pb"
-	pb "github.com/spolabs/nebula/tracker/register/provider/pb"
-	util_hash "github.com/spolabs/nebula/util/hash"
-	util_rsa "github.com/spolabs/nebula/util/rsa"
+	"github.com/samoslab/nebula/provider/node"
+	provider_pb "github.com/samoslab/nebula/provider/pb"
+	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
+	util_hash "github.com/samoslab/nebula/util/hash"
+	util_rsa "github.com/samoslab/nebula/util/rsa"
 )
 
 type ProviderRegisterService struct {

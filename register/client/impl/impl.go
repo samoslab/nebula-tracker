@@ -14,11 +14,11 @@ import (
 	"nebula-tracker/register/random"
 	"nebula-tracker/register/sendmail"
 
+	pb "github.com/samoslab/nebula/tracker/register/client/pb"
 	log "github.com/sirupsen/logrus"
-	pb "github.com/spolabs/nebula/tracker/register/client/pb"
 	"golang.org/x/net/context"
 
-	util_hash "github.com/spolabs/nebula/util/hash"
+	util_hash "github.com/samoslab/nebula/util/hash"
 )
 
 type ClientRegisterService struct {

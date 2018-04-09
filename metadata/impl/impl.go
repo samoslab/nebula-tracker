@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/samoslab/nebula/tracker/metadata/pb"
+	util_bytes "github.com/samoslab/nebula/util/bytes"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
-	pb "github.com/spolabs/nebula/tracker/metadata/pb"
-	util_bytes "github.com/spolabs/nebula/util/bytes"
 	"golang.org/x/net/context"
 )
 

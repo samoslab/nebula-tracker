@@ -7,9 +7,9 @@ import (
 	"io"
 	"nebula-tracker/db"
 
+	pb "github.com/samoslab/nebula/tracker/collector/client/pb"
+	util_bytes "github.com/samoslab/nebula/util/bytes"
 	log "github.com/sirupsen/logrus"
-	pb "github.com/spolabs/nebula/tracker/collector/client/pb"
-	util_bytes "github.com/spolabs/nebula/util/bytes"
 )
 
 type ClientCollectorService struct {
