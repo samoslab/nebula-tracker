@@ -1,15 +1,13 @@
 package impl
 
 import (
-	"crypto"
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math"
 	"nebula-tracker/db"
 	"nebula-tracker/register/random"
 	"nebula-tracker/register/sendmail"
@@ -19,15 +17,15 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
 	"golang.org/x/net/context"
 
+	"github.com/spolabs/nebula/provider/node"
 	provider_pb "github.com/spolabs/nebula/provider/pb"
 	pb "github.com/spolabs/nebula/tracker/register/provider/pb"
-	util_bytes "github.com/spolabs/nebula/util/bytes"
 	util_hash "github.com/spolabs/nebula/util/hash"
+	util_rsa "github.com/spolabs/nebula/util/rsa"
 )
 
 type ProviderRegisterService struct {
@@ -49,7 +47,7 @@ func NewProviderRegisterService() *ProviderRegisterService {
 }
 
 func (self *ProviderRegisterService) decrypt(data []byte) ([]byte, error) {
-	return rsa.DecryptPKCS1v15(rand.Reader, self.PriKey, data)
+	return util_rsa.DecryptLong(self.PriKey, data, node.RSA_KEY_BYTES)
 }
 
 func getClientIp(ctx context.Context) (string, error) {
@@ -60,7 +58,6 @@ func getClientIp(ctx context.Context) (string, error) {
 	if pr.Addr == net.Addr(nil) {
 		return "", fmt.Errorf("client ip peer.Addr is nil")
 	}
-	fmt.Println(pr.Addr.String())
 	addSlice := strings.Split(pr.Addr.String(), ":")
 	return addSlice[0], nil
 }
@@ -71,32 +68,6 @@ func (self *ProviderRegisterService) GetPublicKey(ctx context.Context, req *pb.G
 		return nil, err
 	}
 	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes, Ip: ip}, nil
-}
-
-func verifySignRegisterReq(req *pb.RegisterReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write(req.NodeIdEnc)
-	hasher.Write(req.PublicKeyEnc)
-	hasher.Write(req.EncryptKeyEnc)
-	hasher.Write(req.WalletAddressEnc)
-	hasher.Write(req.BillEmailEnc)
-	hasher.Write(util_bytes.FromUint64(req.MainStorageVolume))
-	hasher.Write(util_bytes.FromUint64(req.UpBandwidth))
-	hasher.Write(util_bytes.FromUint64(req.DownBandwidth))
-	hasher.Write(util_bytes.FromUint64(req.TestUpBandwidth))
-	hasher.Write(util_bytes.FromUint64(req.TestDownBandwidth))
-	hasher.Write(util_bytes.FromUint64(math.Float64bits(req.Availability)))
-	hasher.Write(util_bytes.FromUint32(req.Port))
-	hasher.Write(req.HostEnc)
-	hasher.Write(req.DynamicDomainEnc)
-	for _, val := range req.ExtraStorageVolume {
-		hasher.Write(util_bytes.FromUint64(val))
-	}
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
 }
 
 func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (*pb.RegisterResp, error) {
@@ -118,14 +89,17 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if err != nil {
 		return &pb.RegisterResp{Code: 6, ErrMsg: "decrypt PublicKeyEnc error: " + err.Error()}, nil
 	}
-	if len(nodeId) != 20 || !util_bytes.SameBytes(util_hash.Sha1(publicKey), nodeId) {
+	if len(nodeId) != 20 || !bytes.Equal(util_hash.Sha1(publicKey), nodeId) {
 		return &pb.RegisterResp{Code: 7, ErrMsg: "Public Key is not match NodeId"}, nil
 	}
 	pubKey, err := x509.ParsePKCS1PublicKey(publicKey)
 	if err != nil {
 		return &pb.RegisterResp{Code: 8, ErrMsg: "Public Key can not be parsed"}, nil
 	}
-	if err = verifySignRegisterReq(req, pubKey); err != nil {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.RegisterResp{Code: 28, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err = req.VerifySign(pubKey); err != nil {
 		return &pb.RegisterResp{Code: 9, ErrMsg: "verify sign failed: " + err.Error()}, nil
 	}
 	if req.BillEmailEnc == nil || len(req.BillEmailEnc) == 0 {
@@ -182,23 +156,23 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if (host == nil || len(host) == 0) && (dynamicDomain == nil || len(dynamicDomain) == 0) {
 		return &pb.RegisterResp{Code: 25, ErrMsg: "host is required"}, nil
 	}
-	var hostStr string
-	if host != nil && len(host) > 0 {
-		hostStr = string(host)
-	} else if dynamicDomain != nil && len(dynamicDomain) > 0 {
-		hostStr = string(dynamicDomain)
-	}
-	providerAddr := fmt.Sprintf("%s:%d", hostStr, req.Port)
-	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
-	if err != nil {
-		return &pb.RegisterResp{Code: 26, ErrMsg: "can not connect, error: " + err.Error()}, nil
-	}
-	defer conn.Close()
-	psc := provider_pb.NewProviderServiceClient(conn)
-	err = pingProvider(psc)
-	if err != nil {
-		return &pb.RegisterResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
-	}
+	// var hostStr string
+	// if host != nil && len(host) > 0 {
+	// 	hostStr = string(host)
+	// } else if dynamicDomain != nil && len(dynamicDomain) > 0 {
+	// 	hostStr = string(dynamicDomain)
+	// }
+	// providerAddr := fmt.Sprintf("%s:%d", hostStr, req.Port)
+	// conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+	// if err != nil {
+	// 	return &pb.RegisterResp{Code: 26, ErrMsg: "can not connect, error: " + err.Error()}, nil
+	// }
+	// defer conn.Close()
+	// psc := provider_pb.NewProviderServiceClient(conn)
+	// err = pingProvider(psc)
+	// if err != nil {
+	// 	return &pb.RegisterResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
+	// }
 	storageVolume := []uint64{req.MainStorageVolume}
 	if req.ExtraStorageVolume != nil && len(req.ExtraStorageVolume) > 0 {
 		storageVolume = make([]uint64, 1, 1+len(req.ExtraStorageVolume))
@@ -235,17 +209,6 @@ func (self *ProviderRegisterService) reGenerateVerifyCode(nodeId string, email s
 
 const verify_sign_expired = 15
 
-func verifySignVerifyVerifyBillEmailReq(req *pb.VerifyBillEmailReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.VerifyCode))
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
-}
-
 func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *pb.VerifyBillEmailReq) (*pb.VerifyBillEmailResp, error) {
 	if req.NodeId == nil {
 		return &pb.VerifyBillEmailResp{Code: 2, ErrMsg: "NodeId is required"}, nil
@@ -257,9 +220,11 @@ func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *p
 	if pubKey == nil {
 		return &pb.VerifyBillEmailResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-
-	if err := verifySignVerifyVerifyBillEmailReq(req, pubKey); err != nil {
-		return &pb.VerifyBillEmailResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.VerifyBillEmailResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.VerifyBillEmailResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	found, billEmail, emailVerified, randomCode, sendTime := db.ProviderGetRandomCode(nodeIdStr)
@@ -280,22 +245,16 @@ func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *p
 	db.ProviderUpdateEmailVerified(nodeIdStr)
 	return &pb.VerifyBillEmailResp{Code: 0}, nil
 }
-func verifySignResendVerifyCodeReq(req *pb.ResendVerifyCodeReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
-}
+
 func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (*pb.ResendVerifyCodeResp, error) {
 	pubKey := db.ProviderGetPubKey(req.NodeId)
 	if pubKey == nil {
 		return nil, errors.New("this node id is not been registered")
 	}
-
-	if err := verifySignResendVerifyCodeReq(req, pubKey); err != nil {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return nil, errors.New("auth info expired， please check your system time")
+	}
+	if err := req.VerifySign(pubKey); err != nil {
 		return nil, err
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)

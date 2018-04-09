@@ -1,7 +1,6 @@
 package impl
 
 import (
-	"crypto"
 	"crypto/hmac"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -29,27 +28,17 @@ func NewMatadataService() *MatadataService {
 	return &MatadataService{}
 }
 
-func verifySignMkFolderReq(req *pb.MkFolderReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.Path))
-	for _, f := range req.Folder {
-		hasher.Write([]byte(f))
-	}
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
-}
-
 func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (*pb.MkFolderResp, error) {
+	// TODO support path Id
 	checkRes, pubKey := checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.MkFolderResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
-	if err := verifySignMkFolderReq(req, pubKey); err != nil {
-		return &pb.MkFolderResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.MkFolderResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.MkFolderResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	resobj, parentId := findPathId(nodeIdStr, req.Path)
@@ -82,39 +71,17 @@ func checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey) {
 	return nil, pubKey
 }
 
-func verifySignCheckFileExistReq(req *pb.CheckFileExistReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.FilePath))
-	hasher.Write(req.FileHash)
-	hasher.Write(util_bytes.FromUint64(req.FileSize))
-	hasher.Write([]byte(req.FileName))
-	hasher.Write(util_bytes.FromUint64(req.FileModTime))
-	hasher.Write(req.FileData)
-	if req.Interactive {
-		hasher.Write([]byte{1})
-	} else {
-		hasher.Write([]byte{0})
-	}
-	if req.NewVersion {
-		hasher.Write([]byte{1})
-	} else {
-		hasher.Write([]byte{0})
-	}
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
-}
 func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFileExistReq) (*pb.CheckFileExistResp, error) {
 	checkRes, pubKey := checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.CheckFileExistResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.CheckFileExistResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
 	// TODO new Version
-	if err := verifySignCheckFileExistReq(req, pubKey); err != nil {
-		return &pb.CheckFileExistResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.CheckFileExistResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	resobj, parentId := findPathId(nodeIdStr, req.FilePath)
@@ -195,28 +162,15 @@ func prepareReplicaProvider(num uint32, fileHash []byte, fileSize uint64) []*pb.
 	res := make([]*pb.ReplicaProvider, 0, len(pis))
 	ts := uint64(time.Now().Unix())
 	for _, pi := range pis {
-		rp := pb.ReplicaProvider{NodeId: pi.NodeIdBytes,
+		ticket := uuidStr()
+		res = append(res, &pb.ReplicaProvider{NodeId: pi.NodeIdBytes,
 			Port:      pi.Port,
+			Server:    pi.Server(),
 			Timestamp: ts,
-			Ticket:    uuidStr()}
-		if pi.Host != "" {
-			rp.Server = pi.Host
-		} else {
-			rp.Server = pi.DynamicDomain
-		}
-		rp.Auth = generateReplicaStoreAuth(&pi, &rp, fileHash, fileSize)
+			Ticket:    ticket,
+			Auth:      genProviderStoreAuth(pi.PublicKey, fileHash, fileSize, ts, ticket)})
 	}
 	return res
-}
-
-func generateReplicaStoreAuth(pi *db.ProviderInfo, rp *pb.ReplicaProvider, fileHash []byte, fileSize uint64) []byte {
-	hash := hmac.New(sha256.New, pi.PublicKey)
-	hash.Write([]byte("Store"))
-	hash.Write(fileHash)
-	hash.Write(util_bytes.FromUint64(fileSize))
-	hash.Write(util_bytes.FromUint64(rp.Timestamp))
-	hash.Write([]byte(rp.Ticket))
-	return hash.Sum(nil)
 }
 
 const embed_metadata_max_file_size = 8192
@@ -233,92 +187,92 @@ func fixFileName(name string) string {
 
 const verify_sign_expired = 15
 
-func verifySignUploadFilePrepareReq(req *pb.UploadFilePrepareReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write(req.FileHash)
-	hasher.Write(util_bytes.FromUint64(req.FileSize))
-	for _, p := range req.Piece {
-		hasher.Write(p.Hash)
-		hasher.Write(util_bytes.FromUint32(p.Size))
-	}
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
-}
 func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.UploadFilePrepareReq) (*pb.UploadFilePrepareResp, error) {
 	checkRes, pubKey := checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return nil, errors.New(checkRes.ErrMsg)
 	}
-
-	if err := verifySignUploadFilePrepareReq(req, pubKey); err != nil {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return nil, errors.New("auth info expired， please check your system time")
+	}
+	if err := req.VerifySign(pubKey); err != nil {
 		return nil, err
 	}
-	if req.Piece == nil || len(req.Piece) == 0 {
-		return nil, errors.New("piece Data is required")
+	if len(req.Partition) == 0 {
+		return nil, errors.New("partition Data is required")
 	}
 	providerCnt := chooser.Count()
-	if len(req.Piece) > providerCnt {
-		return nil, errors.New("no enough provider")
-	}
-	backupProCnt := 10
-	if providerCnt-len(req.Piece) < backupProCnt {
-		backupProCnt = providerCnt - len(req.Piece)
-	}
-
-	// nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	return &pb.UploadFilePrepareResp{Provider: prepareErasureCodeProvider(req.Piece, backupProCnt)}, nil
-}
-
-func prepareErasureCodeProvider(piece []*pb.PieceHashAndSize, backupProCnt int) []*pb.ErasureCodeProvider {
-	// TODO
-	return nil
-}
-
-func verifySignUploadFileDoneReq(req *pb.UploadFileDoneReq, pubKey *rsa.PublicKey) (storeVolume uint64, err error) {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return 0, errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.FilePath))
-	hasher.Write(req.FileHash)
-	hasher.Write(util_bytes.FromUint64(req.FileSize))
-	hasher.Write([]byte(req.FileName))
-	hasher.Write(util_bytes.FromUint64(req.FileModTime))
+	pieceCnt := len(req.Partition[0].Piece)
 	for _, p := range req.Partition {
-		for _, b := range p.Block {
-			hasher.Write(b.Hash)
-			hasher.Write(util_bytes.FromUint32(b.Size))
-			hasher.Write(util_bytes.FromUint32(b.BlockSeq))
-			if b.Checksum {
-				hasher.Write([]byte{1})
-			} else {
-				hasher.Write([]byte{0})
-			}
-			for _, by := range b.StoreNodeId {
-				hasher.Write(by)
-			}
-			// check size cheating, verify by auth
-			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
+		if len(p.Piece) == 0 {
+			return nil, errors.New("piece Data is required")
+		}
+		if len(p.Piece) > providerCnt {
+			return nil, errors.New("not enough provider")
+		}
+		if len(p.Piece) != pieceCnt {
+			return nil, errors.New("all parition must have same number piece")
 		}
 	}
-	if req.Interactive {
-		hasher.Write([]byte{1})
-	} else {
-		hasher.Write([]byte{0})
+	backupProCnt := 10
+	if providerCnt-pieceCnt < backupProCnt {
+		backupProCnt = providerCnt - pieceCnt
 	}
-	if req.NewVersion {
-		hasher.Write([]byte{1})
-	} else {
-		hasher.Write([]byte{0})
+	return &pb.UploadFilePrepareResp{Partition: prepareErasureCodeProvider(req.Partition, pieceCnt, backupProCnt)}, nil
+}
+
+func prepareErasureCodeProvider(partition []*pb.SplitPartition, pieceCnt int, backupProCnt int) []*pb.ErasureCodePartition {
+	ts := uint64(time.Now().Unix())
+	res := make([]*pb.ErasureCodePartition, 0, len(partition))
+	for _, part := range partition {
+		pis := chooser.Choose(uint32(pieceCnt + backupProCnt))
+		if len(pis) < pieceCnt {
+			panic("not enough provider")
+		}
+		proAuth := make([]*pb.BlockProviderAuth, 0, len(pis))
+		for i, piece := range part.Piece {
+			pi := pis[i]
+			ticket := uuidStr()
+			proAuth = append(proAuth, &pb.BlockProviderAuth{NodeId: pi.NodeIdBytes,
+				Server: pi.Server(),
+				Port:   pi.Port,
+				Spare:  false,
+				HashAuth: []*pb.PieceHashAuth{&pb.PieceHashAuth{Hash: piece.Hash,
+					Size:   piece.Size,
+					Ticket: ticket,
+					Auth:   genProviderStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)}}})
+		}
+		if len(pis) == pieceCnt {
+			continue
+		}
+		each := pieceCnt * 2 / (len(pis) - pieceCnt)
+		if len(pis)-pieceCnt == 1 {
+			each = pieceCnt
+		} else if pieceCnt*2%(len(pis)-pieceCnt) != 0 {
+			each += 1
+		}
+		for i := pieceCnt; i < len(pis); i++ {
+			pi := pis[i]
+			proAuth = append(proAuth, &pb.BlockProviderAuth{NodeId: pi.NodeIdBytes,
+				Server:   pi.Server(),
+				Port:     pi.Port,
+				Spare:    true,
+				HashAuth: make([]*pb.PieceHashAuth, 0, each)})
+		}
+
+		for i := 0; i < pieceCnt*2; i++ {
+			pi := pis[pieceCnt+i/each]
+			bpa := proAuth[pieceCnt+i/each]
+			piece := part.Piece[i%pieceCnt]
+			ticket := uuidStr()
+			bpa.HashAuth = append(bpa.HashAuth, &pb.PieceHashAuth{Hash: piece.Hash,
+				Size:   piece.Size,
+				Ticket: ticket,
+				Auth:   genProviderStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)})
+		}
+		res = append(res, &pb.ErasureCodePartition{ProviderAuth: proAuth, Timestamp: ts})
 	}
-	err = rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
-	return
+	return res
 }
 
 func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadFileDoneReq) (*pb.UploadFileDoneResp, error) {
@@ -327,9 +281,12 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	if checkRes != nil {
 		return &pb.UploadFileDoneResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
-	storeVolume, err := verifySignUploadFileDoneReq(req, pubKey)
-	if err != nil {
-		return &pb.UploadFileDoneResp{Code: 5, ErrMsg: "Verify Sign failed"}, nil
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.UploadFileDoneResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.UploadFileDoneResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	resobj, parentId := findPathId(nodeIdStr, req.FilePath)
@@ -351,26 +308,15 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	if err != nil {
 		return &pb.UploadFileDoneResp{Code: 9, ErrMsg: err.Error()}, nil
 	}
+	var storeVolume uint64
+	for _, p := range req.Partition {
+		for _, b := range p.Block {
+			// check size cheating, verify by auth
+			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
+		}
+	}
 	db.FileSaveDone(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId, len(req.Partition), blocks, storeVolume)
 	return &pb.UploadFileDoneResp{Code: 0}, nil
-}
-func verifySignListFilesReq(req *pb.ListFilesReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.Path))
-	hasher.Write(util_bytes.FromUint32(req.PageSize))
-	hasher.Write(util_bytes.FromUint32(req.PageNum))
-	hasher.Write([]byte(req.SortType.String()))
-	if req.AscOrder {
-		hasher.Write([]byte{1})
-	} else {
-		hasher.Write([]byte{0})
-	}
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
 }
 
 func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq) (*pb.ListFilesResp, error) {
@@ -378,12 +324,15 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 	if checkRes != nil {
 		return &pb.ListFilesResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.ListFilesResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
 	if req.PageSize > 2000 {
 		return &pb.ListFilesResp{Code: 5, ErrMsg: "page size can not more than 2000"}, nil
 	}
 
-	if err := verifySignListFilesReq(req, pubKey); err != nil {
-		return &pb.ListFilesResp{Code: 6, ErrMsg: "Verify Sign failed"}, nil
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.ListFilesResp{Code: 6, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	resobj, parentId := findPathId(nodeIdStr, req.Path)
@@ -415,24 +364,15 @@ func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
 	return res
 }
 
-func verifySignRetrieveFileReq(req *pb.RetrieveFileReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write(req.FileHash)
-	hasher.Write(util_bytes.FromUint64(req.FileSize))
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
-}
-
 func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveFileReq) (*pb.RetrieveFileResp, error) {
 	checkRes, pubKey := checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.RetrieveFileResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
-	if err := verifySignRetrieveFileReq(req, pubKey); err != nil {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.RetrieveFileResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.RetrieveFileResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	hash := base64.StdEncoding.EncodeToString(req.FileHash)
@@ -482,7 +422,7 @@ func toRetrievePartition(fileHash string, blocks []string, partitionsCount int, 
 		if err != nil {
 			return nil, err
 		}
-		b.Size = uint32(intVal)
+		b.Size = uint64(intVal)
 		intVal, err = strconv.Atoi(arr[2])
 		if err != nil {
 			return nil, err
@@ -515,16 +455,12 @@ func toRetrievePartition(fileHash string, blocks []string, partitionsCount int, 
 				}
 				providerMap[n] = pro
 			}
-			pn := pb.RetrieveNode{NodeId: bytes,
+			ticket := uuidStr()
+			store = append(store, &pb.RetrieveNode{NodeId: bytes,
+				Server: pro.Server(),
 				Port:   pro.Port,
-				Ticket: uuidStr()}
-			if pro.Host != "" {
-				pn.Server = pro.Host
-			} else if pro.DynamicDomain != "" {
-				pn.Server = pro.DynamicDomain
-			}
-			pn.Auth = generateRetrieveNodeAuth(pn.Ticket, pro, b.Hash, b.Size, ts)
-			store = append(store, &pn)
+				Ticket: ticket,
+				Auth:   genProviderRetrieveAuth(pro.PublicKey, b.Hash, b.Size, ts, ticket)})
 		}
 		b.StoreNode = store
 		slice = append(slice, &b)
@@ -537,37 +473,32 @@ func toRetrievePartition(fileHash string, blocks []string, partitionsCount int, 
 	return res, nil
 }
 
-func generateRetrieveNodeAuth(ticket string, pro *db.ProviderInfo, hash []byte, size uint32, ts uint64) []byte {
-	hasher := hmac.New(sha256.New, pro.PublicKey)
-	hasher.Write([]byte("Retrieve"))
+func genProviderRetrieveAuth(publicKey []byte, hash []byte, size uint64, timestamp uint64, ticket string) []byte {
+	return genProviderAuth(publicKey, hash, size, timestamp, ticket, "Retrieve")
+}
+func genProviderStoreAuth(publicKey []byte, hash []byte, size uint64, timestamp uint64, ticket string) []byte {
+	return genProviderAuth(publicKey, hash, size, timestamp, ticket, "Store")
+}
+
+func genProviderAuth(publicKey []byte, hash []byte, size uint64, timestamp uint64, ticket string, method string) []byte {
+	hasher := hmac.New(sha256.New, publicKey)
+	hasher.Write([]byte(method))
 	hasher.Write(hash)
-	hasher.Write(util_bytes.FromUint64(uint64(size)))
-	hasher.Write(util_bytes.FromUint64(ts))
+	hasher.Write(util_bytes.FromUint64(size))
+	hasher.Write(util_bytes.FromUint64(timestamp))
 	hasher.Write([]byte(ticket))
 	return hasher.Sum(nil)
 }
 
-func verifySignRemoveReq(req *pb.RemoveReq, pubKey *rsa.PublicKey) error {
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return errors.New("auth info expired， please check your system time")
-	}
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.Path))
-	if req.Recursive {
-		hasher.Write([]byte{1})
-	} else {
-		hasher.Write([]byte{0})
-	}
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hasher.Sum(nil), req.Sign)
-}
 func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb.RemoveResp, error) {
 	checkRes, pubKey := checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.RemoveResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
-	if err := verifySignRemoveReq(req, pubKey); err != nil {
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.RemoveResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.RemoveResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
@@ -602,7 +533,7 @@ func findPathId(nodeId string, path string) (res *resObj, pathId []byte) {
 const block_sep = ";"
 const block_node_id_sep = ","
 
-func fromPartitions(partitions []*pb.Partition) ([]string, error) {
+func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
 	if partitions == nil || len(partitions) == 0 {
 		return nil, nil
 	}

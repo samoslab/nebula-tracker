@@ -1,11 +1,10 @@
 package impl
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"testing"
-
-	util_bytes "github.com/spolabs/nebula/util/bytes"
 )
 
 func (self *ClientRegisterService) encrypt(data []byte) ([]byte, error) {
@@ -25,7 +24,7 @@ func TestDecrypt(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed.")
 	}
-	if !util_bytes.SameBytes(data, plain) {
+	if !bytes.Equal(data, plain) {
 		t.Errorf("Failed.")
 	}
 }

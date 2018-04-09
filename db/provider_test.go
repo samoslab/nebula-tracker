@@ -22,7 +22,7 @@ func TestDoProviderSave(t *testing.T) {
 	if existsBillEmail(tx, email) {
 		t.Errorf("Failed.")
 	}
-	saveProvider(tx, nodeId, []byte("test-public-key"), email, []byte("test-encrypt-key"), "random")
+	saveProvider(tx, nodeId, []byte("test-public-key"), email, []byte("test-encrypt-key"), "wallet-address", []uint64{10000000000}, 4000000, 20000000, 4000000, 20000000, 0.98, 6666, "127.0.0.1", "", "random")
 	if !existsProviderNodeId(tx, nodeId) {
 		t.Errorf("Failed.")
 	}
@@ -47,4 +47,12 @@ func TestDoProviderSave(t *testing.T) {
 	if !found || !emailVerified || randomCode != "" {
 		t.Errorf("Failed.")
 	}
+	p := providerFindOne(tx, nodeId)
+	if len(p.StorageVolume) != 1 {
+		t.Errorf("Failed.")
+	}
+	if len(providerFindAll(tx)) != 0 {
+		t.Errorf("Failed.")
+	}
+
 }

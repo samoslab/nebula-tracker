@@ -1,12 +1,11 @@
 package db
 
 import (
+	"bytes"
 	"encoding/base64"
 	"testing"
 
 	"nebula-tracker/config"
-
-	util_bytes "github.com/spolabs/nebula/util/bytes"
 )
 
 func TestFileTiny(t *testing.T) {
@@ -71,7 +70,7 @@ func TestFile(t *testing.T) {
 	if partitionCount != 0 || blocks != nil {
 		t.Errorf("Failed.")
 	}
-	if !util_bytes.SameBytes(fileData, data) {
+	if !bytes.Equal(fileData, data) {
 		t.Errorf("Failed.")
 	}
 	fileSaveDone(tx, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2)

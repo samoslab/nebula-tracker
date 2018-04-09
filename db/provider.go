@@ -46,7 +46,7 @@ func ProviderExistsBillEmail(billEmail string) bool {
 func getProviderPublicKeyBytes(nodeId string) []byte {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	res := getPubKeyBytes(tx, nodeId)
+	res := getProviderPubKeyBytes(tx, nodeId)
 	checkErr(tx.Commit())
 	commit = true
 	return res
@@ -182,7 +182,7 @@ func ProviderGetPubKey(nodeId []byte) *rsa.PublicKey {
 	// 	}
 	// 	return b
 	// } else {
-	pubKeyBytes := getPublicKeyBytes(nodeIdStr)
+	pubKeyBytes := getProviderPublicKeyBytes(nodeIdStr)
 	pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
 	if err != nil {
 		panic(err)
@@ -210,6 +210,14 @@ type ProviderInfo struct {
 	StorageVolume     []uint64
 }
 
+func (self ProviderInfo) Server() string {
+	if self.Host != "" {
+		return self.Host
+	} else {
+		return self.DynamicDomain
+	}
+}
+
 func ProviderFindOne(nodeId string) (p *ProviderInfo) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
@@ -220,7 +228,7 @@ func ProviderFindOne(nodeId string) (p *ProviderInfo) {
 }
 
 func providerFindOne(tx *sql.Tx, nodeId string) *ProviderInfo {
-	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME where NODE_ID=$1", nodeId)
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME from PROVIDER where NODE_ID=$1", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
@@ -234,7 +242,7 @@ func scanProviderInfo(rows *sql.Rows) *ProviderInfo {
 	var host, dynamicDomain sql.NullString
 	var storageVolume NullUint64Slice
 	err := rows.Scan(&pi.NodeId, &pi.PublicKey, &pi.BillEmail, &pi.EncryptKey, &pi.WalletAddress, &pi.UpBandwidth, &pi.DownBandwidth, &pi.TestUpBandwidth, &pi.TestDownBandwidth,
-		&pi.Availability, &pi.Port, &host, &dynamicDomain, storageVolume)
+		&pi.Availability, &pi.Port, &host, &dynamicDomain, &storageVolume)
 	checkErr(err)
 	if host.Valid {
 		pi.Host = host.String
@@ -262,7 +270,7 @@ func ProviderFindAll() (slice []ProviderInfo) {
 }
 
 func providerFindAll(tx *sql.Tx) []ProviderInfo {
-	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
 	checkErr(err)
 	defer rows.Close()
 	res := make([]ProviderInfo, 0, 16)
