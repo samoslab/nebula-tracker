@@ -69,7 +69,7 @@ func saveProvider(tx *sql.Tx, nodeId string, pubKeyBytes []byte, contactEmail st
 	walletAddress string, storageVolume []uint64, upBandwidth uint64,
 	downBandwidth uint64, testUpBandwidth uint64, testDownBandwidth uint64, availability float64,
 	port uint32, host string, dynamicDomain string, randomCode string) {
-	stmt, err := tx.Prepare("insert into PROVIDER(NODE_ID,PUBLIC_KEY,BILL_EMAIL,EMAIL_VERIFIED,ENCRYPT_KEY,WALLET_ADDRESS,CREATION,LAST_MODIFIED,RANDOM_CODE,SEND_TIME,ACTIVE,REMOVED,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME) values ($1, $2, $3, false, $4, $5, now(), now(), $6, now(), false, false,$7,$8,$9,$10,$11,$12,$13,$14," + arrayClause(len(storageVolume), 15) + ")")
+	stmt, err := tx.Prepare("insert into PROVIDER(NODE_ID,PUBLIC_KEY,BILL_EMAIL,EMAIL_VERIFIED,ENCRYPT_KEY,WALLET_ADDRESS,CREATION,LAST_MODIFIED,RANDOM_CODE,SEND_TIME,ACTIVE,REMOVED,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME) values ($1, $2, $3, false, $4, $5, now(), now(), $6, now(), true, false,$7,$8,$9,$10,$11,$12,$13,$14," + arrayClause(len(storageVolume), 15) + ")")
 	defer stmt.Close()
 	checkErr(err)
 	args := make([]interface{}, 14, len(storageVolume)+14)

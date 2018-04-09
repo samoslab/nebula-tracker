@@ -17,6 +17,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
 	"golang.org/x/net/context"
@@ -156,23 +157,23 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if (host == nil || len(host) == 0) && (dynamicDomain == nil || len(dynamicDomain) == 0) {
 		return &pb.RegisterResp{Code: 25, ErrMsg: "host is required"}, nil
 	}
-	// var hostStr string
-	// if host != nil && len(host) > 0 {
-	// 	hostStr = string(host)
-	// } else if dynamicDomain != nil && len(dynamicDomain) > 0 {
-	// 	hostStr = string(dynamicDomain)
-	// }
-	// providerAddr := fmt.Sprintf("%s:%d", hostStr, req.Port)
-	// conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
-	// if err != nil {
-	// 	return &pb.RegisterResp{Code: 26, ErrMsg: "can not connect, error: " + err.Error()}, nil
-	// }
-	// defer conn.Close()
-	// psc := provider_pb.NewProviderServiceClient(conn)
-	// err = pingProvider(psc)
-	// if err != nil {
-	// 	return &pb.RegisterResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
-	// }
+	var hostStr string
+	if host != nil && len(host) > 0 {
+		hostStr = string(host)
+	} else if dynamicDomain != nil && len(dynamicDomain) > 0 {
+		hostStr = string(dynamicDomain)
+	}
+	providerAddr := fmt.Sprintf("%s:%d", hostStr, req.Port)
+	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+	if err != nil {
+		return &pb.RegisterResp{Code: 26, ErrMsg: "can not connect, error: " + err.Error()}, nil
+	}
+	defer conn.Close()
+	psc := provider_pb.NewProviderServiceClient(conn)
+	err = pingProvider(psc)
+	if err != nil {
+		return &pb.RegisterResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
+	}
 	storageVolume := []uint64{req.MainStorageVolume}
 	if req.ExtraStorageVolume != nil && len(req.ExtraStorageVolume) > 0 {
 		storageVolume = make([]uint64, 1, 1+len(req.ExtraStorageVolume))

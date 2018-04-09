@@ -1,0 +1,3 @@
+metadata interface support pathId 
+metadata interface support newVersion
+provider add speed test module
