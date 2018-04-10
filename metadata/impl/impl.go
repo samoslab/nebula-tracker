@@ -1,9 +1,7 @@
 package impl
 
 import (
-	"crypto/hmac"
 	"crypto/rsa"
-	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -14,23 +12,25 @@ import (
 	"strings"
 	"time"
 
+	provider_pb "github.com/samoslab/nebula/provider/pb"
 	pb "github.com/samoslab/nebula/tracker/metadata/pb"
-	util_bytes "github.com/samoslab/nebula/util/bytes"
+
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
 type MatadataService struct {
+	d dao
 }
 
 func NewMatadataService() *MatadataService {
-	return &MatadataService{}
+	return &MatadataService{d: &daoImpl{}}
 }
 
 func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (*pb.MkFolderResp, error) {
 	// TODO support path Id
-	checkRes, pubKey := checkNodeId(req.NodeId)
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.MkFolderResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
@@ -41,11 +41,11 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 		return &pb.MkFolderResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, parentId := findPathId(nodeIdStr, req.Path)
+	resobj, parentId := self.findPathId(nodeIdStr, req.Path)
 	if resobj != nil {
 		return &pb.MkFolderResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
-	firstDuplicationName := db.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder)
+	firstDuplicationName := self.d.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder)
 	if firstDuplicationName != "" {
 		return &pb.MkFolderResp{Code: 8, ErrMsg: "duplication of folder name: " + firstDuplicationName}, nil
 	}
@@ -57,14 +57,14 @@ type resObj struct {
 	ErrMsg string
 }
 
-func checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey) {
+func (self *MatadataService) checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey) {
 	if nodeId == nil {
 		return &resObj{Code: 100, ErrMsg: "NodeId is required"}, nil
 	}
 	if len(nodeId) != 20 {
 		return &resObj{Code: 101, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := db.ClientGetPubKey(nodeId)
+	pubKey := self.d.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return &resObj{Code: 102, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -72,7 +72,7 @@ func checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey) {
 }
 
 func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFileExistReq) (*pb.CheckFileExistResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.CheckFileExistResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
@@ -84,12 +84,12 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		return &pb.CheckFileExistResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, parentId := findPathId(nodeIdStr, req.FilePath)
+	resobj, parentId := self.findPathId(nodeIdStr, req.FilePath)
 	if resobj != nil {
 		return &pb.CheckFileExistResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	fileName := req.FileName
-	existId, _ := db.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	existId, _ := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
 	if existId != nil {
 		if req.Interactive {
 			return &pb.CheckFileExistResp{Code: 8, ErrMsg: "exist same name file or folder"}, nil
@@ -99,7 +99,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 	}
 	//check available space
 	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
-	exist, active, _, done, size := db.FileCheckExist(hashStr)
+	exist, active, _, done, size := self.d.FileCheckExist(hashStr)
 	if exist {
 		if size != req.FileSize {
 			log.Warnf("hash: %s size is %d, new upload file size is %d", hashStr, size, req.FileSize)
@@ -110,14 +110,14 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		if !done {
 			return &pb.CheckFileExistResp{Code: 10, ErrMsg: "this file is being uploaded by other user, please wait a moment to retry"}, nil
 		}
-		db.FileReuse(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId)
+		self.d.FileReuse(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId)
 		return &pb.CheckFileExistResp{Code: 0}, nil
 	} else {
 		if req.FileSize <= embed_metadata_max_file_size {
 			if req.FileSize != uint64(len(req.FileData)) {
 				return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
 			}
-			db.FileSaveTiny(nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
+			self.d.FileSaveTiny(nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
 			return &pb.CheckFileExistResp{Code: 0}, nil
 		}
 		resp := pb.CheckFileExistResp{Code: 1}
@@ -130,7 +130,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 				resp.ReplicaCount = uint32(providerCnt)
 			}
 			resp.Provider = prepareReplicaProvider(resp.ReplicaCount, req.FileHash, req.FileSize)
-			db.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 5*req.FileSize)
+			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 5*req.FileSize)
 		} else {
 			resp.StoreType = pb.FileStoreType_ErasureCode
 			if providerCnt >= 40 {
@@ -149,7 +149,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 				resp.DataPieceCount = 2
 				resp.VerifyPieceCount = 1
 			}
-			db.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
+			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
 		}
 		return &resp, nil
 	}
@@ -168,7 +168,7 @@ func prepareReplicaProvider(num uint32, fileHash []byte, fileSize uint64) []*pb.
 			Server:    pi.Server(),
 			Timestamp: ts,
 			Ticket:    ticket,
-			Auth:      genProviderStoreAuth(pi.PublicKey, fileHash, fileSize, ts, ticket)})
+			Auth:      provider_pb.GenStoreAuth(pi.PublicKey, fileHash, fileSize, ts, ticket)})
 	}
 	return res
 }
@@ -188,7 +188,7 @@ func fixFileName(name string) string {
 const verify_sign_expired = 15
 
 func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.UploadFilePrepareReq) (*pb.UploadFilePrepareResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return nil, errors.New(checkRes.ErrMsg)
 	}
@@ -240,7 +240,7 @@ func prepareErasureCodeProvider(partition []*pb.SplitPartition, pieceCnt int, ba
 				HashAuth: []*pb.PieceHashAuth{&pb.PieceHashAuth{Hash: piece.Hash,
 					Size:   piece.Size,
 					Ticket: ticket,
-					Auth:   genProviderStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)}}})
+					Auth:   provider_pb.GenStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)}}})
 		}
 		if len(pis) == pieceCnt {
 			continue
@@ -268,7 +268,7 @@ func prepareErasureCodeProvider(partition []*pb.SplitPartition, pieceCnt int, ba
 			bpa.HashAuth = append(bpa.HashAuth, &pb.PieceHashAuth{Hash: piece.Hash,
 				Size:   piece.Size,
 				Ticket: ticket,
-				Auth:   genProviderStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)})
+				Auth:   provider_pb.GenStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)})
 		}
 		res = append(res, &pb.ErasureCodePartition{ProviderAuth: proAuth, Timestamp: ts})
 	}
@@ -277,7 +277,7 @@ func prepareErasureCodeProvider(partition []*pb.SplitPartition, pieceCnt int, ba
 
 func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadFileDoneReq) (*pb.UploadFileDoneResp, error) {
 	// TODO newVersion
-	checkRes, pubKey := checkNodeId(req.NodeId)
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.UploadFileDoneResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
@@ -289,12 +289,12 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		return &pb.UploadFileDoneResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, parentId := findPathId(nodeIdStr, req.FilePath)
+	resobj, parentId := self.findPathId(nodeIdStr, req.FilePath)
 	if resobj != nil {
 		return &pb.UploadFileDoneResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	fileName := req.FileName
-	existId, _ := db.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	existId, _ := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
 	if existId != nil {
 		if req.Interactive {
 			return &pb.UploadFileDoneResp{Code: 8, ErrMsg: "exist same name file or folder"}, nil
@@ -315,12 +315,12 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
 		}
 	}
-	db.FileSaveDone(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId, len(req.Partition), blocks, storeVolume)
+	self.d.FileSaveDone(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId, len(req.Partition), blocks, storeVolume)
 	return &pb.UploadFileDoneResp{Code: 0}, nil
 }
 
 func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq) (*pb.ListFilesResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.ListFilesResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
@@ -335,7 +335,7 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 		return &pb.ListFilesResp{Code: 6, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, parentId := findPathId(nodeIdStr, req.Path)
+	resobj, parentId := self.findPathId(nodeIdStr, req.Path)
 	if resobj != nil {
 		return &pb.ListFilesResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -349,7 +349,7 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 	} else {
 		return &pb.ListFilesResp{Code: 9, ErrMsg: "must specified sortType"}, nil
 	}
-	total, fofs := db.FileOwnerListOfPath(nodeIdStr, parentId, req.PageSize, req.PageNum, sortField, req.AscOrder)
+	total, fofs := self.d.FileOwnerListOfPath(nodeIdStr, parentId, req.PageSize, req.PageNum, sortField, req.AscOrder)
 	return &pb.ListFilesResp{Code: 0, TotalRecord: total, Fof: toFileOrFolderSlice(fofs)}, nil
 }
 
@@ -365,7 +365,7 @@ func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
 }
 
 func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveFileReq) (*pb.RetrieveFileResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.RetrieveFileResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
@@ -376,7 +376,7 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	hash := base64.StdEncoding.EncodeToString(req.FileHash)
-	exist, active, fileData, partitionCount, blocks, size := db.FileRetrieve(hash)
+	exist, active, fileData, partitionCount, blocks, size := self.d.FileRetrieve(hash)
 	if !exist {
 		return &pb.RetrieveFileResp{Code: 6, ErrMsg: "file not exist"}, nil
 	}
@@ -390,14 +390,14 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
 	}
 	ts := uint64(time.Now().Unix())
-	parts, err := toRetrievePartition(hash, blocks, partitionCount, ts)
+	parts, err := self.toRetrievePartition(hash, blocks, partitionCount, ts)
 	if err != nil {
 		return &pb.RetrieveFileResp{Code: 9, ErrMsg: err.Error()}, nil
 	}
 	return &pb.RetrieveFileResp{Code: 0, Partition: parts, Timestamp: ts}, nil
 }
 
-func toRetrievePartition(fileHash string, blocks []string, partitionsCount int, ts uint64) ([]*pb.RetrievePartition, error) {
+func (self *MatadataService) toRetrievePartition(fileHash string, blocks []string, partitionsCount int, ts uint64) ([]*pb.RetrievePartition, error) {
 	if partitionsCount == 0 {
 		return nil, errors.New("empty blocks")
 	}
@@ -449,7 +449,7 @@ func toRetrievePartition(fileHash string, blocks []string, partitionsCount int, 
 			if v, ok := providerMap[n]; ok {
 				pro = v
 			} else {
-				pro = db.ProviderFindOne(n)
+				pro = self.d.ProviderFindOne(n)
 				if pro == nil {
 					return nil, errors.New("can not find provider, nodeId: " + n)
 				}
@@ -460,7 +460,7 @@ func toRetrievePartition(fileHash string, blocks []string, partitionsCount int, 
 				Server: pro.Server(),
 				Port:   pro.Port,
 				Ticket: ticket,
-				Auth:   genProviderRetrieveAuth(pro.PublicKey, b.Hash, b.Size, ts, ticket)})
+				Auth:   provider_pb.GenRetrieveAuth(pro.PublicKey, b.Hash, b.Size, ts, ticket)})
 		}
 		b.StoreNode = store
 		slice = append(slice, &b)
@@ -473,25 +473,8 @@ func toRetrievePartition(fileHash string, blocks []string, partitionsCount int, 
 	return res, nil
 }
 
-func genProviderRetrieveAuth(publicKey []byte, hash []byte, size uint64, timestamp uint64, ticket string) []byte {
-	return genProviderAuth(publicKey, hash, size, timestamp, ticket, "Retrieve")
-}
-func genProviderStoreAuth(publicKey []byte, hash []byte, size uint64, timestamp uint64, ticket string) []byte {
-	return genProviderAuth(publicKey, hash, size, timestamp, ticket, "Store")
-}
-
-func genProviderAuth(publicKey []byte, hash []byte, size uint64, timestamp uint64, ticket string, method string) []byte {
-	hasher := hmac.New(sha256.New, publicKey)
-	hasher.Write([]byte(method))
-	hasher.Write(hash)
-	hasher.Write(util_bytes.FromUint64(size))
-	hasher.Write(util_bytes.FromUint64(timestamp))
-	hasher.Write([]byte(ticket))
-	return hasher.Sum(nil)
-}
-
 func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb.RemoveResp, error) {
-	checkRes, pubKey := checkNodeId(req.NodeId)
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.RemoveResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
 	}
@@ -502,20 +485,20 @@ func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb
 		return &pb.RemoveResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, pathId := findPathId(nodeIdStr, req.Path)
+	resobj, pathId := self.findPathId(nodeIdStr, req.Path)
 	if resobj != nil {
 		return &pb.RemoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	if pathId == nil {
 		return &pb.RemoveResp{Code: 6, ErrMsg: "path not exists"}, nil
 	}
-	if !db.FileOwnerRemove(nodeIdStr, pathId, req.Recursive) {
+	if !self.d.FileOwnerRemove(nodeIdStr, pathId, req.Recursive) {
 		return &pb.RemoveResp{Code: 7, ErrMsg: "folder not empty"}, nil
 	}
 	return &pb.RemoveResp{Code: 0}, nil
 }
 
-func findPathId(nodeId string, path string) (res *resObj, pathId []byte) {
+func (self *MatadataService) findPathId(nodeId string, path string) (res *resObj, pathId []byte) {
 	if path == "" || path == "/" {
 		return
 	}
@@ -523,7 +506,7 @@ func findPathId(nodeId string, path string) (res *resObj, pathId []byte) {
 		return &resObj{Code: 200, ErrMsg: "path must start with slash /"}, nil
 	}
 	var found bool
-	found, pathId = db.FileOwnerIdOfFilePath(nodeId, path)
+	found, pathId = self.d.FileOwnerIdOfFilePath(nodeId, path)
 	if !found {
 		return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
 	}
