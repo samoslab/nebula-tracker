@@ -265,5 +265,31 @@ func TestCheckFileExist(t *testing.T) {
 	assert.Equal(uint32(0), resp.Code)
 	mockDao.AssertExpectations(t)
 
+	size = 9233320
+	mockDao = new(daoMock)
+	mockChooser := new(chooserMock)
+	ms = &MatadataService{c: mockChooser, d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, path).Return(true, parentId)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileCheckExist", hashStr).Return(false, true, false, true, size)
+	mockChooser.On("Count").Return(12)
+	mockDao.On("FileSaveStep1", nodeIdStr, hashStr, size, uint64(0))
+	req = pb.CheckFileExistReq{NodeId: nodeId,
+		Timestamp:   ts,
+		FilePath:    path,
+		FileHash:    hash,
+		FileSize:    size,
+		FileName:    name,
+		FileModTime: ts - 1000,
+		Interactive: false,
+		NewVersion:  false}
+	req.SignReq(priKey)
+	resp, err = ms.CheckFileExist(ctx, &req)
+	assert.Equal(uint32(1), resp.Code)
+	assert.Equal(uint32(8), resp.DataPieceCount)
+	assert.Equal(uint32(4), resp.VerifyPieceCount)
+	assert.Equal(pb.FileStoreType_ErasureCode, resp.StoreType)
+	mockDao.AssertExpectations(t)
 	// TODO FileStoreType_ErasureCode or FileStoreType_MultiReplica
 }

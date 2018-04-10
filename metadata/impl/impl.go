@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"nebula-tracker/config"
 	"nebula-tracker/db"
-	chooser "nebula-tracker/metadata/provider_chooser"
 	"strconv"
 	"strings"
 	"time"
@@ -21,11 +20,12 @@ import (
 )
 
 type MatadataService struct {
+	c providerChooser
 	d dao
 }
 
 func NewMatadataService() *MatadataService {
-	return &MatadataService{d: &daoImpl{}}
+	return &MatadataService{c: &chooserImpl{}, d: &daoImpl{}}
 }
 
 func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (*pb.MkFolderResp, error) {
@@ -121,7 +121,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			return &pb.CheckFileExistResp{Code: 0}, nil
 		}
 		resp := pb.CheckFileExistResp{Code: 1}
-		providerCnt := chooser.Count()
+		providerCnt := self.c.Count()
 		conf := config.GetTrackerConfig()
 		if req.FileSize <= multi_replica_max_file_size || (!conf.TestMode && providerCnt < 12) || (conf.TestMode && providerCnt < 3) {
 			resp.StoreType = pb.FileStoreType_MultiReplica
@@ -129,7 +129,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			if providerCnt < 5 {
 				resp.ReplicaCount = uint32(providerCnt)
 			}
-			resp.Provider = prepareReplicaProvider(resp.ReplicaCount, req.FileHash, req.FileSize)
+			resp.Provider = self.prepareReplicaProvider(resp.ReplicaCount, req.FileHash, req.FileSize)
 			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 5*req.FileSize)
 		} else {
 			resp.StoreType = pb.FileStoreType_ErasureCode
@@ -157,8 +157,8 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 func uuidStr() string {
 	return uuid.Must(uuid.NewV4()).String()
 }
-func prepareReplicaProvider(num uint32, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {
-	pis := chooser.Choose(num)
+func (self *MatadataService) prepareReplicaProvider(num uint32, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {
+	pis := self.c.Choose(num)
 	res := make([]*pb.ReplicaProvider, 0, len(pis))
 	ts := uint64(time.Now().Unix())
 	for _, pi := range pis {
@@ -201,7 +201,7 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 	if len(req.Partition) == 0 {
 		return nil, errors.New("partition Data is required")
 	}
-	providerCnt := chooser.Count()
+	providerCnt := self.c.Count()
 	pieceCnt := len(req.Partition[0].Piece)
 	for _, p := range req.Partition {
 		if len(p.Piece) == 0 {
@@ -218,14 +218,14 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 	if providerCnt-pieceCnt < backupProCnt {
 		backupProCnt = providerCnt - pieceCnt
 	}
-	return &pb.UploadFilePrepareResp{Partition: prepareErasureCodeProvider(req.Partition, pieceCnt, backupProCnt)}, nil
+	return &pb.UploadFilePrepareResp{Partition: self.prepareErasureCodeProvider(req.Partition, pieceCnt, backupProCnt)}, nil
 }
 
-func prepareErasureCodeProvider(partition []*pb.SplitPartition, pieceCnt int, backupProCnt int) []*pb.ErasureCodePartition {
+func (self *MatadataService) prepareErasureCodeProvider(partition []*pb.SplitPartition, pieceCnt int, backupProCnt int) []*pb.ErasureCodePartition {
 	ts := uint64(time.Now().Unix())
 	res := make([]*pb.ErasureCodePartition, 0, len(partition))
 	for _, part := range partition {
-		pis := chooser.Choose(uint32(pieceCnt + backupProCnt))
+		pis := self.c.Choose(uint32(pieceCnt + backupProCnt))
 		if len(pis) < pieceCnt {
 			panic("not enough provider")
 		}
