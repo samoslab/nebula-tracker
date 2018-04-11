@@ -521,10 +521,13 @@ const block_node_id_sep = ","
 
 func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
 	if partitions == nil || len(partitions) == 0 {
-		return nil, nil
+		return nil, errors.New("empty partition")
 	}
 	res := make([]string, 0, len(partitions))
 	for _, p := range partitions {
+		if len(p.Block) == 0 {
+			return nil, errors.New("empty block")
+		}
 		for _, b := range p.Block {
 			if b.StoreNodeId == nil || len(b.StoreNodeId) == 0 {
 				return nil, errors.New("empty store nodeId")

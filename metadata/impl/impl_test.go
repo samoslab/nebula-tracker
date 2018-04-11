@@ -512,3 +512,275 @@ func TestUploadFilePrepare(t *testing.T) {
 	}
 	// t.Error(resp.Partition[0].ProviderAuth)
 }
+
+func TestUploadFileDone(t *testing.T) {
+	assert := assert.New(t)
+	priKey, err := rsa.GenerateKey(rand.Reader, 256*8)
+	if err != nil {
+		t.Errorf("failed")
+	}
+	pubKey := &priKey.PublicKey
+	pubKeyBytes := x509.MarshalPKCS1PublicKey(pubKey)
+	nodeId := util_hash.Sha1(pubKeyBytes)
+	nodeIdStr := base64.StdEncoding.EncodeToString(nodeId)
+	ts := uint64(time.Now().Unix())
+	path := "/folder1/folder2"
+	hash := util_hash.Sha1([]byte("test-file"))
+	hashStr := base64.StdEncoding.EncodeToString(hash)
+	size := uint64(98234)
+	name := "file.txt"
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	parentId := []byte("test-folder-id")
+
+	mockDao := new(daoMock)
+	ms := &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, path).Return(true, parentId)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	req := pb.UploadFileDoneReq{NodeId: nodeId,
+		Timestamp:   ts,
+		FilePath:    path,
+		FileHash:    hash,
+		FileSize:    size,
+		FileName:    name,
+		FileModTime: ts - 1000,
+		Partition:   nil,
+		Interactive: true,
+		NewVersion:  false}
+	req.SignReq(priKey)
+	resp, err := ms.UploadFileDone(ctx, &req)
+	assert.Equal(uint32(8), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, path).Return(true, parentId)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	req = pb.UploadFileDoneReq{NodeId: nodeId,
+		Timestamp:   ts,
+		FilePath:    path,
+		FileHash:    hash,
+		FileSize:    size,
+		FileName:    name,
+		FileModTime: ts - 1000,
+		Partition:   nil,
+		Interactive: false,
+		NewVersion:  false}
+	req.SignReq(priKey)
+	resp, err = ms.UploadFileDone(ctx, &req)
+	assert.Equal(uint32(9), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, path).Return(true, parentId)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	req = pb.UploadFileDoneReq{NodeId: nodeId,
+		Timestamp:   ts,
+		FilePath:    path,
+		FileHash:    hash,
+		FileSize:    size,
+		FileName:    name,
+		FileModTime: ts - 1000,
+		Partition:   []*pb.StorePartition{&pb.StorePartition{Block: []*pb.StoreBlock{}}},
+		Interactive: false,
+		NewVersion:  false}
+	req.SignReq(priKey)
+	resp, err = ms.UploadFileDone(ctx, &req)
+	assert.Equal(uint32(9), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, path).Return(true, parentId)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileSaveDone", nodeIdStr, hashStr, mock.Anything, size, ts-1000, parentId, 1, mock.Anything, mock.Anything)
+	req = pb.UploadFileDoneReq{NodeId: nodeId,
+		Timestamp:   ts,
+		FilePath:    path,
+		FileHash:    hash,
+		FileSize:    size,
+		FileName:    name,
+		FileModTime: ts - 1000,
+		Partition: []*pb.StorePartition{&pb.StorePartition{Block: []*pb.StoreBlock{&pb.StoreBlock{Hash: []byte("test-hash1"),
+			Size:        123123,
+			BlockSeq:    1,
+			Checksum:    false,
+			StoreNodeId: [][]byte{[]byte("test-node-id1"), []byte("test-node-id2")},
+		}, &pb.StoreBlock{Hash: []byte("test-hash2"),
+			Size:        123123,
+			BlockSeq:    2,
+			Checksum:    false,
+			StoreNodeId: [][]byte{[]byte("test-node-id1"), []byte("test-node-id2")},
+		}, &pb.StoreBlock{Hash: []byte("test-hash3"),
+			Size:        123123,
+			BlockSeq:    1,
+			Checksum:    true,
+			StoreNodeId: [][]byte{[]byte("test-node-id1"), []byte("test-node-id2")},
+		},
+		}}},
+		Interactive: false,
+		NewVersion:  false}
+	req.SignReq(priKey)
+	resp, err = ms.UploadFileDone(ctx, &req)
+	assert.Equal(uint32(0), resp.Code)
+	mockDao.AssertExpectations(t)
+}
+
+func TestRetrieveFile(t *testing.T) {
+	assert := assert.New(t)
+	priKey, err := rsa.GenerateKey(rand.Reader, 256*8)
+	if err != nil {
+		t.Errorf("failed")
+	}
+	pubKey := &priKey.PublicKey
+	pubKeyBytes := x509.MarshalPKCS1PublicKey(pubKey)
+	nodeId := util_hash.Sha1(pubKeyBytes)
+	ts := uint64(time.Now().Unix())
+	hash := util_hash.Sha1([]byte("test-file"))
+	hashStr := base64.StdEncoding.EncodeToString(hash)
+	size := uint64(98234)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mockDao := new(daoMock)
+	ms := &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileRetrieve", hashStr).Return(false, false, nil, 0, nil, uint64(0))
+	req := pb.RetrieveFileReq{NodeId: nodeId,
+		Timestamp: ts,
+		FileHash:  hash,
+		FileSize:  size}
+	req.SignReq(priKey)
+	resp, err := ms.RetrieveFile(ctx, &req)
+	assert.Equal(uint32(6), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileRetrieve", hashStr).Return(true, false, nil, 0, nil, uint64(0))
+	req = pb.RetrieveFileReq{NodeId: nodeId,
+		Timestamp: ts,
+		FileHash:  hash,
+		FileSize:  size}
+	req.SignReq(priKey)
+	resp, err = ms.RetrieveFile(ctx, &req)
+	assert.Equal(uint32(7), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileRetrieve", hashStr).Return(true, true, nil, 0, nil, size-1)
+	req = pb.RetrieveFileReq{NodeId: nodeId,
+		Timestamp: ts,
+		FileHash:  hash,
+		FileSize:  size}
+	req.SignReq(priKey)
+	resp, err = ms.RetrieveFile(ctx, &req)
+	assert.Equal(uint32(8), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileRetrieve", hashStr).Return(true, true, hash, 0, nil, size)
+	req = pb.RetrieveFileReq{NodeId: nodeId,
+		Timestamp: ts,
+		FileHash:  hash,
+		FileSize:  size}
+	req.SignReq(priKey)
+	resp, err = ms.RetrieveFile(ctx, &req)
+	assert.Equal(uint32(0), resp.Code)
+	assert.Equal(hash, resp.FileData)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileRetrieve", hashStr).Return(true, true, nil, 1, []string{"dGVzdC1oYXNoMQ==;123123;1;0;dGVzdC1ub2RlLWlkMQ==,dGVzdC1ub2RlLWlkMg==", "dGVzdC1oYXNoMg==;123123;2;0;dGVzdC1ub2RlLWlkMQ==,dGVzdC1ub2RlLWlkMg==", "dGVzdC1oYXNoMw==;123123;1;1;dGVzdC1ub2RlLWlkMQ==,dGVzdC1ub2RlLWlkMg=="}, size)
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+
+	req = pb.RetrieveFileReq{NodeId: nodeId,
+		Timestamp: ts,
+		FileHash:  hash,
+		FileSize:  size}
+	req.SignReq(priKey)
+	resp, err = ms.RetrieveFile(ctx, &req)
+	assert.Equal(uint32(0), resp.Code)
+	mockDao.AssertExpectations(t)
+}
+
+func TestRemove(t *testing.T) {
+	assert := assert.New(t)
+	priKey, err := rsa.GenerateKey(rand.Reader, 256*8)
+	if err != nil {
+		t.Errorf("failed")
+	}
+	pubKey := &priKey.PublicKey
+	pubKeyBytes := x509.MarshalPKCS1PublicKey(pubKey)
+	nodeId := util_hash.Sha1(pubKeyBytes)
+	nodeIdStr := base64.StdEncoding.EncodeToString(nodeId)
+	ts := uint64(time.Now().Unix())
+	// hash := util_hash.Sha1([]byte("test-file"))
+	// hashStr := base64.StdEncoding.EncodeToString(hash)
+	// size := uint64(98234)
+	path := "/folder1/folder2"
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mockDao := new(daoMock)
+	ms := &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	req := pb.RemoveReq{NodeId: nodeId,
+		Timestamp: ts,
+		Path:      "/",
+		Recursive: false}
+	req.SignReq(priKey)
+	resp, err := ms.Remove(ctx, &req)
+	assert.Equal(uint32(6), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	pathId := []byte("path-id")
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, path).Return(true, pathId)
+	mockDao.On("FileOwnerRemove", nodeIdStr, pathId, false).Return(false)
+	req = pb.RemoveReq{NodeId: nodeId,
+		Timestamp: ts,
+		Path:      path,
+		Recursive: false}
+	req.SignReq(priKey)
+	resp, err = ms.Remove(ctx, &req)
+	assert.Equal(uint32(7), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, path).Return(true, pathId)
+	mockDao.On("FileOwnerRemove", nodeIdStr, pathId, false).Return(true)
+	req = pb.RemoveReq{NodeId: nodeId,
+		Timestamp: ts,
+		Path:      path,
+		Recursive: false}
+	req.SignReq(priKey)
+	resp, err = ms.Remove(ctx, &req)
+	assert.Equal(uint32(0), resp.Code)
+	mockDao.AssertExpectations(t)
+}
+
+func TestListFiles(t *testing.T) {
+
+}
