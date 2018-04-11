@@ -41,7 +41,7 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 		return &pb.MkFolderResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, parentId := self.findPathId(nodeIdStr, req.Path)
+	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.MkFolderResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -84,7 +84,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		return &pb.CheckFileExistResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, parentId := self.findPathId(nodeIdStr, req.FilePath)
+	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.CheckFileExistResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -292,7 +292,7 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		return &pb.UploadFileDoneResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, parentId := self.findPathId(nodeIdStr, req.FilePath)
+	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.UploadFileDoneResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -338,7 +338,7 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 		return &pb.ListFilesResp{Code: 6, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, parentId := self.findPathId(nodeIdStr, req.Path)
+	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.ListFilesResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -362,7 +362,7 @@ func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
 	}
 	res := make([]*pb.FileOrFolder, 0, len(fofs))
 	for _, fof := range fofs {
-		res = append(res, &pb.FileOrFolder{Folder: fof.IsFolder, Name: fof.Name, FileHash: fof.FileHash, FileSize: fof.FileSize, ModTime: fof.ModTime})
+		res = append(res, &pb.FileOrFolder{Id: fof.Id, Folder: fof.IsFolder, Name: fof.Name, FileHash: fof.FileHash, FileSize: fof.FileSize, ModTime: fof.ModTime})
 	}
 	return res
 }
@@ -488,7 +488,7 @@ func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb
 		return &pb.RemoveResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resobj, pathId := self.findPathId(nodeIdStr, req.Path)
+	resobj, pathId := self.findPathId(nodeIdStr, req.Target, false)
 	if resobj != nil {
 		return &pb.RemoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -501,19 +501,34 @@ func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb
 	return &pb.RemoveResp{Code: 0}, nil
 }
 
-func (self *MatadataService) findPathId(nodeId string, path string) (res *resObj, pathId []byte) {
-	if path == "" || path == "/" {
+func (self *MatadataService) findPathId(nodeId string, filePath *pb.FilePath, needFolder bool) (res *resObj, pathId []byte) {
+	switch v := filePath.OneOfPath.(type) {
+	case *pb.FilePath_Id:
+		ni, isFolder := self.d.FileOwnerCheckId(v.Id)
+		if len(ni) == 0 {
+			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
+		} else if ni != nodeId {
+			return &resObj{Code: 202, ErrMsg: "wrong path owner"}, nil
+		}
+		if needFolder && !isFolder {
+			return &resObj{Code: 203, ErrMsg: "path is not a folder"}, nil
+		}
+	case *pb.FilePath_Path:
+		path := v.Path
+		if path == "" || path == "/" {
+			return
+		}
+		if path[0] != '/' {
+			return &resObj{Code: 200, ErrMsg: "path must start with slash /"}, nil
+		}
+		var found bool
+		found, pathId = self.d.FileOwnerIdOfFilePath(nodeId, path)
+		if !found {
+			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
+		}
 		return
 	}
-	if path[0] != '/' {
-		return &resObj{Code: 200, ErrMsg: "path must start with slash /"}, nil
-	}
-	var found bool
-	found, pathId = self.d.FileOwnerIdOfFilePath(nodeId, path)
-	if !found {
-		return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
-	}
-	return
+	return &resObj{Code: 204, ErrMsg: "path is not exists"}, nil
 }
 
 const block_sep = ";"

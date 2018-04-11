@@ -134,7 +134,7 @@ func fileOwnerListOfPathCount(tx *sql.Tx, nodeId string, parent []byte) (total u
 
 func fileOwnerListOfPath(tx *sql.Tx, nodeId string, parent []byte, pageSize uint32, pageNum uint32, sortField string, asc bool) []*Fof {
 	var args []interface{}
-	sqlStr := "SELECT FOLDER,NAME,MOD_TIME,HASH,SIZE FROM FILE_OWNER where NODE_ID=$1 and PARENT_ID%s"
+	sqlStr := "SELECT ID,FOLDER,NAME,MOD_TIME,HASH,SIZE FROM FILE_OWNER where NODE_ID=$1 and PARENT_ID%s"
 	if parent == nil || len(parent) == 0 {
 		sqlStr = fmt.Sprintf(sqlStr, " is null")
 		args = []interface{}{nodeId}
@@ -158,12 +158,13 @@ func fileOwnerListOfPath(tx *sql.Tx, nodeId string, parent []byte, pageSize uint
 	defer rows.Close()
 	res := make([]*Fof, 0, pageSize)
 	for rows.Next() {
+		var id []byte
 		var isFolder bool
 		var size uint64
 		var modTime time.Time
 		var hashStr sql.NullString
 		var name string
-		err = rows.Scan(&isFolder, &name, &modTime, &hashStr, &size)
+		err = rows.Scan(&id, &isFolder, &name, &modTime, &hashStr, &size)
 		checkErr(err)
 		var hash []byte
 		if hashStr.Valid {
@@ -172,12 +173,13 @@ func fileOwnerListOfPath(tx *sql.Tx, nodeId string, parent []byte, pageSize uint
 				panic(err)
 			}
 		}
-		res = append(res, &Fof{IsFolder: isFolder, Name: name, ModTime: uint64(modTime.Unix()), FileHash: hash, FileSize: size})
+		res = append(res, &Fof{Id: id, IsFolder: isFolder, Name: name, ModTime: uint64(modTime.Unix()), FileHash: hash, FileSize: size})
 	}
 	return res
 }
 
 type Fof struct {
+	Id       []byte
 	IsFolder bool
 	Name     string
 	ModTime  uint64
@@ -224,4 +226,25 @@ func fileOwnerRemove(tx *sql.Tx, nodeId string, pathId []byte) {
 	if cnt == 0 {
 		panic(errors.New("no record found"))
 	}
+}
+
+func fileOwnerCheckId(tx *sql.Tx, id []byte) (nodeId string, isFolder bool) {
+	rows, err := tx.Query("SELECT NODE_ID,FOLDER FROM FILE_OWNER where ID=$1", id)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&nodeId, &isFolder)
+		checkErr(err)
+		return
+	}
+	return "", false
+}
+
+func FileOwnerCheckId(id []byte) (nodeId string, isFolder bool) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	nodeId, isFolder = fileOwnerCheckId(tx, id)
+	checkErr(tx.Commit())
+	commit = true
+	return
 }

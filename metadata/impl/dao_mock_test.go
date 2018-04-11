@@ -69,6 +69,27 @@ func (_m *daoMock) FileCheckExist(hash string) (bool, bool, bool, bool, uint64) 
 	return r0, r1, r2, r3, r4
 }
 
+// FileOwnerCheckId provides a mock function with given fields: id
+func (_m *daoMock) FileOwnerCheckId(id []byte) (string, bool) {
+	ret := _m.Called(id)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func([]byte) string); ok {
+		r0 = rf(id)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func([]byte) bool); ok {
+		r1 = rf(id)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
 // FileOwnerFileExists provides a mock function with given fields: nodeId, parent, name
 func (_m *daoMock) FileOwnerFileExists(nodeId string, parent []byte, name string) ([]byte, bool) {
 	ret := _m.Called(nodeId, parent, name)

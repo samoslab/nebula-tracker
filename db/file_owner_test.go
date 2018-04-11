@@ -54,7 +54,11 @@ func TestFileOwner(t *testing.T) {
 		t.Errorf("Failed.")
 	}
 	fofs = fileOwnerListOfPath(tx, nodeId, id1, 10, 1, "MOD_TIME", true)
-	if len(fofs) != 1 || fofs[0].Name != "test-folder2" {
+	if len(fofs) != 1 || fofs[0].Name != "test-folder2" || len(fofs[0].Id) == 0 {
+		t.Errorf("Failed.")
+	}
+	nodeId2, isFolder := fileOwnerCheckId(tx, fofs[0].Id)
+	if len(nodeId2) == 0 || !isFolder {
 		t.Errorf("Failed.")
 	}
 	fofs = fileOwnerListOfPath(tx, nodeId, id1, 10, 1, "SIZE", true)

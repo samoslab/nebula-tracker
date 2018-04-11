@@ -19,6 +19,7 @@ type dao interface {
 	ProviderFindOne(nodeId string) (p *db.ProviderInfo)
 	FileOwnerRemove(nodeId string, pathId []byte, recursive bool) (res bool)
 	FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte)
+	FileOwnerCheckId(id []byte) (nodeId string, isFolder bool)
 }
 type daoImpl struct {
 }
@@ -61,4 +62,7 @@ func (self *daoImpl) FileOwnerRemove(nodeId string, pathId []byte, recursive boo
 }
 func (self *daoImpl) FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte) {
 	return db.FileOwnerIdOfFilePath(nodeId, path)
+}
+func (self *daoImpl) FileOwnerCheckId(id []byte) (nodeId string, isFolder bool) {
+	return db.FileOwnerCheckId(id)
 }
