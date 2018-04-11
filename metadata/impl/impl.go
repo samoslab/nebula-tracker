@@ -130,7 +130,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 				resp.ReplicaCount = uint32(providerCnt)
 			}
 			resp.Provider = self.prepareReplicaProvider(resp.ReplicaCount, req.FileHash, req.FileSize)
-			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 5*req.FileSize)
+			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
 		} else {
 			resp.StoreType = pb.FileStoreType_ErasureCode
 			if providerCnt >= 40 {
@@ -199,14 +199,14 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 		return nil, err
 	}
 	if len(req.Partition) == 0 {
-		return nil, errors.New("partition Data is required")
+		return nil, errors.New("partition data is required")
+	}
+	pieceCnt := len(req.Partition[0].Piece)
+	if pieceCnt == 0 {
+		return nil, errors.New("piece data is required")
 	}
 	providerCnt := self.c.Count()
-	pieceCnt := len(req.Partition[0].Piece)
 	for _, p := range req.Partition {
-		if len(p.Piece) == 0 {
-			return nil, errors.New("piece Data is required")
-		}
 		if len(p.Piece) > providerCnt {
 			return nil, errors.New("not enough provider")
 		}
@@ -215,6 +215,9 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 		}
 	}
 	backupProCnt := 10
+	if backupProCnt > pieceCnt {
+		backupProCnt = pieceCnt
+	}
 	if providerCnt-pieceCnt < backupProCnt {
 		backupProCnt = providerCnt - pieceCnt
 	}
