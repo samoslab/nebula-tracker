@@ -782,5 +782,53 @@ func TestRemove(t *testing.T) {
 }
 
 func TestListFiles(t *testing.T) {
+	assert := assert.New(t)
+	priKey, err := rsa.GenerateKey(rand.Reader, 256*8)
+	if err != nil {
+		t.Errorf("failed")
+	}
+	pubKey := &priKey.PublicKey
+	pubKeyBytes := x509.MarshalPKCS1PublicKey(pubKey)
+	nodeId := util_hash.Sha1(pubKeyBytes)
+	nodeIdStr := base64.StdEncoding.EncodeToString(nodeId)
+	ts := uint64(time.Now().Unix())
+	// hash := util_hash.Sha1([]byte("test-file"))
+	// hashStr := base64.StdEncoding.EncodeToString(hash)
+	// size := uint64(98234)
+	path := "/folder1/folder2"
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	mockDao := new(daoMock)
+	ms := &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	req := pb.ListFilesReq{NodeId: nodeId,
+		Timestamp: ts,
+		Path:      path,
+		PageSize:  2500,
+		PageNum:   1,
+		SortType:  pb.SortType_Name,
+		AscOrder:  true,
+	}
+	req.SignReq(priKey)
+	resp, err := ms.ListFiles(ctx, &req)
+	assert.Equal(uint32(5), resp.Code)
+
+	pathId := []byte("path-id")
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, path).Return(true, pathId)
+	mockDao.On("FileOwnerListOfPath", nodeIdStr, mock.Anything, uint32(500), uint32(1), "NAME", true).Return(uint32(0), nil)
+	req = pb.ListFilesReq{NodeId: nodeId,
+		Timestamp: ts,
+		Path:      path,
+		PageSize:  500,
+		PageNum:   1,
+		AscOrder:  true,
+	}
+	req.SignReq(priKey)
+	resp, err = ms.ListFiles(ctx, &req)
+	assert.Equal(uint32(0), resp.Code)
+	mockDao.AssertExpectations(t)
 }
