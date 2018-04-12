@@ -58,7 +58,7 @@ type resObj struct {
 }
 
 func (self *MatadataService) checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey) {
-	if nodeId == nil {
+	if len(nodeId) == 0 {
 		return &resObj{Code: 100, ErrMsg: "NodeId is required"}, nil
 	}
 	if len(nodeId) != 20 {
@@ -89,12 +89,24 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		return &pb.CheckFileExistResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	fileName := req.FileName
-	existId, _ := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
-	if existId != nil {
-		if req.Interactive {
-			return &pb.CheckFileExistResp{Code: 8, ErrMsg: "exist same name file or folder"}, nil
+	existId, isFolder := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	if len(existId) > 0 {
+		if isFolder {
+			if req.Interactive {
+				return &pb.CheckFileExistResp{Code: 12, ErrMsg: "exist same name folder"}, nil
+			} else {
+				fileName = fixFileName(req.FileName)
+				existId = nil
+			}
 		} else {
-			fileName = fixFileName(req.FileName)
+			if !req.NewVersion {
+				if req.Interactive {
+					return &pb.CheckFileExistResp{Code: 8, ErrMsg: "exist same name file"}, nil
+				} else {
+					fileName = fixFileName(req.FileName)
+					existId = nil
+				}
+			}
 		}
 	}
 	//check available space
@@ -110,14 +122,14 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		if !done {
 			return &pb.CheckFileExistResp{Code: 10, ErrMsg: "this file is being uploaded by other user, please wait a moment to retry"}, nil
 		}
-		self.d.FileReuse(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId)
+		self.d.FileReuse(existId, nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId)
 		return &pb.CheckFileExistResp{Code: 0}, nil
 	} else {
 		if req.FileSize <= embed_metadata_max_file_size {
 			if req.FileSize != uint64(len(req.FileData)) {
 				return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
 			}
-			self.d.FileSaveTiny(nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
+			self.d.FileSaveTiny(existId, nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
 			return &pb.CheckFileExistResp{Code: 0}, nil
 		}
 		resp := pb.CheckFileExistResp{Code: 1}
@@ -297,12 +309,24 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		return &pb.UploadFileDoneResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	fileName := req.FileName
-	existId, _ := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
-	if existId != nil {
-		if req.Interactive {
-			return &pb.UploadFileDoneResp{Code: 8, ErrMsg: "exist same name file or folder"}, nil
+	existId, isFolder := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	if len(existId) > 0 {
+		if isFolder {
+			if req.Interactive {
+				return &pb.UploadFileDoneResp{Code: 12, ErrMsg: "exist same name folder"}, nil
+			} else {
+				fileName = fixFileName(req.FileName)
+				existId = nil
+			}
 		} else {
-			fileName = fixFileName(req.FileName)
+			if !req.NewVersion {
+				if req.Interactive {
+					return &pb.UploadFileDoneResp{Code: 8, ErrMsg: "exist same name file"}, nil
+				} else {
+					fileName = fixFileName(req.FileName)
+					existId = nil
+				}
+			}
 		}
 	}
 	//check available space
@@ -318,7 +342,7 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
 		}
 	}
-	self.d.FileSaveDone(nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId, len(req.Partition), blocks, storeVolume)
+	self.d.FileSaveDone(existId, nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId, len(req.Partition), blocks, storeVolume)
 	return &pb.UploadFileDoneResp{Code: 0}, nil
 }
 
@@ -357,7 +381,7 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 }
 
 func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
-	if fofs == nil || len(fofs) == 0 {
+	if len(fofs) == 0 {
 		return nil
 	}
 	res := make([]*pb.FileOrFolder, 0, len(fofs))
@@ -389,7 +413,7 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 	if size != req.FileSize {
 		return &pb.RetrieveFileResp{Code: 8, ErrMsg: "file data size is not equal fileSize"}, nil
 	}
-	if fileData != nil && len(fileData) > 0 {
+	if len(fileData) > 0 {
 		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
 	}
 	ts := uint64(time.Now().Unix())
@@ -439,7 +463,7 @@ func (self *MatadataService) toRetrievePartition(fileHash string, blocks []strin
 			return nil, errors.New("can not parse chechsum char:" + arr[3])
 		}
 		nodeIds := strings.Split(arr[4], block_node_id_sep)
-		if nodeIds == nil || len(nodeIds) == 0 {
+		if len(nodeIds) == 0 {
 			return nil, fmt.Errorf("parse file: %s block str %s error, no store nodeId", fileHash, str)
 		}
 		store := make([]*pb.RetrieveNode, 0, len(nodeIds))
@@ -492,7 +516,7 @@ func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb
 	if resobj != nil {
 		return &pb.RemoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
-	if pathId == nil {
+	if len(pathId) == 0 {
 		return &pb.RemoveResp{Code: 6, ErrMsg: "path not exists"}, nil
 	}
 	if !self.d.FileOwnerRemove(nodeIdStr, pathId, req.Recursive) {
@@ -504,6 +528,9 @@ func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb
 func (self *MatadataService) findPathId(nodeId string, filePath *pb.FilePath, needFolder bool) (res *resObj, pathId []byte) {
 	switch v := filePath.OneOfPath.(type) {
 	case *pb.FilePath_Id:
+		if len(v.Id) == 0 {
+			return
+		}
 		ni, isFolder := self.d.FileOwnerCheckId(v.Id)
 		if len(ni) == 0 {
 			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
@@ -521,10 +548,13 @@ func (self *MatadataService) findPathId(nodeId string, filePath *pb.FilePath, ne
 		if path[0] != '/' {
 			return &resObj{Code: 200, ErrMsg: "path must start with slash /"}, nil
 		}
-		var found bool
-		found, pathId = self.d.FileOwnerIdOfFilePath(nodeId, path)
+		var found, isFolder bool
+		found, pathId, isFolder = self.d.FileOwnerIdOfFilePath(nodeId, path)
 		if !found {
 			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
+		}
+		if needFolder && !isFolder {
+			return &resObj{Code: 203, ErrMsg: "path is not a folder"}, nil
 		}
 		return
 	}
@@ -535,7 +565,7 @@ const block_sep = ";"
 const block_node_id_sep = ","
 
 func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
-	if partitions == nil || len(partitions) == 0 {
+	if len(partitions) == 0 {
 		return nil, errors.New("empty partition")
 	}
 	res := make([]string, 0, len(partitions))
@@ -544,7 +574,7 @@ func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
 			return nil, errors.New("empty block")
 		}
 		for _, b := range p.Block {
-			if b.StoreNodeId == nil || len(b.StoreNodeId) == 0 {
+			if len(b.StoreNodeId) == 0 {
 				return nil, errors.New("empty store nodeId")
 			}
 			str := base64.StdEncoding.EncodeToString(b.Hash) + block_sep + strconv.Itoa(int(b.Size)) + block_sep + strconv.Itoa(int(b.BlockSeq)) + block_sep

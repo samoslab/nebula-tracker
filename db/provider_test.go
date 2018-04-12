@@ -16,6 +16,9 @@ func TestDoProviderSave(t *testing.T) {
 	nodeId := base64.StdEncoding.EncodeToString(sha1Sum([]byte("test node id")))
 	// t.Errorf("%s length: %d", nodeId, len(nodeId))
 	email := "testemail@testemail.com"
+
+	initCount := len(providerFindAll(tx))
+
 	if existsProviderNodeId(tx, nodeId) {
 		t.Errorf("Failed.")
 	}
@@ -51,8 +54,9 @@ func TestDoProviderSave(t *testing.T) {
 	if len(p.StorageVolume) != 1 {
 		t.Errorf("Failed.")
 	}
-	if len(providerFindAll(tx)) != 0 {
-		t.Errorf("Failed.")
+	if len(providerFindAll(tx)) != initCount+1 {
+		t.Error(initCount)
+		t.Error(len(providerFindAll(tx)))
 	}
 
 }

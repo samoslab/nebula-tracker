@@ -41,12 +41,16 @@ func incrementRefCount(tx *sql.Tx, hash string) {
 	}
 }
 
-func FileReuse(nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte) {
+func FileReuse(existId []byte, nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	incrementRefCount(tx, hash)
-	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
-	saveFileVersion(tx, ownerId, nodeId, hash)
+	if len(existId) > 0 {
+		updateFileOwnerNewVersion(tx, existId, nodeId, modTime, hash, size)
+	} else {
+		existId = saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
+	}
+	saveFileVersion(tx, existId, nodeId, hash)
 	checkErr(tx.Commit())
 	commit = true
 }
@@ -59,12 +63,16 @@ func fileSave(tx *sql.Tx, nodeId string, hash string, size uint64, fileData []by
 	checkErr(err)
 }
 
-func FileSaveTiny(nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, parentId []byte) {
+func FileSaveTiny(existId []byte, nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, parentId []byte) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	fileSave(tx, nodeId, hash, size, fileData, true, size*3)
-	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
-	saveFileVersion(tx, ownerId, nodeId, hash)
+	if len(existId) > 0 {
+		updateFileOwnerNewVersion(tx, existId, nodeId, modTime, hash, size)
+	} else {
+		existId = saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
+	}
+	saveFileVersion(tx, existId, nodeId, hash)
 	checkErr(tx.Commit())
 	commit = true
 }
@@ -95,12 +103,16 @@ func fileSaveDone(tx *sql.Tx, hash string, partitionCount int, blocks []string, 
 	}
 }
 
-func FileSaveDone(nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte, partitionCount int, blocks []string, storeVolume uint64) {
+func FileSaveDone(existId []byte, nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte, partitionCount int, blocks []string, storeVolume uint64) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	fileSaveDone(tx, hash, partitionCount, blocks, storeVolume)
-	ownerId := saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
-	saveFileVersion(tx, ownerId, nodeId, hash)
+	if len(existId) > 0 {
+		updateFileOwnerNewVersion(tx, existId, nodeId, modTime, hash, size)
+	} else {
+		existId = saveFileOwner(tx, nodeId, false, name, parentId, modTime, &sql.NullString{Valid: true, String: hash}, size)
+	}
+	saveFileVersion(tx, existId, nodeId, hash)
 	checkErr(tx.Commit())
 	commit = true
 }

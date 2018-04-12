@@ -12,30 +12,30 @@ import (
 
 const slash = "/"
 
-func FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte) {
+func FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte, isFolder bool) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	found, id = queryIdRecursion(tx, nodeId, path)
+	found, id, isFolder = queryIdRecursion(tx, nodeId, path)
 	checkErr(tx.Commit())
 	commit = true
 	return
 }
 
-func queryIdRecursion(tx *sql.Tx, nodeId string, path string) (found bool, id []byte) {
+func queryIdRecursion(tx *sql.Tx, nodeId string, path string) (found bool, id []byte, isFolder bool) {
 	paths := strings.Split(path[1:], slash)
 	for _, p := range paths {
-		id = queryId(tx, nodeId, id, p)
-		if id == nil {
-			return false, nil
+		found, id, isFolder = queryId(tx, nodeId, id, p)
+		if !found {
+			return
 		}
 	}
-	return true, id
+	return
 }
 
-func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string) []byte {
+func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string) (found bool, id []byte, isFolder bool) {
 	var rows *sql.Rows
 	var err error
-	sqlStr := "SELECT ID FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s and FOLDER=true"
+	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s and FOLDER=true"
 	if parent == nil || len(parent) == 0 {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, folderName)
 	} else {
@@ -44,12 +44,11 @@ func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string) []byte
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
-		var id []byte
-		err = rows.Scan(&id)
+		err = rows.Scan(&id, &isFolder)
 		checkErr(err)
-		return id
+		return true, id, isFolder
 	}
-	return nil
+	return false, nil, false
 }
 
 func FileOwnerFileExists(nodeId string, parent []byte, name string) (id []byte, isFolder bool) {
@@ -87,6 +86,19 @@ func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, parent
 	return lastInsertId
 }
 
+func updateFileOwnerNewVersion(tx *sql.Tx, existId []byte, nodeId string, modTime uint64, hash string, size uint64) {
+	stmt, err := tx.Prepare("update FILE_OWNER set MOD_TIME=$3,HASH=$4,SIZE=$5 where ID=$1 and NODE_ID=$2 and FOLDER=false")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(existId, nodeId, time.Unix(int64(modTime), 0), hash, size)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	if cnt == 0 {
+		panic(errors.New("no record found"))
+	}
+}
+
 func FileOwnerMkFolders(nodeId string, parent []byte, folders []string) (firstDuplicationName string) {
 	modTime := uint64(time.Now().Unix())
 	tx, commit := beginTx()
@@ -106,9 +118,13 @@ func fileOwnerMkFolders(tx *sql.Tx, nodeId string, parent []byte, folders []stri
 		}
 	}()
 	hash := &sql.NullString{}
+	var parentId interface{} = nil
+	if len(parent) > 0 {
+		parentId = parent
+	}
 	for _, folder := range folders {
 		firstDuplicationName = folder
-		saveFileOwner(tx, nodeId, true, folder, parent, modTime, hash, 0)
+		saveFileOwner(tx, nodeId, true, folder, parentId, modTime, hash, 0)
 	}
 	return ""
 }

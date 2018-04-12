@@ -114,7 +114,7 @@ func (_m *daoMock) FileOwnerFileExists(nodeId string, parent []byte, name string
 }
 
 // FileOwnerIdOfFilePath provides a mock function with given fields: nodeId, path
-func (_m *daoMock) FileOwnerIdOfFilePath(nodeId string, path string) (bool, []byte) {
+func (_m *daoMock) FileOwnerIdOfFilePath(nodeId string, path string) (bool, []byte, bool) {
 	ret := _m.Called(nodeId, path)
 
 	var r0 bool
@@ -133,7 +133,14 @@ func (_m *daoMock) FileOwnerIdOfFilePath(nodeId string, path string) (bool, []by
 		}
 	}
 
-	return r0, r1
+	var r2 bool
+	if rf, ok := ret.Get(2).(func(string, string) bool); ok {
+		r2 = rf(nodeId, path)
+	} else {
+		r2 = ret.Get(2).(bool)
+	}
+
+	return r0, r1, r2
 }
 
 // FileOwnerListOfPath provides a mock function with given fields: nodeId, parentId, pageSize, pageNum, sortField, asc
@@ -240,14 +247,14 @@ func (_m *daoMock) FileRetrieve(hash string) (bool, bool, []byte, int, []string,
 	return r0, r1, r2, r3, r4, r5
 }
 
-// FileReuse provides a mock function with given fields: nodeId, hash, name, size, modTime, parentId
-func (_m *daoMock) FileReuse(nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte) {
-	_m.Called(nodeId, hash, name, size, modTime, parentId)
+// FileReuse provides a mock function with given fields: existId, nodeId, hash, name, size, modTime, parentId
+func (_m *daoMock) FileReuse(existId []byte, nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte) {
+	_m.Called(existId, nodeId, hash, name, size, modTime, parentId)
 }
 
-// FileSaveDone provides a mock function with given fields: nodeId, hash, name, size, modTime, parentId, partitionCount, blocks, storeVolume
-func (_m *daoMock) FileSaveDone(nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte, partitionCount int, blocks []string, storeVolume uint64) {
-	_m.Called(nodeId, hash, name, size, modTime, parentId, partitionCount, blocks, storeVolume)
+// FileSaveDone provides a mock function with given fields: existId, nodeId, hash, name, size, modTime, parentId, partitionCount, blocks, storeVolume
+func (_m *daoMock) FileSaveDone(existId []byte, nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte, partitionCount int, blocks []string, storeVolume uint64) {
+	_m.Called(existId, nodeId, hash, name, size, modTime, parentId, partitionCount, blocks, storeVolume)
 }
 
 // FileSaveStep1 provides a mock function with given fields: nodeId, hash, size, storeVolume
@@ -255,9 +262,9 @@ func (_m *daoMock) FileSaveStep1(nodeId string, hash string, size uint64, storeV
 	_m.Called(nodeId, hash, size, storeVolume)
 }
 
-// FileSaveTiny provides a mock function with given fields: nodeId, hash, fileData, name, size, modTime, parentId
-func (_m *daoMock) FileSaveTiny(nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, parentId []byte) {
-	_m.Called(nodeId, hash, fileData, name, size, modTime, parentId)
+// FileSaveTiny provides a mock function with given fields: existId, nodeId, hash, fileData, name, size, modTime, parentId
+func (_m *daoMock) FileSaveTiny(existId []byte, nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, parentId []byte) {
+	_m.Called(existId, nodeId, hash, fileData, name, size, modTime, parentId)
 }
 
 // ProviderFindOne provides a mock function with given fields: nodeId
