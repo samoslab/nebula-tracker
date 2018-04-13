@@ -14,9 +14,9 @@ import (
 	"nebula-tracker/register/random"
 	"nebula-tracker/register/sendmail"
 
+	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
 	log "github.com/sirupsen/logrus"
-	"github.com/spolabs/nebula/provider/node"
 	"golang.org/x/net/context"
 
 	util_hash "github.com/samoslab/nebula/util/hash"
