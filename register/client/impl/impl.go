@@ -16,9 +16,11 @@ import (
 
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
 	log "github.com/sirupsen/logrus"
+	"github.com/spolabs/nebula/provider/node"
 	"golang.org/x/net/context"
 
 	util_hash "github.com/samoslab/nebula/util/hash"
+	util_rsa "github.com/samoslab/nebula/util/rsa"
 )
 
 type ClientRegisterService struct {
@@ -44,7 +46,7 @@ func (self *ClientRegisterService) GetPublicKey(ctx context.Context, req *pb.Get
 }
 
 func (self *ClientRegisterService) decrypt(data []byte) ([]byte, error) {
-	return rsa.DecryptPKCS1v15(rand.Reader, self.PriKey, data)
+	return util_rsa.DecryptLong(self.PriKey, data, node.RSA_KEY_BYTES)
 }
 
 func (self *ClientRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (*pb.RegisterResp, error) {
