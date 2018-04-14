@@ -22,6 +22,9 @@ func FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte, i
 }
 
 func queryIdRecursion(tx *sql.Tx, nodeId string, path string) (found bool, id []byte, isFolder bool) {
+	if path[len(path)-1] == '/' {
+		path = path[0 : len(path)-1]
+	}
 	paths := strings.Split(path[1:], slash)
 	for _, p := range paths {
 		found, id, isFolder = queryId(tx, nodeId, id, p)
