@@ -22,12 +22,19 @@ func StopAutoUpdate() {
 
 var providers *[]db.ProviderInfo
 var providerMap map[string]*db.ProviderInfo
+var initialized = false
 
 func Count() int {
+	if !initialized {
+		update()
+	}
 	return len(*providers)
 }
 
 func Choose(num uint32) []db.ProviderInfo {
+	if !initialized {
+		update()
+	}
 	// TODO
 	return (*providers)[0:num]
 }
@@ -43,6 +50,7 @@ func Get(nodeId string) *db.ProviderInfo {
 func update() {
 	all := db.ProviderFindAll()
 	providers, providerMap = filter(all)
+	initialized = true
 	fmt.Printf("%s found %d available provider.\n", time.Now().UTC().Format("2006-01-02 15:04 UTC"), len(*providers))
 }
 

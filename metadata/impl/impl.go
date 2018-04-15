@@ -40,14 +40,34 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.MkFolderResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
+	if len(req.Folder) == 0 {
+		return &pb.MkFolderResp{Code: 6, ErrMsg: "Folder is required"}, nil
+	}
+	for _, name := range req.Folder {
+		if len(name) == 0 {
+			return &pb.MkFolderResp{Code: 7, ErrMsg: "folder name can not be empty"}, nil
+		}
+	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.MkFolderResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
-	firstDuplicationName := self.d.FileOwnerMkFolders(nodeIdStr, parentId, req.Folder)
-	if firstDuplicationName != "" {
-		return &pb.MkFolderResp{Code: 8, ErrMsg: "duplication of folder name: " + firstDuplicationName}, nil
+	duplicateFile, duplicateFolder := self.d.FileOwnerMkFolders(req.Interactive, nodeIdStr, parentId, req.Folder)
+	if req.Interactive {
+		if len(duplicateFile)+len(duplicateFolder) > 0 {
+			if len(duplicateFile) == 0 {
+				return &pb.MkFolderResp{Code: 8, ErrMsg: "duplication of folder name: " + strings.Join(duplicateFolder, ", ")}, nil
+			} else if len(duplicateFolder) == 0 {
+				return &pb.MkFolderResp{Code: 9, ErrMsg: "duplication of folder name, aleady exist file: " + strings.Join(duplicateFile, ", ")}, nil
+			} else {
+				return &pb.MkFolderResp{Code: 10, ErrMsg: "duplication of folder name, aleady exist folder: " + strings.Join(duplicateFolder, ", ") + ", aleady exist file:" + strings.Join(duplicateFile, ", ")}, nil
+			}
+		}
+	} else {
+		if len(duplicateFile) > 0 {
+			return &pb.MkFolderResp{Code: 9, ErrMsg: "duplication of folder name, aleady exist file: " + strings.Join(duplicateFile, ", ")}, nil
+		}
 	}
 	return &pb.MkFolderResp{Code: 0}, nil
 }

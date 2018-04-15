@@ -166,18 +166,29 @@ func (_m *daoMock) FileOwnerListOfPath(nodeId string, parentId []byte, pageSize 
 	return r0, r1
 }
 
-// FileOwnerMkFolders provides a mock function with given fields: nodeId, parent, folders
-func (_m *daoMock) FileOwnerMkFolders(nodeId string, parent []byte, folders []string) string {
-	ret := _m.Called(nodeId, parent, folders)
+// FileOwnerMkFolders provides a mock function with given fields: interactive, nodeId, parent, folders
+func (_m *daoMock) FileOwnerMkFolders(interactive bool, nodeId string, parent []byte, folders []string) ([]string, []string) {
+	ret := _m.Called(interactive, nodeId, parent, folders)
 
-	var r0 string
-	if rf, ok := ret.Get(0).(func(string, []byte, []string) string); ok {
-		r0 = rf(nodeId, parent, folders)
+	var r0 []string
+	if rf, ok := ret.Get(0).(func(bool, string, []byte, []string) []string); ok {
+		r0 = rf(interactive, nodeId, parent, folders)
 	} else {
-		r0 = ret.Get(0).(string)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
 	}
 
-	return r0
+	var r1 []string
+	if rf, ok := ret.Get(1).(func(bool, string, []byte, []string) []string); ok {
+		r1 = rf(interactive, nodeId, parent, folders)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]string)
+		}
+	}
+
+	return r0, r1
 }
 
 // FileOwnerRemove provides a mock function with given fields: nodeId, pathId, recursive

@@ -81,8 +81,11 @@ func TestFileOwner(t *testing.T) {
 	if fileOwnerListOfPathCount(tx, nodeId, nil) != count+1 {
 		t.Errorf("Failed.")
 	}
-	folder := fileOwnerMkFolders(tx, nodeId, id1, []string{"test1", "test-folder2", "test2"}, uint64(time.Now().Unix()))
-	if folder != "test-folder2" {
+	duplicate := fileOwnerMkFolders(tx, false, nodeId, id1, []string{"test1", "test-folder2", "test2"})
+	if len(duplicate) != 1 {
+		t.Errorf("Failed.")
+	}
+	if v, ok := duplicate["test-folder2"]; !ok || !v {
 		t.Errorf("Failed.")
 	}
 }
