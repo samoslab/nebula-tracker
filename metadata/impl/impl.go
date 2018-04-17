@@ -278,6 +278,7 @@ func (self *MatadataService) prepareErasureCodeProvider(partition []*pb.SplitPar
 					Auth:   provider_pb.GenStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)}}})
 		}
 		if len(pis) == pieceCnt {
+			res = append(res, &pb.ErasureCodePartition{ProviderAuth: proAuth, Timestamp: ts})
 			continue
 		}
 		each := pieceCnt * 2 / (len(pis) - pieceCnt)

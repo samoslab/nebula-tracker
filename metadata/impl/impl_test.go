@@ -759,6 +759,43 @@ func TestUploadFilePrepare(t *testing.T) {
 			assert.Equal(2, len(pa.HashAuth))
 		}
 	}
+
+	req = pb.UploadFilePrepareReq{NodeId: nodeId,
+		Timestamp: ts,
+		FileHash:  hash,
+		FileSize:  size,
+		Partition: []*pb.SplitPartition{&pb.SplitPartition{Piece: []*pb.PieceHashAndSize{&pb.PieceHashAndSize{
+			Hash: []byte("hash1"),
+			Size: 1212121,
+		},
+			&pb.PieceHashAndSize{
+				Hash: []byte("hash2"),
+				Size: 1212121,
+			},
+			&pb.PieceHashAndSize{
+				Hash: []byte("hash3"),
+				Size: 1212121,
+			},
+		}}}}
+	req.SignReq(priKey)
+	mockDao = new(daoMock)
+	mockChooser = new(chooserMock)
+	ms = &MatadataService{c: mockChooser, d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockChooser.On("Count").Return(3)
+	mockChooser.On("Choose", uint32(3)).Return(mockProviderInfoSlice(3))
+	resp, err = ms.UploadFilePrepare(ctx, &req)
+	if resp == nil || err != nil {
+		t.Error(err)
+	}
+	mockDao.AssertExpectations(t)
+	mockChooser.AssertExpectations(t)
+	assert.Equal(1, len(resp.Partition))
+	assert.Equal(3, len(resp.Partition[0].ProviderAuth))
+	for _, pa := range resp.Partition[0].ProviderAuth {
+		assert.False(pa.Spare)
+		assert.Equal(1, len(pa.HashAuth))
+	}
 	// t.Error(resp.Partition[0].ProviderAuth)
 }
 
