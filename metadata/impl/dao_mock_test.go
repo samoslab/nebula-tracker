@@ -27,46 +27,53 @@ func (_m *daoMock) ClientGetPubKey(nodeId []byte) *rsa.PublicKey {
 	return r0
 }
 
-// FileCheckExist provides a mock function with given fields: hash
-func (_m *daoMock) FileCheckExist(hash string) (bool, bool, bool, bool, uint64) {
-	ret := _m.Called(hash)
+// FileCheckExist provides a mock function with given fields: nodeId, hash, doneExpSecs
+func (_m *daoMock) FileCheckExist(nodeId string, hash string, doneExpSecs int) (bool, bool, bool, uint64, bool, bool) {
+	ret := _m.Called(nodeId, hash, doneExpSecs)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(string) bool); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(string, string, int) bool); ok {
+		r0 = rf(nodeId, hash, doneExpSecs)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 bool
-	if rf, ok := ret.Get(1).(func(string) bool); ok {
-		r1 = rf(hash)
+	if rf, ok := ret.Get(1).(func(string, string, int) bool); ok {
+		r1 = rf(nodeId, hash, doneExpSecs)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
 
 	var r2 bool
-	if rf, ok := ret.Get(2).(func(string) bool); ok {
-		r2 = rf(hash)
+	if rf, ok := ret.Get(2).(func(string, string, int) bool); ok {
+		r2 = rf(nodeId, hash, doneExpSecs)
 	} else {
 		r2 = ret.Get(2).(bool)
 	}
 
-	var r3 bool
-	if rf, ok := ret.Get(3).(func(string) bool); ok {
-		r3 = rf(hash)
+	var r3 uint64
+	if rf, ok := ret.Get(3).(func(string, string, int) uint64); ok {
+		r3 = rf(nodeId, hash, doneExpSecs)
 	} else {
-		r3 = ret.Get(3).(bool)
+		r3 = ret.Get(3).(uint64)
 	}
 
-	var r4 uint64
-	if rf, ok := ret.Get(4).(func(string) uint64); ok {
-		r4 = rf(hash)
+	var r4 bool
+	if rf, ok := ret.Get(4).(func(string, string, int) bool); ok {
+		r4 = rf(nodeId, hash, doneExpSecs)
 	} else {
-		r4 = ret.Get(4).(uint64)
+		r4 = ret.Get(4).(bool)
 	}
 
-	return r0, r1, r2, r3, r4
+	var r5 bool
+	if rf, ok := ret.Get(5).(func(string, string, int) bool); ok {
+		r5 = rf(nodeId, hash, doneExpSecs)
+	} else {
+		r5 = ret.Get(5).(bool)
+	}
+
+	return r0, r1, r2, r3, r4, r5
 }
 
 // FileOwnerCheckId provides a mock function with given fields: id

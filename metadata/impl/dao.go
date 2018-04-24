@@ -9,7 +9,7 @@ type dao interface {
 	FileOwnerMkFolders(interactive bool, nodeId string, parent []byte, folders []string) (duplicateFileName []string, duplicateFolderName []string)
 	ClientGetPubKey(nodeId []byte) *rsa.PublicKey
 	FileOwnerFileExists(nodeId string, parent []byte, name string) (id []byte, isFolder bool)
-	FileCheckExist(hash string) (exist bool, active bool, removed bool, done bool, size uint64)
+	FileCheckExist(nodeId string, hash string, doneExpSecs int) (exist bool, active bool, done bool, size uint64, selfCreate bool, doneExpired bool)
 	FileReuse(existId []byte, nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte)
 	FileSaveTiny(existId []byte, nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, parentId []byte)
 	FileSaveStep1(nodeId string, hash string, size uint64, storeVolume uint64)
@@ -33,8 +33,8 @@ func (self *daoImpl) ClientGetPubKey(nodeId []byte) *rsa.PublicKey {
 func (self *daoImpl) FileOwnerFileExists(nodeId string, parent []byte, name string) (id []byte, isFolder bool) {
 	return db.FileOwnerFileExists(nodeId, parent, name)
 }
-func (self *daoImpl) FileCheckExist(hash string) (exist bool, active bool, removed bool, done bool, size uint64) {
-	return db.FileCheckExist(hash)
+func (self *daoImpl) FileCheckExist(nodeId string, hash string, doneExpSecs int) (exist bool, active bool, done bool, size uint64, selfCreate bool, doneExpired bool) {
+	return db.FileCheckExist(nodeId, hash, doneExpSecs)
 }
 func (self *daoImpl) FileReuse(existId []byte, nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte) {
 	db.FileReuse(existId, nodeId, hash, name, size, modTime, parentId)

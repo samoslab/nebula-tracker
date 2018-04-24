@@ -150,61 +150,71 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 	}
 	//check available space
 	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
-	exist, active, _, done, size := self.d.FileCheckExist(hashStr)
+	exist, active, done, size, selfCreate, doneExpired := self.d.FileCheckExist(nodeIdStr, hashStr, done_expired)
 	if exist {
 		if size != req.FileSize {
 			log.Warnf("hash: %s size is %d, new upload file size is %d", hashStr, size, req.FileSize)
 		}
 		if !active {
-			return &pb.CheckFileExistResp{Code: 9, ErrMsg: "this file can not upload Because of laws and regulations"}, nil
+			return &pb.CheckFileExistResp{Code: 9, ErrMsg: "this file can not upload because of laws and regulations"}, nil
 		}
-		if !done {
-			return &pb.CheckFileExistResp{Code: 10, ErrMsg: "this file is being uploaded by other user, please wait a moment to retry"}, nil
-		}
-		self.d.FileReuse(existId, nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId)
-		return &pb.CheckFileExistResp{Code: 0}, nil
-	} else {
-		if req.FileSize <= embed_metadata_max_file_size {
-			if req.FileSize != uint64(len(req.FileData)) {
-				return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
-			}
-			self.d.FileSaveTiny(existId, nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
+		if done {
+			self.d.FileReuse(existId, nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId)
 			return &pb.CheckFileExistResp{Code: 0}, nil
-		}
-		resp := pb.CheckFileExistResp{Code: 1}
-		providerCnt := self.c.Count()
-		conf := config.GetTrackerConfig()
-		if req.FileSize <= multi_replica_max_file_size || (!conf.TestMode && providerCnt < 12) || (conf.TestMode && providerCnt < 3) {
-			resp.StoreType = pb.FileStoreType_MultiReplica
-			resp.ReplicaCount = 5
-			if providerCnt < 5 {
-				resp.ReplicaCount = uint32(providerCnt)
-			}
-			resp.Provider = self.prepareReplicaProvider(resp.ReplicaCount, req.FileHash, req.FileSize)
-			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
 		} else {
-			resp.StoreType = pb.FileStoreType_ErasureCode
-			if providerCnt >= 40 {
-				resp.DataPieceCount = 32
-				resp.VerifyPieceCount = 8
-			} else if providerCnt >= 22 {
-				resp.DataPieceCount = 16
-				resp.VerifyPieceCount = 6
-			} else if providerCnt >= 12 {
-				resp.DataPieceCount = 8
-				resp.VerifyPieceCount = 4
-			} else if conf.TestMode && providerCnt >= 6 {
-				resp.DataPieceCount = 4
-				resp.VerifyPieceCount = 2
-			} else if conf.TestMode && providerCnt >= 3 {
-				resp.DataPieceCount = 2
-				resp.VerifyPieceCount = 1
+			if !selfCreate && !doneExpired {
+				return &pb.CheckFileExistResp{Code: 10, ErrMsg: "this file is being uploaded by other user, please wait a moment to retry"}, nil
 			}
+		}
+	}
+	if req.FileSize <= embed_metadata_max_file_size {
+		if req.FileSize != uint64(len(req.FileData)) {
+			return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
+		}
+		self.d.FileSaveTiny(existId, nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
+		return &pb.CheckFileExistResp{Code: 0}, nil
+	}
+	resp = &pb.CheckFileExistResp{Code: 1}
+	providerCnt := self.c.Count()
+	conf := config.GetTrackerConfig()
+	if req.FileSize <= multi_replica_max_file_size || (!conf.TestMode && providerCnt < 12) || (conf.TestMode && providerCnt < 3) {
+		resp.StoreType = pb.FileStoreType_MultiReplica
+		resp.ReplicaCount = 5
+		if providerCnt < 5 {
+			resp.ReplicaCount = uint32(providerCnt)
+		}
+		resp.Provider = self.prepareReplicaProvider(resp.ReplicaCount, req.FileHash, req.FileSize)
+		if !exist {
 			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
 		}
-		return &resp, nil
+	} else {
+		resp.StoreType = pb.FileStoreType_ErasureCode
+		if providerCnt >= 40 {
+			resp.DataPieceCount = 32
+			resp.VerifyPieceCount = 8
+		} else if providerCnt >= 22 {
+			resp.DataPieceCount = 16
+			resp.VerifyPieceCount = 6
+		} else if providerCnt >= 12 {
+			resp.DataPieceCount = 8
+			resp.VerifyPieceCount = 4
+		} else if conf.TestMode && providerCnt >= 6 {
+			resp.DataPieceCount = 4
+			resp.VerifyPieceCount = 2
+		} else if conf.TestMode && providerCnt >= 3 {
+			resp.DataPieceCount = 2
+			resp.VerifyPieceCount = 1
+		}
+		if !exist {
+			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
+		}
 	}
+	return resp, nil
+
 }
+
+const done_expired = 1800
+
 func uuidStr() string {
 	return uuid.Must(uuid.NewV4()).String()
 }
