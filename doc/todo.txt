@@ -1,5 +1,5 @@
 [finished] metadata interface support pathId 
 [finished] metadata interface support newVersion
 provider add speed test module
-interface implement method add recover
-upnp/ice for nat
+[finished]interface implement method add recover
+[finished]upnp/ice for nat

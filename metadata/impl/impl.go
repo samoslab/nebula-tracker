@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"nebula-tracker/config"
 	"nebula-tracker/db"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +29,13 @@ func NewMatadataService() *MatadataService {
 	return &MatadataService{c: &chooserImpl{}, d: &daoImpl{}}
 }
 
-func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (*pb.MkFolderResp, error) {
+func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (resp *pb.MkFolderResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.MkFolderResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	// TODO support path Id
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
@@ -46,6 +53,9 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 	for _, name := range req.Folder {
 		if len(name) == 0 {
 			return &pb.MkFolderResp{Code: 7, ErrMsg: "folder name can not be empty"}, nil
+		}
+		if strings.ContainsAny(name, "/") {
+			return &pb.MkFolderResp{Code: 13, ErrMsg: "folder name can not contains slash /"}, nil
 		}
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
@@ -91,7 +101,13 @@ func (self *MatadataService) checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey
 	return nil, pubKey
 }
 
-func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFileExistReq) (*pb.CheckFileExistResp, error) {
+func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFileExistReq) (resp *pb.CheckFileExistResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.CheckFileExistResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.CheckFileExistResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
@@ -107,6 +123,9 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.CheckFileExistResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
+	}
+	if strings.ContainsAny(req.FileName, "/") {
+		return &pb.CheckFileExistResp{Code: 13, ErrMsg: "filename can not contains slash /"}, nil
 	}
 	fileName := req.FileName
 	existId, isFolder := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
@@ -219,7 +238,13 @@ func fixFileName(name string) string {
 
 const verify_sign_expired = 15
 
-func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.UploadFilePrepareReq) (*pb.UploadFilePrepareResp, error) {
+func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.UploadFilePrepareReq) (resp *pb.UploadFilePrepareResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = errors.New(fmt.Sprintf("System error: %s", er))
+		}
+	}()
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return nil, errors.New(checkRes.ErrMsg)
@@ -311,8 +336,13 @@ func (self *MatadataService) prepareErasureCodeProvider(partition []*pb.SplitPar
 	return res
 }
 
-func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadFileDoneReq) (*pb.UploadFileDoneResp, error) {
-	// TODO newVersion
+func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadFileDoneReq) (resp *pb.UploadFileDoneResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.UploadFileDoneResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.UploadFileDoneResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
@@ -328,6 +358,9 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.UploadFileDoneResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
+	}
+	if strings.ContainsAny(req.FileName, "/") {
+		return &pb.UploadFileDoneResp{Code: 13, ErrMsg: "filename can not contains slash /"}, nil
 	}
 	fileName := req.FileName
 	existId, isFolder := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
@@ -367,7 +400,13 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	return &pb.UploadFileDoneResp{Code: 0}, nil
 }
 
-func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq) (*pb.ListFilesResp, error) {
+func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq) (resp *pb.ListFilesResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.ListFilesResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.ListFilesResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
@@ -412,7 +451,13 @@ func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
 	return res
 }
 
-func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveFileReq) (*pb.RetrieveFileResp, error) {
+func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveFileReq) (resp *pb.RetrieveFileResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.RetrieveFileResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.RetrieveFileResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
@@ -521,7 +566,13 @@ func (self *MatadataService) toRetrievePartition(fileHash string, blocks []strin
 	return res, nil
 }
 
-func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb.RemoveResp, error) {
+func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (resp *pb.RemoveResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.RemoveResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.RemoveResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil

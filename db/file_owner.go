@@ -38,7 +38,7 @@ func queryIdRecursion(tx *sql.Tx, nodeId string, path string) (found bool, id []
 func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string) (found bool, id []byte, isFolder bool) {
 	var rows *sql.Rows
 	var err error
-	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s and FOLDER=true"
+	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s and FOLDER=true and REMOVED=false"
 	if parent == nil || len(parent) == 0 {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, folderName)
 	} else {
@@ -66,7 +66,7 @@ func FileOwnerFileExists(nodeId string, parent []byte, name string) (id []byte, 
 func fileOwnerFileExists(tx *sql.Tx, nodeId string, parent []byte, name string) (id []byte, isFolder bool) {
 	var rows *sql.Rows
 	var err error
-	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s"
+	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s and REMOVED=false"
 	if parent == nil || len(parent) == 0 {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, name)
 	} else {
@@ -83,7 +83,7 @@ func fileOwnerFileExists(tx *sql.Tx, nodeId string, parent []byte, name string) 
 }
 
 func fileOwnerBatchFileExists(tx *sql.Tx, nodeId string, parent []byte, names []string) map[string]bool {
-	sqlStr := "SELECT NAME,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME in " + inClause(len(names), 2) + " and PARENT_ID%s"
+	sqlStr := "SELECT NAME,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME in " + inClause(len(names), 2) + " and PARENT_ID%s and REMOVED=false"
 	if len(parent) == 0 {
 		sqlStr = fmt.Sprintf(sqlStr, " is null")
 	} else {
@@ -284,7 +284,7 @@ func fileOwnerRemove(tx *sql.Tx, nodeId string, pathId []byte) {
 }
 
 func fileOwnerCheckId(tx *sql.Tx, id []byte) (nodeId string, isFolder bool) {
-	rows, err := tx.Query("SELECT NODE_ID,FOLDER FROM FILE_OWNER where ID=$1", id)
+	rows, err := tx.Query("SELECT NODE_ID,FOLDER FROM FILE_OWNER where ID=$1 and REMOVED=false", id)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
