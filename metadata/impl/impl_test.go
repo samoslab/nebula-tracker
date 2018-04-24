@@ -1088,6 +1088,21 @@ func TestRemove(t *testing.T) {
 	resp, err = ms.Remove(ctx, &req)
 	assert.Equal(uint32(0), resp.Code)
 	mockDao.AssertExpectations(t)
+
+	path = &pb.FilePath{&pb.FilePath_Id{pathId}}
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerCheckId", pathId).Return(nodeIdStr, false)
+	mockDao.On("FileOwnerRemove", nodeIdStr, pathId, false).Return(true)
+	req = pb.RemoveReq{NodeId: nodeId,
+		Timestamp: ts,
+		Target:    path,
+		Recursive: false}
+	req.SignReq(priKey)
+	resp, err = ms.Remove(ctx, &req)
+	assert.Equal(uint32(0), resp.Code)
+	mockDao.AssertExpectations(t)
 }
 
 func TestListFiles(t *testing.T) {

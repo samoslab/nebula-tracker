@@ -612,6 +612,7 @@ func (self *MatadataService) findPathId(nodeId string, filePath *pb.FilePath, ne
 		if needFolder && !isFolder {
 			return &resObj{Code: 203, ErrMsg: "path is not a folder"}, nil
 		}
+		return nil, v.Id
 	case *pb.FilePath_Path:
 		path := v.Path
 		if path == "" || path == "/" {
