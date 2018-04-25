@@ -32,7 +32,7 @@ func FileCheckExist(nodeId string, hash string, doneExpSecs int) (exist bool, ac
 }
 
 func fileChangeCreatorNodeId(tx *sql.Tx, hash string, nodeId string) {
-	stmt, err := tx.Prepare("update FILE CREATOR_NODE_ID=$2,REMOVED=false,LAST_MODIFIED=now() where HASH=$1")
+	stmt, err := tx.Prepare("update FILE set CREATOR_NODE_ID=$2,REMOVED=false,LAST_MODIFIED=now() where HASH=$1")
 	defer stmt.Close()
 	checkErr(err)
 	rs, err := stmt.Exec(hash, nodeId)
@@ -45,10 +45,10 @@ func fileChangeCreatorNodeId(tx *sql.Tx, hash string, nodeId string) {
 }
 
 func fileChangeRemoved(tx *sql.Tx, hash string, removed bool) {
-	stmt, err := tx.Prepare("update FILE REMOVED=$2,LAST_MODIFIED=now() where HASH=$1")
+	stmt, err := tx.Prepare("update FILE set REMOVED=$2,LAST_MODIFIED=now() where HASH=$1 and REMOVED=$3")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(hash, removed)
+	rs, err := stmt.Exec(hash, removed, !removed)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -62,7 +62,7 @@ func fileCheckExist(tx *sql.Tx, hash string) (exist bool, active bool, removed b
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
-		err = rows.Scan(&active, &removed, &done, &size, &creatorNodeId, lastModified)
+		err = rows.Scan(&active, &removed, &done, &size, &creatorNodeId, &lastModified)
 		checkErr(err)
 		exist = true
 		return

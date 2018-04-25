@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"testing"
+	"time"
 
 	"nebula-tracker/config"
 )
@@ -18,6 +19,20 @@ func TestFileTiny(t *testing.T) {
 	hash := base64.StdEncoding.EncodeToString(sha1Sum([]byte("test hash")))
 	fileSave(tx, nodeId, hash, 123123, nil, true, 123123*3)
 	incrementRefCount(tx, hash)
+	exist, active, removed, done, size, creatorNodeId, lastModified := fileCheckExist(tx, hash)
+	if !exist || !active || removed || !done || creatorNodeId != nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
+		t.Errorf("Failed.")
+	}
+	fileChangeRemoved(tx, hash, true)
+	exist, active, removed, done, size, creatorNodeId, lastModified = fileCheckExist(tx, hash)
+	if !exist || !active || !removed || !done || creatorNodeId != nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
+		t.Errorf("Failed.")
+	}
+	fileChangeCreatorNodeId(tx, hash, "test-new-node-id")
+	exist, active, removed, done, size, creatorNodeId, lastModified = fileCheckExist(tx, hash)
+	if !exist || !active || removed || !done || creatorNodeId == nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
+		t.Errorf("Failed.")
+	}
 	exist, active, data, partitionCount, blocks, size := fileRetrieve(tx, hash)
 	if !exist {
 		t.Errorf("Failed.")
