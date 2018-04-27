@@ -1,0 +1,28 @@
+syntax = "proto3";
+package pb;
+
+service UploadService {
+
+	rpc Upload(stream UploadReq) returns (UploadResp){}
+
+    rpc Download(DownloadReq) returns (stream DownloadResp){}
+ 	
+}   
+message UploadReq{
+    bytes data=1;
+}
+
+message UploadResp{
+}
+
+message DownloadReq{
+    uint32 batchSize=1;
+}
+
+message DownloadResp{
+    bytes data=1;
+}
+
+
+
+
