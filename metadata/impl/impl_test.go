@@ -1205,3 +1205,41 @@ func TestListFiles(t *testing.T) {
 	assert.Equal(uint32(0), resp.Code)
 	mockDao.AssertExpectations(t)
 }
+
+func TestToRetrievePartition(t *testing.T) {
+	assert := assert.New(t)
+	// priKey, err := rsa.GenerateKey(rand.Reader, 256*8)
+	// if err != nil {
+	// 	t.Errorf("failed")
+	// }
+	// pubKey := &priKey.PublicKey
+	// pubKeyBytes := x509.MarshalPKCS1PublicKey(pubKey)
+	// nodeId := util_hash.Sha1(pubKeyBytes)
+	// nodeIdStr := base64.StdEncoding.EncodeToString(nodeId)
+	hash := util_hash.Sha1([]byte("test-file"))
+	hashStr := base64.StdEncoding.EncodeToString(hash)
+	ts := uint64(time.Now().Unix())
+
+	mockDao := new(daoMock)
+	mockChooser := new(chooserMock)
+	ms := &MatadataService{c: mockChooser, d: mockDao}
+	blocks := []string{"6PH4p/r6lfeda015UsGUimTQQx4=;69632672;0;0;C4dbshTe5MGCwVzBTtl9kF2j/zs=", "z4cD2ZvO1Rm9iEbt6U6GKLYCc90=;69632672;1;0;FOO58qPQuakQqjoGr7s3soczexs=", "4oUhBG58oaTmeAyomggi2qoUoIU=;69632672;2;1;t4ofGQu2D6JaRmizTWqkJ1Eh6T0=", "yRctnsgmP3uHE5QOXneMgoBmPf8=;69632672;0;0;C4dbshTe5MGCwVzBTtl9kF2j/zs=", "7Tgc7U4ab6v8nJRw+WZu1yJbY0U=;69632672;1;0;FOO58qPQuakQqjoGr7s3soczexs=", "Ke1p6JLqLM7FX5+HM4CEd/SAcxc=;69632672;2;1;t4ofGQu2D6JaRmizTWqkJ1Eh6T0="}
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
+	partitions, err := ms.toRetrievePartition(hashStr, blocks, 2, ts)
+	assert.Nil(err)
+	assert.Equal(2, len(partitions))
+	assert.Equal(3, len(partitions[0].Block))
+	assert.Equal(3, len(partitions[1].Block))
+	assert.Equal("6PH4p/r6lfeda015UsGUimTQQx4=", base64.StdEncoding.EncodeToString(partitions[0].Block[0].Hash))
+	assert.Equal("z4cD2ZvO1Rm9iEbt6U6GKLYCc90=", base64.StdEncoding.EncodeToString(partitions[0].Block[1].Hash))
+	assert.Equal("4oUhBG58oaTmeAyomggi2qoUoIU=", base64.StdEncoding.EncodeToString(partitions[0].Block[2].Hash))
+	assert.Equal("yRctnsgmP3uHE5QOXneMgoBmPf8=", base64.StdEncoding.EncodeToString(partitions[1].Block[0].Hash))
+	assert.Equal("7Tgc7U4ab6v8nJRw+WZu1yJbY0U=", base64.StdEncoding.EncodeToString(partitions[1].Block[1].Hash))
+	assert.Equal("Ke1p6JLqLM7FX5+HM4CEd/SAcxc=", base64.StdEncoding.EncodeToString(partitions[1].Block[2].Hash))
+	// t.Error(partitions)
+}

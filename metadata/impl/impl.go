@@ -571,7 +571,7 @@ func (self *MatadataService) toRetrievePartition(fileHash string, blocks []strin
 	res := make([]*pb.RetrievePartition, 0, partitionsCount)
 	blockCount := len(blocks) / partitionsCount
 	for i := 0; i < partitionsCount; i++ {
-		res = append(res, &pb.RetrievePartition{Block: slice[i : i+blockCount]})
+		res = append(res, &pb.RetrievePartition{Block: slice[i*blockCount : i*blockCount+blockCount]})
 	}
 	return res, nil
 }
