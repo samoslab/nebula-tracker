@@ -13,12 +13,14 @@ import (
 )
 
 func upload(client pb.UploadServiceClient, batchSize uint32) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	file, err := os.Open("test.file")
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	stream, err := client.Upload(context.Background())
+	stream, err := client.Upload(ctx)
 	if err != nil {
 		return err
 	}
@@ -47,6 +49,8 @@ func upload(client pb.UploadServiceClient, batchSize uint32) error {
 }
 
 func download(client pb.UploadServiceClient, batchSize uint32) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	file, err := os.OpenFile(
 		strconv.FormatInt(time.Now().Unix(), 16)+".file",
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
@@ -55,7 +59,7 @@ func download(client pb.UploadServiceClient, batchSize uint32) error {
 		return err
 	}
 	defer file.Close()
-	stream, err := client.Download(context.Background(), &pb.DownloadReq{BatchSize: batchSize})
+	stream, err := client.Download(ctx, &pb.DownloadReq{BatchSize: batchSize})
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {
@@ -75,17 +79,17 @@ func download(client pb.UploadServiceClient, batchSize uint32) error {
 }
 
 func main() {
-	if len(os.Args) != 3 {
+	if len(os.Args) != 4 {
 		fmt.Println("Error Usage.")
 		return
 	}
-	val, err := strconv.ParseUint(os.Args[2], 10, 64)
+	val, err := strconv.ParseUint(os.Args[3], 10, 64)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	batchSize := uint32(val)
-	conn, err := grpc.Dial("127.0.0.1:6666", grpc.WithInsecure())
+	conn, err := grpc.Dial(os.Args[1], grpc.WithInsecure())
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -93,15 +97,23 @@ func main() {
 	defer conn.Close()
 	usc := pb.NewUploadServiceClient(conn)
 	start := time.Now().UnixNano()
-	switch os.Args[1] {
+	switch os.Args[2] {
 	case "upload":
-		upload(usc, batchSize)
-		fmt.Printf("%q cost: %d\n", os.Args[1], time.Now().UnixNano()-start)
+		err = upload(usc, batchSize)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Printf("%q batchSize: %d cost: %d\n", os.Args[2], batchSize, time.Now().UnixNano()-start)
 	case "download":
-		download(usc, batchSize)
-		fmt.Printf("%q cost: %d\n", os.Args[1], time.Now().UnixNano()-start)
+		err = download(usc, batchSize)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Printf("%q batchSize: %d cost: %d\n", os.Args[2], batchSize, time.Now().UnixNano()-start)
 	default:
-		fmt.Printf("%q is not valid command.\n", os.Args[1])
+		fmt.Printf("%q is not valid command.\n", os.Args[2])
 		os.Exit(2)
 	}
 }
