@@ -56,7 +56,7 @@ func main() {
 	defer lstfile.Close()
 	start := time.Now().UnixNano()
 	for i := 0; i < count; i++ {
-		bs := random(32, 512)
+		bs := random(32*1024, 512*1024)
 		key := sha1Sum(bs)
 		_, err := lstfile.Write(key)
 		if err != nil {
