@@ -270,7 +270,17 @@ func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *
 	return &pb.ResendVerifyCodeResp{Success: true}, nil
 }
 
+func (self *ProviderRegisterService) AddExtraStorage(ctx context.Context, req *pb.AddExtraStorageReq) (*pb.AddExtraStorageResp, error) {
+	//TODO
+	return nil, nil
+}
+
 func (self *ProviderRegisterService) GetTrackerServer(ctx context.Context, req *pb.GetTrackerServerReq) (*pb.GetTrackerServerResp, error) {
+	// TODO
+	return nil, nil
+}
+
+func (self *ProviderRegisterService) GetCollectorServer(ctx context.Context, req *pb.GetCollectorServerReq) (*pb.GetCollectorServerResp, error) {
 	// TODO
 	return nil, nil
 }

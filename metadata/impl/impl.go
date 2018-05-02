@@ -183,7 +183,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		if providerCnt < 5 {
 			resp.ReplicaCount = uint32(providerCnt)
 		}
-		resp.Provider = self.prepareReplicaProvider(resp.ReplicaCount, req.FileHash, req.FileSize)
+		resp.Provider = self.prepareReplicaProvider(nodeIdStr, resp.ReplicaCount, req.FileHash, req.FileSize)
 		if !exist {
 			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
 		}
@@ -216,20 +216,21 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 const done_expired = 1800
 
 func uuidStr() string {
-	return uuid.Must(uuid.NewV4()).String()
+	u := uuid.Must(uuid.NewV4())
+	return "-" + base64.StdEncoding.EncodeToString(u[:])
 }
-func (self *MatadataService) prepareReplicaProvider(num uint32, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {
+func (self *MatadataService) prepareReplicaProvider(nodeId string, num uint32, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {
 	pis := self.c.Choose(num)
 	res := make([]*pb.ReplicaProvider, 0, len(pis))
 	ts := uint64(time.Now().Unix())
 	for _, pi := range pis {
-		ticket := uuidStr()
+		ticket := nodeId + uuidStr()
 		res = append(res, &pb.ReplicaProvider{NodeId: pi.NodeIdBytes,
 			Port:      pi.Port,
 			Server:    pi.Server(),
 			Timestamp: ts,
 			Ticket:    ticket,
-			Auth:      provider_pb.GenStoreAuth(pi.PublicKey, fileHash, fileSize, ts, ticket)})
+			Auth:      provider_pb.GenStoreAuth(pi.PublicKey, fileHash, fileSize, fileHash, fileSize, ts, ticket)})
 	}
 	return res
 }
@@ -288,10 +289,10 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 	if providerCnt-pieceCnt < backupProCnt {
 		backupProCnt = providerCnt - pieceCnt
 	}
-	return &pb.UploadFilePrepareResp{Partition: self.prepareErasureCodeProvider(req.Partition, pieceCnt, backupProCnt)}, nil
+	return &pb.UploadFilePrepareResp{Partition: self.prepareErasureCodeProvider(base64.StdEncoding.EncodeToString(req.NodeId), req.FileHash, req.FileSize, req.Partition, pieceCnt, backupProCnt)}, nil
 }
 
-func (self *MatadataService) prepareErasureCodeProvider(partition []*pb.SplitPartition, pieceCnt int, backupProCnt int) []*pb.ErasureCodePartition {
+func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash []byte, fileSize uint64, partition []*pb.SplitPartition, pieceCnt int, backupProCnt int) []*pb.ErasureCodePartition {
 	ts := uint64(time.Now().Unix())
 	res := make([]*pb.ErasureCodePartition, 0, len(partition))
 	for _, part := range partition {
@@ -302,7 +303,7 @@ func (self *MatadataService) prepareErasureCodeProvider(partition []*pb.SplitPar
 		proAuth := make([]*pb.BlockProviderAuth, 0, len(pis))
 		for i, piece := range part.Piece {
 			pi := pis[i]
-			ticket := uuidStr()
+			ticket := nodeId + uuidStr()
 			proAuth = append(proAuth, &pb.BlockProviderAuth{NodeId: pi.NodeIdBytes,
 				Server: pi.Server(),
 				Port:   pi.Port,
@@ -310,7 +311,7 @@ func (self *MatadataService) prepareErasureCodeProvider(partition []*pb.SplitPar
 				HashAuth: []*pb.PieceHashAuth{&pb.PieceHashAuth{Hash: piece.Hash,
 					Size:   piece.Size,
 					Ticket: ticket,
-					Auth:   provider_pb.GenStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)}}})
+					Auth:   provider_pb.GenStoreAuth(pi.PublicKey, fileHash, fileSize, piece.Hash, uint64(piece.Size), ts, ticket)}}})
 		}
 		if len(pis) == pieceCnt {
 			res = append(res, &pb.ErasureCodePartition{ProviderAuth: proAuth, Timestamp: ts})
@@ -335,11 +336,11 @@ func (self *MatadataService) prepareErasureCodeProvider(partition []*pb.SplitPar
 			pi := pis[pieceCnt+i/each]
 			bpa := proAuth[pieceCnt+i/each]
 			piece := part.Piece[i%pieceCnt]
-			ticket := uuidStr()
+			ticket := nodeId + uuidStr()
 			bpa.HashAuth = append(bpa.HashAuth, &pb.PieceHashAuth{Hash: piece.Hash,
 				Size:   piece.Size,
 				Ticket: ticket,
-				Auth:   provider_pb.GenStoreAuth(pi.PublicKey, piece.Hash, uint64(piece.Size), ts, ticket)})
+				Auth:   provider_pb.GenStoreAuth(pi.PublicKey, fileHash, fileSize, piece.Hash, uint64(piece.Size), ts, ticket)})
 		}
 		res = append(res, &pb.ErasureCodePartition{ProviderAuth: proAuth, Timestamp: ts})
 	}
@@ -493,14 +494,14 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
 	}
 	ts := uint64(time.Now().Unix())
-	parts, err := self.toRetrievePartition(hash, blocks, partitionCount, ts)
+	parts, err := self.toRetrievePartition(base64.StdEncoding.EncodeToString(req.NodeId), req.FileHash, req.FileSize, blocks, partitionCount, ts)
 	if err != nil {
 		return &pb.RetrieveFileResp{Code: 9, ErrMsg: err.Error()}, nil
 	}
 	return &pb.RetrieveFileResp{Code: 0, Partition: parts, Timestamp: ts}, nil
 }
 
-func (self *MatadataService) toRetrievePartition(fileHash string, blocks []string, partitionsCount int, ts uint64) ([]*pb.RetrievePartition, error) {
+func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte, fileSize uint64, blocks []string, partitionsCount int, ts uint64) ([]*pb.RetrievePartition, error) {
 	if partitionsCount == 0 {
 		return nil, errors.New("empty blocks")
 	}
@@ -514,7 +515,7 @@ func (self *MatadataService) toRetrievePartition(fileHash string, blocks []strin
 	for _, str := range blocks {
 		arr := strings.Split(str, block_sep)
 		if len(arr) != 5 {
-			return nil, fmt.Errorf("parse file: %s block str %s length error", fileHash, str)
+			return nil, fmt.Errorf("parse file: %s block str %s length error", base64.StdEncoding.EncodeToString(fileHash), str)
 		}
 		b := pb.RetrieveBlock{}
 		b.Hash, err = base64.StdEncoding.DecodeString(arr[0])
@@ -540,7 +541,7 @@ func (self *MatadataService) toRetrievePartition(fileHash string, blocks []strin
 		}
 		nodeIds := strings.Split(arr[4], block_node_id_sep)
 		if len(nodeIds) == 0 {
-			return nil, fmt.Errorf("parse file: %s block str %s error, no store nodeId", fileHash, str)
+			return nil, fmt.Errorf("parse file: %s block str %s error, no store nodeId", base64.StdEncoding.EncodeToString(fileHash), str)
 		}
 		store := make([]*pb.RetrieveNode, 0, len(nodeIds))
 		for _, n := range nodeIds {
@@ -558,12 +559,12 @@ func (self *MatadataService) toRetrievePartition(fileHash string, blocks []strin
 				}
 				providerMap[n] = pro
 			}
-			ticket := uuidStr()
+			ticket := nodeId + uuidStr()
 			store = append(store, &pb.RetrieveNode{NodeId: bytes,
 				Server: pro.Server(),
 				Port:   pro.Port,
 				Ticket: ticket,
-				Auth:   provider_pb.GenRetrieveAuth(pro.PublicKey, b.Hash, b.Size, ts, ticket)})
+				Auth:   provider_pb.GenRetrieveAuth(pro.PublicKey, fileHash, fileSize, b.Hash, b.Size, ts, ticket)})
 		}
 		b.StoreNode = store
 		slice = append(slice, &b)
