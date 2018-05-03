@@ -145,8 +145,13 @@ func updateProviderEmailVerified(tx *sql.Tx, nodeId string) {
 	stmt, err := tx.Prepare("update PROVIDER set EMAIL_VERIFIED=true,LAST_MODIFIED=now(),SEND_TIME=NULL,RANDOM_CODE=NULL where NODE_ID=$1 and REMOVED=false")
 	defer stmt.Close()
 	checkErr(err)
-	_, err = stmt.Exec(nodeId)
+	rs, err := stmt.Exec(nodeId)
 	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	if cnt == 0 {
+		panic(errors.New("no record found"))
+	}
 }
 
 func ProviderUpdateVerifyCode(nodeId string, randomCode string) {
@@ -278,4 +283,25 @@ func providerFindAll(tx *sql.Tx) []ProviderInfo {
 		res = append(res, *scanProviderInfo(rows))
 	}
 	return res
+}
+
+func ProviderAddExtraStorage(nodeId string, volume uint64) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	providerAddExtraStorage(tx, nodeId, volume)
+	checkErr(tx.Commit())
+	commit = true
+}
+
+func providerAddExtraStorage(tx *sql.Tx, nodeId string, volume uint64) {
+	stmt, err := tx.Prepare("update PROVIDER set STORAGE_VOLUME=array_append(STORAGE_VOLUME, $2),LAST_MODIFIED=now() where NODE_ID=$1 and REMOVED=false")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(nodeId, volume)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	if cnt == 0 {
+		panic(errors.New("no record found"))
+	}
 }

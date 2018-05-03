@@ -51,8 +51,18 @@ func TestDoProviderSave(t *testing.T) {
 		t.Errorf("Failed.")
 	}
 	p := providerFindOne(tx, nodeId)
-	if len(p.StorageVolume) != 1 {
+	if len(p.StorageVolume) != 1 || p.StorageVolume[0] != 10000000000 {
 		t.Errorf("Failed.")
+	}
+	providerAddExtraStorage(tx, nodeId, 100000000000)
+	p = providerFindOne(tx, nodeId)
+	if len(p.StorageVolume) != 2 || p.StorageVolume[len(p.StorageVolume)-1] != 100000000000 {
+		t.Error(p.StorageVolume)
+	}
+	providerAddExtraStorage(tx, nodeId, 200000000000)
+	p = providerFindOne(tx, nodeId)
+	if len(p.StorageVolume) != 3 || p.StorageVolume[len(p.StorageVolume)-1] != 200000000000 {
+		t.Error(p.StorageVolume)
 	}
 	if len(providerFindAll(tx)) != initCount+1 {
 		t.Error(initCount)

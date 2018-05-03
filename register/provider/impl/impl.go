@@ -271,8 +271,22 @@ func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *
 }
 
 func (self *ProviderRegisterService) AddExtraStorage(ctx context.Context, req *pb.AddExtraStorageReq) (*pb.AddExtraStorageResp, error) {
-	//TODO
-	return nil, nil
+	pubKey := db.ProviderGetPubKey(req.NodeId)
+	if pubKey == nil {
+		return nil, errors.New("this node id is not been registered")
+	}
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return nil, errors.New("auth info expired， please check your system time")
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return nil, err
+	}
+	if req.Volume <= 10000000000 {
+		return nil, errors.New("storage volume must more than 10G")
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	db.ProviderAddExtraStorage(nodeIdStr, req.Volume)
+	return &pb.AddExtraStorageResp{Success: true}, nil
 }
 
 func (self *ProviderRegisterService) GetTrackerServer(ctx context.Context, req *pb.GetTrackerServerReq) (*pb.GetTrackerServerResp, error) {
