@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 
-	collector_cimpl "nebula-tracker/collector/client/impl"
 	"nebula-tracker/config"
 	"nebula-tracker/db"
 	metadata_impl "nebula-tracker/metadata/impl"
@@ -13,7 +12,6 @@ import (
 	register_cimpl "nebula-tracker/register/client/impl"
 	register_pimpl "nebula-tracker/register/provider/impl"
 
-	pbcc "github.com/samoslab/nebula/tracker/collector/client/pb"
 	pbm "github.com/samoslab/nebula/tracker/metadata/pb"
 	pbrc "github.com/samoslab/nebula/tracker/register/client/pb"
 	pbrp "github.com/samoslab/nebula/tracker/register/provider/pb"
@@ -35,7 +33,7 @@ func main() {
 	pbrp.RegisterProviderRegisterServiceServer(grpcServer, register_pimpl.NewProviderRegisterService())
 	pbrc.RegisterClientRegisterServiceServer(grpcServer, register_cimpl.NewClientRegisterService())
 	pbm.RegisterMatadataServiceServer(grpcServer, metadata_impl.NewMatadataService())
-	pbcc.RegisterClientCollectorServiceServer(grpcServer, collector_cimpl.NewClientCollectorService())
+
 	grpcServer.Serve(lis)
 
 }

@@ -1208,16 +1208,16 @@ func TestListFiles(t *testing.T) {
 
 func TestToRetrievePartition(t *testing.T) {
 	assert := assert.New(t)
-	// priKey, err := rsa.GenerateKey(rand.Reader, 256*8)
-	// if err != nil {
-	// 	t.Errorf("failed")
-	// }
-	// pubKey := &priKey.PublicKey
-	// pubKeyBytes := x509.MarshalPKCS1PublicKey(pubKey)
-	// nodeId := util_hash.Sha1(pubKeyBytes)
-	// nodeIdStr := base64.StdEncoding.EncodeToString(nodeId)
+	priKey, err := rsa.GenerateKey(rand.Reader, 256*8)
+	if err != nil {
+		t.Errorf("failed")
+	}
+	pubKey := &priKey.PublicKey
+	pubKeyBytes := x509.MarshalPKCS1PublicKey(pubKey)
+	nodeId := util_hash.Sha1(pubKeyBytes)
+	nodeIdStr := base64.StdEncoding.EncodeToString(nodeId)
 	hash := util_hash.Sha1([]byte("test-file"))
-	hashStr := base64.StdEncoding.EncodeToString(hash)
+	// hashStr := base64.StdEncoding.EncodeToString(hash)
 	ts := uint64(time.Now().Unix())
 
 	mockDao := new(daoMock)
@@ -1230,7 +1230,7 @@ func TestToRetrievePartition(t *testing.T) {
 	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
 	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
 	mockDao.On("ProviderFindOne", mock.Anything).Return(&mockProviderInfoSlice(1)[0])
-	partitions, err := ms.toRetrievePartition(hashStr, blocks, 2, ts)
+	partitions, err := ms.toRetrievePartition(nodeIdStr, hash, 823243, blocks, 2, ts)
 	assert.Nil(err)
 	assert.Equal(2, len(partitions))
 	assert.Equal(3, len(partitions[0].Block))
