@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"nebula-tracker/db"
 	"nebula-tracker/register/random"
@@ -27,6 +26,8 @@ import (
 	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ProviderRegisterService struct {
@@ -250,21 +251,21 @@ func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *p
 func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (*pb.ResendVerifyCodeResp, error) {
 	pubKey := db.ProviderGetPubKey(req.NodeId)
 	if pubKey == nil {
-		return nil, errors.New("this node id is not been registered")
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
 	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return nil, errors.New("auth info expired， please check your system time")
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	found, billEmail, emailVerified, _, _ := db.ProviderGetRandomCode(nodeIdStr)
 	if !found {
-		return nil, errors.New("this node id is not been registered")
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
 	if emailVerified {
-		return nil, errors.New("already verified！")
+		return nil, status.Error(codes.AlreadyExists, "already verified！")
 	}
 	self.reGenerateVerifyCode(nodeIdStr, billEmail)
 	return &pb.ResendVerifyCodeResp{Success: true}, nil
@@ -273,16 +274,16 @@ func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *
 func (self *ProviderRegisterService) AddExtraStorage(ctx context.Context, req *pb.AddExtraStorageReq) (*pb.AddExtraStorageResp, error) {
 	pubKey := db.ProviderGetPubKey(req.NodeId)
 	if pubKey == nil {
-		return nil, errors.New("this node id is not been registered")
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
 	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return nil, errors.New("auth info expired， please check your system time")
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
 	if req.Volume <= 10000000000 {
-		return nil, errors.New("storage volume must more than 10G")
+		return nil, status.Error(codes.OutOfRange, "storage volume must more than 10G")
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	db.ProviderAddExtraStorage(nodeIdStr, req.Volume)

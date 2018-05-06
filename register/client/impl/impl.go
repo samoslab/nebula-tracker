@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"time"
 
@@ -21,6 +20,8 @@ import (
 
 	util_hash "github.com/samoslab/nebula/util/hash"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ClientRegisterService struct {
@@ -103,7 +104,7 @@ func (self *ClientRegisterService) reGenerateVerifyCode(nodeId string, email str
 
 const verify_sign_expired = 15
 
-func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *pb.VerifyContactEmailReq) (*pb.VerifyContactEmailResp, error) {
+func (self *ClientRegisterService) dede(ctx context.Context, req *pb.VerifyContactEmailReq) (*pb.VerifyContactEmailResp, error) {
 	if req.NodeId == nil {
 		return &pb.VerifyContactEmailResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -143,21 +144,21 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 func (self *ClientRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (*pb.ResendVerifyCodeResp, error) {
 	pubKey := db.ClientGetPubKey(req.NodeId)
 	if pubKey == nil {
-		return nil, errors.New("this node id is not been registered")
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
 	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return nil, errors.New("auth info expired， please check your system time")
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed: %s", err)
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	found, contactEmail, emailVerified, _, _ := db.ClientGetRandomCode(nodeIdStr)
 	if !found {
-		return nil, errors.New("this node id is not been registered")
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
 	if emailVerified {
-		return nil, errors.New("already verified！")
+		return nil, status.Error(codes.AlreadyExists, "already verified！")
 	}
 	self.reGenerateVerifyCode(nodeIdStr, contactEmail)
 	return &pb.ResendVerifyCodeResp{Success: true}, nil

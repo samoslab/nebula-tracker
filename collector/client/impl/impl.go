@@ -6,6 +6,8 @@ import (
 
 	pb "github.com/samoslab/nebula/tracker/collector/client/pb"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ClientCollectorService struct {
@@ -15,7 +17,7 @@ func NewClientCollectorService() *ClientCollectorService {
 	return &ClientCollectorService{}
 }
 
-func (self *ClientCollectorService) Collect(stream pb.ClientCollectorService_CollectServer) error {
+func (self *ClientCollectorService) Collect(stream pb.ClientCollectorService_CollectServer) (er error) {
 	// var pubKey *rsa.PublicKey
 	for {
 		req, err := stream.Recv()
@@ -23,8 +25,9 @@ func (self *ClientCollectorService) Collect(stream pb.ClientCollectorService_Col
 			if err == io.EOF {
 				return stream.SendAndClose(&pb.CollectResp{})
 			}
-			log.Errorf("failed to recv, error: %v", err)
-			return err
+			er = status.Errorf(codes.Unknown, "failed to recv, error: %v", err)
+			log.Errorln(er)
+			return
 		}
 		// if pubKey == nil {
 		// 	pubKey = db.ClientGetPubKey(req.NodeId)
