@@ -38,7 +38,6 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 			resp = &pb.MkFolderResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
 		}
 	}()
-	// TODO support path Id
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
 		return &pb.MkFolderResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
@@ -117,7 +116,6 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
 		return &pb.CheckFileExistResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
-	// TODO new Version
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.CheckFileExistResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
@@ -188,7 +186,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		if providerCnt < 5 {
 			resp.ReplicaCount = uint32(providerCnt)
 		}
-		resp.Provider = self.prepareReplicaProvider(nodeIdStr, resp.ReplicaCount, req.FileHash, req.FileSize)
+		resp.Provider = self.prepareReplicaProvider(nodeIdStr, int(resp.ReplicaCount), req.FileHash, req.FileSize)
 		if !exist {
 			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
 		}
@@ -224,7 +222,7 @@ func uuidStr() string {
 	u := uuid.Must(uuid.NewV4())
 	return "-" + base64.StdEncoding.EncodeToString(u[:])
 }
-func (self *MatadataService) prepareReplicaProvider(nodeId string, num uint32, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {
+func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {
 	pis := self.c.Choose(num)
 	res := make([]*pb.ReplicaProvider, 0, len(pis))
 	ts := uint64(time.Now().Unix())
@@ -301,7 +299,7 @@ func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash 
 	ts := uint64(time.Now().Unix())
 	res := make([]*pb.ErasureCodePartition, 0, len(partition))
 	for _, part := range partition {
-		pis := self.c.Choose(uint32(pieceCnt + backupProCnt))
+		pis := self.c.Choose(pieceCnt + backupProCnt)
 		if len(pis) < pieceCnt {
 			panic("not enough provider")
 		}

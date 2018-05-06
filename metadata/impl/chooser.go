@@ -7,7 +7,7 @@ import (
 
 type providerChooser interface {
 	Count() int
-	Choose(num uint32) []db.ProviderInfo
+	Choose(num int) []db.ProviderInfo
 }
 
 type chooserImpl struct {
@@ -17,6 +17,6 @@ func (self *chooserImpl) Count() int {
 	return chooser.Count()
 }
 
-func (self *chooserImpl) Choose(num uint32) []db.ProviderInfo {
+func (self *chooserImpl) Choose(num int) []db.ProviderInfo {
 	return chooser.Choose(num)
 }

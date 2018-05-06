@@ -11,11 +11,11 @@ type chooserMock struct {
 }
 
 // Choose provides a mock function with given fields: num
-func (_m *chooserMock) Choose(num uint32) []db.ProviderInfo {
+func (_m *chooserMock) Choose(num int) []db.ProviderInfo {
 	ret := _m.Called(num)
 
 	var r0 []db.ProviderInfo
-	if rf, ok := ret.Get(0).(func(uint32) []db.ProviderInfo); ok {
+	if rf, ok := ret.Get(0).(func(int) []db.ProviderInfo); ok {
 		r0 = rf(num)
 	} else {
 		if ret.Get(0) != nil {
