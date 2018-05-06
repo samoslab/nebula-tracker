@@ -14,6 +14,8 @@ import (
 
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	pb "github.com/samoslab/nebula/tracker/metadata/pb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -128,7 +130,8 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		return &pb.CheckFileExistResp{Code: 13, ErrMsg: "filename can not contains slash /"}, nil
 	}
 	fileName := req.FileName
-	existId, isFolder := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
+	existId, isFolder, hash := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
 	if len(existId) > 0 {
 		if isFolder {
 			if req.Interactive {
@@ -138,6 +141,9 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 				existId = nil
 			}
 		} else {
+			if hash == hashStr {
+				return &pb.CheckFileExistResp{Code: 0, ErrMsg: "file aleady exists"}, nil
+			}
 			if !req.NewVersion {
 				if req.Interactive {
 					return &pb.CheckFileExistResp{Code: 8, ErrMsg: "exist same name file"}, nil
@@ -149,7 +155,6 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		}
 	}
 	//check available space
-	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
 	exist, active, done, size, selfCreate, doneExpired := self.d.FileCheckExist(nodeIdStr, hashStr, done_expired)
 	if exist {
 		if size != req.FileSize {
@@ -253,33 +258,33 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 	defer func() {
 		if er := recover(); er != nil {
 			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
-			err = errors.New(fmt.Sprintf("System error: %s", er))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
 		}
 	}()
 	checkRes, pubKey := self.checkNodeId(req.NodeId)
 	if checkRes != nil {
-		return nil, errors.New(checkRes.ErrMsg)
+		return nil, status.Error(codes.InvalidArgument, checkRes.ErrMsg)
 	}
 	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
-		return nil, errors.New("auth info expired， please check your system time")
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
 	if len(req.Partition) == 0 {
-		return nil, errors.New("partition data is required")
+		return nil, status.Error(codes.InvalidArgument, "partition data is required")
 	}
 	pieceCnt := len(req.Partition[0].Piece)
 	if pieceCnt == 0 {
-		return nil, errors.New("piece data is required")
+		return nil, status.Error(codes.InvalidArgument, "piece data is required")
 	}
 	providerCnt := self.c.Count()
 	for _, p := range req.Partition {
 		if len(p.Piece) > providerCnt {
-			return nil, errors.New("not enough provider")
+			return nil, status.Error(codes.InvalidArgument, "not enough provider")
 		}
 		if len(p.Piece) != pieceCnt {
-			return nil, errors.New("all parition must have same number piece")
+			return nil, status.Error(codes.InvalidArgument, "all parition must have same number piece")
 		}
 	}
 	backupProCnt := 10
@@ -374,7 +379,8 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		return &pb.UploadFileDoneResp{Code: 13, ErrMsg: "filename can not contains slash /"}, nil
 	}
 	fileName := req.FileName
-	existId, isFolder := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
+	existId, isFolder, hash := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
 	if len(existId) > 0 {
 		if isFolder {
 			if req.Interactive {
@@ -384,6 +390,9 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 				existId = nil
 			}
 		} else {
+			if hash == hashStr {
+				return &pb.UploadFileDoneResp{Code: 14, ErrMsg: "file aleady exists"}, nil
+			}
 			if !req.NewVersion {
 				if req.Interactive {
 					return &pb.UploadFileDoneResp{Code: 8, ErrMsg: "exist same name file"}, nil
@@ -395,7 +404,6 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		}
 	}
 	//check available space
-	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
 	blocks, err := fromPartitions(req.Partition)
 	if err != nil {
 		return &pb.UploadFileDoneResp{Code: 9, ErrMsg: err.Error()}, nil

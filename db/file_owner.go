@@ -54,19 +54,19 @@ func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string) (found
 	return false, nil, false
 }
 
-func FileOwnerFileExists(nodeId string, parent []byte, name string) (id []byte, isFolder bool) {
+func FileOwnerFileExists(nodeId string, parent []byte, name string) (id []byte, isFolder bool, hash string) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	id, isFolder = fileOwnerFileExists(tx, nodeId, parent, name)
+	id, isFolder, hash = fileOwnerFileExists(tx, nodeId, parent, name)
 	checkErr(tx.Commit())
 	commit = true
 	return
 }
 
-func fileOwnerFileExists(tx *sql.Tx, nodeId string, parent []byte, name string) (id []byte, isFolder bool) {
+func fileOwnerFileExists(tx *sql.Tx, nodeId string, parent []byte, name string) (id []byte, isFolder bool, hash string) {
 	var rows *sql.Rows
 	var err error
-	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s and REMOVED=false"
+	sqlStr := "SELECT ID,FOLDER,HASH FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s and REMOVED=false"
 	if parent == nil || len(parent) == 0 {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, name)
 	} else {
@@ -75,11 +75,15 @@ func fileOwnerFileExists(tx *sql.Tx, nodeId string, parent []byte, name string) 
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
-		err = rows.Scan(&id, &isFolder)
+		var hashNullable sql.NullString
+		err = rows.Scan(&id, &isFolder, &hashNullable)
+		if hashNullable.Valid {
+			hash = hashNullable.String
+		}
 		checkErr(err)
 		return
 	}
-	return nil, false
+	return nil, false, ""
 }
 
 func fileOwnerBatchFileExists(tx *sql.Tx, nodeId string, parent []byte, names []string) map[string]bool {

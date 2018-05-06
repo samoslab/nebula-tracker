@@ -14,6 +14,8 @@ import (
 	util_hash "github.com/samoslab/nebula/util/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestMkFolder(t *testing.T) {
@@ -290,7 +292,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms := &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), false)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), false, "other")
 	req := pb.CheckFileExistReq{NodeId: nodeId,
 		Timestamp:   ts,
 		Parent:      path,
@@ -310,7 +312,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	req = pb.CheckFileExistReq{NodeId: nodeId,
 		Timestamp:   ts,
 		Parent:      path,
@@ -346,7 +348,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(true, true, false, size, false, false)
 	req = pb.CheckFileExistReq{NodeId: nodeId,
 		Timestamp:   ts,
@@ -368,7 +370,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{c: mockChooser, d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(true, true, false, size, true, false)
 	mockChooser.On("Count").Return(2)
 	mockChooser.On("Choose", uint32(2)).Return(mockProviderInfoSlice(2))
@@ -392,7 +394,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{c: mockChooser, d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(true, true, false, size, false, true)
 	mockChooser.On("Count").Return(2)
 	mockChooser.On("Choose", uint32(2)).Return(mockProviderInfoSlice(2))
@@ -416,7 +418,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, true, "")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(true, true, true, size, false, false)
 	mockDao.On("FileReuse", mock.Anything, nodeIdStr, hashStr, mock.Anything, size, ts-1000, parentId)
 	req = pb.CheckFileExistReq{NodeId: nodeId,
@@ -438,7 +440,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false, "other")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(true, true, true, size, false, false)
 	mockDao.On("FileReuse", existId, nodeIdStr, hashStr, mock.Anything, size, ts-1000, parentId)
 	req = pb.CheckFileExistReq{NodeId: nodeId,
@@ -460,7 +462,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false, "other")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(true, true, true, size, false, false)
 	mockDao.On("FileReuse", mock.Anything, nodeIdStr, hashStr, mock.Anything, size, ts-1000, parentId)
 	req = pb.CheckFileExistReq{NodeId: nodeId,
@@ -482,7 +484,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, true, "")
 	req = pb.CheckFileExistReq{NodeId: nodeId,
 		Timestamp:   ts,
 		Parent:      path,
@@ -502,7 +504,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false, "other")
 	req = pb.CheckFileExistReq{NodeId: nodeId,
 		Timestamp:   ts,
 		Parent:      path,
@@ -524,7 +526,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(false, true, true, size, false, false)
 	req = pb.CheckFileExistReq{NodeId: nodeId,
 		Timestamp:   ts,
@@ -546,7 +548,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(false, true, true, size, false, false)
 	mockDao.On("FileSaveTiny", mock.Anything, nodeIdStr, hashStr, hash, mock.Anything, size, ts-1000, parentId).Return(false, true, false, true, size)
 	req = pb.CheckFileExistReq{NodeId: nodeId,
@@ -570,7 +572,7 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{c: mockChooser, d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(false, true, true, size, false, false)
 	mockChooser.On("Count").Return(12)
 	mockDao.On("FileSaveStep1", nodeIdStr, hashStr, size, uint64(0))
@@ -598,7 +600,29 @@ func TestCheckFileExist(t *testing.T) {
 	ms = &MatadataService{c: mockChooser, d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), false, hashStr)
+	req = pb.CheckFileExistReq{NodeId: nodeId,
+		Timestamp:   ts,
+		Parent:      path,
+		FileHash:    hash,
+		FileSize:    size,
+		FileName:    name,
+		FileModTime: ts - 1000,
+		Interactive: false,
+		NewVersion:  false}
+	req.SignReq(priKey)
+	resp, err = ms.CheckFileExist(ctx, &req)
+	assert.Equal(uint32(0), resp.Code)
+	mockDao.AssertExpectations(t)
+	mockChooser.AssertExpectations(t)
+
+	size = 933320
+	mockDao = new(daoMock)
+	mockChooser = new(chooserMock)
+	ms = &MatadataService{c: mockChooser, d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	mockDao.On("FileCheckExist", nodeIdStr, hashStr, 1800).Return(false, true, true, size, false, false)
 	mockChooser.On("Count").Return(2)
 	mockChooser.On("Choose", uint32(2)).Return(mockProviderInfoSlice(2))
@@ -677,7 +701,8 @@ func TestUploadFilePrepare(t *testing.T) {
 	ms := &MatadataService{c: mockChooser, d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	resp, err := ms.UploadFilePrepare(ctx, &req)
-	if resp != nil || err == nil || err.Error() != "partition data is required" {
+	st, ok := status.FromError(err)
+	if resp != nil || !ok || err == nil || st.Code() != codes.InvalidArgument || st.Message() != "partition data is required" {
 		t.Error(err)
 	}
 	mockDao.AssertExpectations(t)
@@ -693,7 +718,8 @@ func TestUploadFilePrepare(t *testing.T) {
 	ms = &MatadataService{c: mockChooser, d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	resp, err = ms.UploadFilePrepare(ctx, &req)
-	if resp != nil || err == nil || err.Error() != "piece data is required" {
+	st, ok = status.FromError(err)
+	if resp != nil || !ok || err == nil || st.Code() != codes.InvalidArgument || st.Message() != "piece data is required" {
 		t.Error(err)
 	}
 	mockDao.AssertExpectations(t)
@@ -722,7 +748,8 @@ func TestUploadFilePrepare(t *testing.T) {
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockChooser.On("Count").Return(2)
 	resp, err = ms.UploadFilePrepare(ctx, &req)
-	if resp != nil || err == nil || err.Error() != "not enough provider" {
+	st, ok = status.FromError(err)
+	if resp != nil || !ok || err == nil || st.Code() != codes.InvalidArgument || st.Message() != "not enough provider" {
 		t.Error(err)
 	}
 	mockDao.AssertExpectations(t)
@@ -760,7 +787,8 @@ func TestUploadFilePrepare(t *testing.T) {
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockChooser.On("Count").Return(3)
 	resp, err = ms.UploadFilePrepare(ctx, &req)
-	if resp != nil || err == nil || err.Error() != "all parition must have same number piece" {
+	st, ok = status.FromError(err)
+	if resp != nil || !ok || err == nil || st.Code() != codes.InvalidArgument || st.Message() != "all parition must have same number piece" {
 		t.Error(err)
 	}
 	mockDao.AssertExpectations(t)
@@ -872,7 +900,7 @@ func TestUploadFileDone(t *testing.T) {
 	ms := &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	req := pb.UploadFileDoneReq{NodeId: nodeId,
 		Timestamp:   ts,
 		Parent:      path,
@@ -892,7 +920,7 @@ func TestUploadFileDone(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), false)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), false, "other")
 	req = pb.UploadFileDoneReq{NodeId: nodeId,
 		Timestamp:   ts,
 		Parent:      path,
@@ -912,7 +940,7 @@ func TestUploadFileDone(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	req = pb.UploadFileDoneReq{NodeId: nodeId,
 		Timestamp:   ts,
 		Parent:      path,
@@ -932,7 +960,7 @@ func TestUploadFileDone(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return([]byte("exist-id"), true, "")
 	req = pb.UploadFileDoneReq{NodeId: nodeId,
 		Timestamp:   ts,
 		Parent:      path,
@@ -953,7 +981,43 @@ func TestUploadFileDone(t *testing.T) {
 	ms = &MatadataService{d: mockDao}
 	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
 	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
-	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false, hashStr)
+	req = pb.UploadFileDoneReq{NodeId: nodeId,
+		Timestamp:   ts,
+		Parent:      path,
+		FileHash:    hash,
+		FileSize:    size,
+		FileName:    name,
+		FileModTime: ts - 1000,
+		Partition: []*pb.StorePartition{&pb.StorePartition{Block: []*pb.StoreBlock{&pb.StoreBlock{Hash: []byte("test-hash1"),
+			Size:        123123,
+			BlockSeq:    1,
+			Checksum:    false,
+			StoreNodeId: [][]byte{[]byte("test-node-id1"), []byte("test-node-id2")},
+		}, &pb.StoreBlock{Hash: []byte("test-hash2"),
+			Size:        123123,
+			BlockSeq:    2,
+			Checksum:    false,
+			StoreNodeId: [][]byte{[]byte("test-node-id1"), []byte("test-node-id2")},
+		}, &pb.StoreBlock{Hash: []byte("test-hash3"),
+			Size:        123123,
+			BlockSeq:    1,
+			Checksum:    true,
+			StoreNodeId: [][]byte{[]byte("test-node-id1"), []byte("test-node-id2")},
+		},
+		}}},
+		Interactive: false,
+		NewVersion:  true}
+	req.SignReq(priKey)
+	resp, err = ms.UploadFileDone(ctx, &req)
+	assert.Equal(uint32(14), resp.Code)
+	mockDao.AssertExpectations(t)
+
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeId).Return(pubKey)
+	mockDao.On("FileOwnerIdOfFilePath", nodeIdStr, pathStr).Return(true, parentId, true)
+	mockDao.On("FileOwnerFileExists", nodeIdStr, parentId, name).Return(existId, false, "other")
 	mockDao.On("FileSaveDone", existId, nodeIdStr, hashStr, mock.Anything, size, ts-1000, parentId, 1, mock.Anything, mock.Anything)
 	req = pb.UploadFileDoneReq{NodeId: nodeId,
 		Timestamp:   ts,
@@ -985,6 +1049,7 @@ func TestUploadFileDone(t *testing.T) {
 	resp, err = ms.UploadFileDone(ctx, &req)
 	assert.Equal(uint32(0), resp.Code)
 	mockDao.AssertExpectations(t)
+
 }
 
 func TestRetrieveFile(t *testing.T) {

@@ -42,12 +42,12 @@ func TestFileOwner(t *testing.T) {
 	if !found || !bytes.Equal(id2, resId) {
 		t.Errorf("Failed.")
 	}
-	id, isFolder := fileOwnerFileExists(tx, nodeId, nil, "test-folder")
+	id, isFolder, _ := fileOwnerFileExists(tx, nodeId, nil, "test-folder")
 	if !bytes.Equal(id, id1) || !isFolder {
 		t.Errorf("Failed.")
 	}
 
-	id, isFolder = fileOwnerFileExists(tx, nodeId, id1, "test-folder2")
+	id, isFolder, _ = fileOwnerFileExists(tx, nodeId, id1, "test-folder2")
 	if !bytes.Equal(id, id2) || !isFolder {
 		t.Errorf("Failed.")
 	}
