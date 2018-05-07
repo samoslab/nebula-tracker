@@ -1,5 +1,21 @@
+tracker:
 [finished] metadata interface support pathId 
 [finished] metadata interface support newVersion
-provider add speed test module
-[finished]interface implement method add recover
-[finished]upnp/ice for nat
+[finished] interface implement method add recover
+storage package, order, buy interface, view order interface
+user storage volume statistics and check
+
+
+collector:
+get provider public key from tracker interface
+save collector to seperator db
+fee and bill
+storage proof and available test
+anti-cheating
+
+
+provider:
+[finished] upnp/ice for nat
+unit test
+collector sender optimize
+add speed test module

@@ -27,7 +27,7 @@ var initialized = false
 var currentProviderIdx uint64 = 0
 
 func incrementProviderIdx(offset uint64) {
-	atomic.AddUint64(&currentProviderIdx, 1)
+	atomic.AddUint64(&currentProviderIdx, offset)
 }
 func Count() int {
 	if !initialized {
