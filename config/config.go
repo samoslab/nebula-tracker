@@ -57,3 +57,30 @@ func GetTrackerConfig() *TrackerConfig {
 	initTrackerConfig = true
 	return trackerConfig
 }
+
+var initInterfaceConfig = false
+var interfaceConfig *InterfaceConfig
+
+type InterfaceConfig struct {
+	Db            Db
+	ListenIp      string `default:"127.0.0.1"`
+	ListenPort    int    `default:"6655"`
+	EncryptKeyHex string
+	TestMode      bool `default:"false"`
+}
+
+func GetInterfaceConfig() *InterfaceConfig {
+	if initInterfaceConfig {
+		return interfaceConfig
+	}
+	m := multiconfig.NewWithPath(config_filename) // supports TOML, JSON and YAML
+	interfaceConfig = new(InterfaceConfig)
+	err := m.Load(interfaceConfig) // Check for error
+	if err != nil {
+		fmt.Printf("GetInterfaceConfig Error: %s\n", err)
+	}
+	m.MustLoad(interfaceConfig) // Panic's if there is any error
+	//	fmt.Printf("%+v\n", config)
+	initInterfaceConfig = true
+	return interfaceConfig
+}
