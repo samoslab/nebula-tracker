@@ -104,7 +104,7 @@ func (self *ClientRegisterService) reGenerateVerifyCode(nodeId string, email str
 
 const verify_sign_expired = 15
 
-func (self *ClientRegisterService) dede(ctx context.Context, req *pb.VerifyContactEmailReq) (*pb.VerifyContactEmailResp, error) {
+func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *pb.VerifyContactEmailReq) (*pb.VerifyContactEmailResp, error) {
 	if req.NodeId == nil {
 		return &pb.VerifyContactEmailResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
