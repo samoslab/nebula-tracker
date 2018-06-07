@@ -175,3 +175,31 @@ func ClientGetPubKey(nodeId []byte) *rsa.PublicKey {
 		return pubKey
 	}
 }
+
+func ClientGetPubKeyBytes(nodeId []byte) []byte {
+	return getPublicKeyBytes(base64.StdEncoding.EncodeToString(nodeId))
+}
+
+func ClientAllPubKeyBytes() (m map[string][]byte) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	m = clientAllPubKeyBytes(tx)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func clientAllPubKeyBytes(tx *sql.Tx) map[string][]byte {
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY FROM CLIENT where REMOVED=false")
+	checkErr(err)
+	defer rows.Close()
+	m := make(map[string][]byte, 16)
+	for rows.Next() {
+		var nodeId string
+		var pubKey []byte
+		err = rows.Scan(&nodeId, &pubKey)
+		checkErr(err)
+		m[nodeId] = pubKey
+	}
+	return m
+}

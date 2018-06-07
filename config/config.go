@@ -65,8 +65,10 @@ type InterfaceConfig struct {
 	Db            Db
 	ListenIp      string `default:"127.0.0.1"`
 	ListenPort    int    `default:"6655"`
-	EncryptKeyHex string
-	TestMode      bool `default:"false"`
+	AuthValidSec  int    `default:"15"`
+	AuthToken     string `default:"test"`
+	EncryptKeyHex string `default:"4fcf16120e28dec237da6ecdcb7ec3be"`
+	TestMode      bool   `default:"false"`
 }
 
 func GetInterfaceConfig() *InterfaceConfig {

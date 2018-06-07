@@ -305,3 +305,31 @@ func providerAddExtraStorage(tx *sql.Tx, nodeId string, volume uint64) {
 		panic(errors.New("no record found"))
 	}
 }
+
+func ProviderGetPubKeyBytes(nodeId []byte) []byte {
+	return getProviderPublicKeyBytes(base64.StdEncoding.EncodeToString(nodeId))
+}
+
+func ProviderAllPubKeyBytes() (m map[string][]byte) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	m = providerAllPubKeyBytes(tx)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func providerAllPubKeyBytes(tx *sql.Tx) map[string][]byte {
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY FROM PROVIDER where REMOVED=false")
+	checkErr(err)
+	defer rows.Close()
+	m := make(map[string][]byte, 16)
+	for rows.Next() {
+		var nodeId string
+		var pubKey []byte
+		err = rows.Scan(&nodeId, &pubKey)
+		checkErr(err)
+		m[nodeId] = pubKey
+	}
+	return m
+}
