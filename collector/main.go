@@ -7,7 +7,6 @@ import (
 
 	collector_cimpl "nebula-tracker/collector/client/impl"
 	"nebula-tracker/collector/config"
-	"nebula-tracker/collector/db"
 	collector_pimpl "nebula-tracker/collector/provider/impl"
 
 	pbcc "github.com/samoslab/nebula/tracker/collector/client/pb"
@@ -21,8 +20,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	dbo := db.OpenDb(&conf.Db)
-	defer dbo.Close()
+	// dbo := db.OpenDb(&conf.Db)
+	// defer dbo.Close()
 
 	grpcServer := grpc.NewServer()
 	pbcc.RegisterClientCollectorServiceServer(grpcServer, collector_cimpl.NewClientCollectorService())

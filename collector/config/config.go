@@ -12,9 +12,10 @@ var initCollectorConfig = false
 var collectorConfig *CollectorConfig
 
 type CollectorConfig struct {
-	Db       Db
-	Server   Server
-	TestMode bool `default:"false"`
+	Db               Db
+	Server           Server
+	TrackerInterface TrackerInterface
+	TestMode         bool `default:"false"`
 }
 
 type Db struct {
@@ -32,6 +33,13 @@ type Db struct {
 type Server struct {
 	ListenIp   string `default:"127.0.0.1"`
 	ListenPort int    `default:"6688"`
+}
+
+type TrackerInterface struct {
+	ContextPath   string `default:"http://localhost:6655/api"`
+	ApiToken      string `default:"test"`
+	EncryptKeyHex string `default:"4fcf16120e28dec237da6ecdcb7ec3be"`
+	Debug         bool   `default:"false"`
 }
 
 func GetCollectorConfig() *CollectorConfig {
