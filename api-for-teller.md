@@ -26,6 +26,7 @@ Request Body:  
 Response:  
 成功：{"code":0}  
 失败：{"code":1,"errmsg":"errmsg"}  
+```
 
 3. /api/deposit/  
 发送存入信息，要么整体全部失败，要么整体全部成功  
