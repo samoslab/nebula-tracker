@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"time"
 
 	cache "github.com/patrickmn/go-cache"
@@ -121,6 +122,7 @@ func ClientUpdateEmailVerified(nodeId string) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	updateEmailVerified(tx, nodeId)
+
 	checkErr(tx.Commit())
 	commit = true
 }
@@ -137,6 +139,10 @@ func ClientUpdateVerifyCode(nodeId string, randomCode string) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	updateVerifyCode(tx, nodeId, randomCode)
+	address, checksum := allocateAddress(tx)
+	if address != "" {
+		fillRechargeAddress(tx, nodeId, address, checksum)
+	}
 	checkErr(tx.Commit())
 	commit = true
 }
@@ -202,4 +208,30 @@ func clientAllPubKeyBytes(tx *sql.Tx) map[string][]byte {
 		m[nodeId] = pubKey
 	}
 	return m
+}
+
+func clientDeposit(tx *sql.Tx, address string, amount uint64) {
+	stmt, err := tx.Prepare("update CLIENT set BALANCE=BALANCE+$2,VERSION=VERSION+1,LAST_MODIFIED=now() where ADDRESS=$1")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(address, amount)
+	checkErr(err)
+	rowsAffected, err := rs.RowsAffected()
+	checkErr(err)
+	if rowsAffected == 0 {
+		panic(fmt.Errorf("not found address: %s", address))
+	}
+}
+
+func fillRechargeAddress(tx *sql.Tx, nodeId string, address string, checksum string) {
+	stmt, err := tx.Prepare("update CLIENT set RECHARGE_ADDRESS=$2,ADDRESS_CHECKSUM=$3,LAST_MODIFIED=now() where NODE_ID=$1")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(nodeId, address, checksum)
+	checkErr(err)
+	rowsAffected, err := rs.RowsAffected()
+	checkErr(err)
+	if rowsAffected == 0 {
+		panic(fmt.Errorf("not found nodeId: %s", nodeId))
+	}
 }

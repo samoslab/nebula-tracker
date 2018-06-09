@@ -86,3 +86,32 @@ func GetInterfaceConfig() *InterfaceConfig {
 	initInterfaceConfig = true
 	return interfaceConfig
 }
+
+type ApiForTellerConfig struct {
+	Db                   Db
+	ListenIp             string `default:"127.0.0.1"`
+	ListenPort           int    `default:"6688"`
+	AuthToken            string
+	AuthValidSec         int `default:"15"`
+	AddressChecksumToken string
+	Debug                bool `default:"false"`
+}
+
+var initApiForTellerConfig = false
+var apiForTellerConfig *ApiForTellerConfig
+
+func GetApiForTellerConfig() *ApiForTellerConfig {
+	if initApiForTellerConfig {
+		return apiForTellerConfig
+	}
+	m := multiconfig.NewWithPath(config_filename) // supports TOML, JSON and YAML
+	apiForTellerConfig = new(ApiForTellerConfig)
+	err := m.Load(apiForTellerConfig) // Check for error
+	if err != nil {
+		fmt.Printf("GetInterfaceConfig Error: %s\n", err)
+	}
+	m.MustLoad(apiForTellerConfig) // Panic's if there is any error
+	//	fmt.Printf("%+v\n", config)
+	initApiForTellerConfig = true
+	return apiForTellerConfig
+}

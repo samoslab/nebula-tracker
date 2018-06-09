@@ -43,18 +43,17 @@ create table IF NOT EXISTS AVAILABLE_ADDRESS(
     CREATION TIMESTAMPTZ NOT NULL,
     USED BOOL DEFAULT false,
     USAGE_TIME TIMESTAMPTZ DEFAULT NULL
-)
+);
 
-create table DEPOSIT_RECORD(
-	ID SERIAL PRIMARY KEY,
-	CREATION TIMESTAMPTZ NOT NULL,
-	ADDRESS varchar(255) not null,
-	SEQ bigint not null unique,
-	TRANSACTION_TIME bigint not null,
-	TRANSACTION_ID varchar(512) not null,
-	AMOUNT bigint not null,
-	HEIGHT bigint not null,
-	primary key(ID),
-	UNIQUE (ADDRESS, TRANSACTION_ID,AMOUNT,HEIGHT)
+create table IF NOT EXISTS DEPOSIT_RECORD(
+    ID SERIAL PRIMARY KEY,
+    CREATION TIMESTAMPTZ NOT NULL,
+    ADDRESS varchar(255) not null,
+    SEQ bigint not null unique,
+    TRANSACTION_TIME bigint not null,
+    TRANSACTION_ID varchar(512) not null,
+    AMOUNT bigint not null,
+    HEIGHT bigint not null,
+    UNIQUE (ADDRESS, TRANSACTION_ID,AMOUNT,HEIGHT)
 );
 
