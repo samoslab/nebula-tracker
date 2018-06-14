@@ -10,6 +10,7 @@ import (
 	"time"
 
 	cache "github.com/patrickmn/go-cache"
+	log "github.com/sirupsen/logrus"
 )
 
 func ClientRegister(nodeId string, pubKeyBytes []byte, pubKey *rsa.PublicKey, contactEmail string, randomCode string) {
@@ -235,6 +236,42 @@ func fillRechargeAddress(tx *sql.Tx, nodeId string, address string, checksum str
 		panic(fmt.Errorf("not found nodeId: %s", nodeId))
 	}
 }
+func GetRechargeAddress(nodeId string) (address string) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	address = getRechargeAddress(tx, nodeId)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func getRechargeAddress(tx *sql.Tx, nodeId string) (address string) {
+	rows, err := tx.Query("SELECT RECHARGE_ADDRESS,ADDRESS_CHECKSUM FROM CLIENT where NODE_ID=$1 and RECHARGE_ADDRESS is not null and ADDRESS_CHECKSUM is not null", nodeId)
+	checkErr(err)
+	defer rows.Close()
+	var checksum string
+	for rows.Next() {
+		err = rows.Scan(&address, &checksum)
+		checkErr(err)
+		if verifyChecksum(address, checksum) {
+			return
+		} else {
+			err := fmt.Errorf("client recharge address checksum error, nodeId: %s, address: %s, checksum: %s", nodeId, address, checksum)
+			log.Error(err)
+			panic(err)
+		}
+	}
+
+	address, checksum = allocateAddress(tx)
+	if address != "" {
+		fillRechargeAddress(tx, nodeId, address, checksum)
+		return address
+	} else {
+		err := fmt.Errorf("no available address")
+		log.Error(err)
+		panic(err)
+	}
+}
 
 func getBalance(tx *sql.Tx, nodeId string) (balance int64) {
 	rows, err := tx.Query("SELECT BALANCE FROM CLIENT where NODE_ID=$1", nodeId)
@@ -264,7 +301,7 @@ func getCurrentPackage(tx *sql.Tx, nodeId string) (inService bool, level int32, 
 func GetCurrentPackage(nodeId string) (inService bool, level int32, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	inService, level, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeIdStr)
+	inService, level, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeId)
 	checkErr(tx.Commit())
 	commit = true
 	return
