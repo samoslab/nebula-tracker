@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"time"
 )
 
 type OrderInfo struct {
@@ -82,14 +83,14 @@ func buildOrderInfo(rows *sql.Rows) *OrderInfo {
 	return &oi
 }
 
-func BuyPackage(nodeId string, packageId int64, quanlity uint32, cancelUnpaid bool) (oi *OrderInfo) {
+func BuyPackage(nodeId string, packageId int64, quanlity uint32, cancelUnpaid bool, renew bool, endTime time.Time, upgrade bool) (oi *OrderInfo) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	if cancelUnpaid {
 		cancelUnpaidOrder(tx, nodeId)
 	}
 	pi := getPackageInfo(tx, packageId)
-	id := buyPackage(tx, nodeId, pi, quanlity)
+	id := buyPackage(tx, nodeId, pi, quanlity, renew, endTime, upgrade)
 	oi = getOrderInfo(tx, nodeId, id)
 	checkErr(tx.Commit())
 	commit = true
@@ -106,11 +107,14 @@ func cancelUnpaidOrder(tx *sql.Tx, nodeId string) {
 	checkErr(err)
 }
 
-func buyPackage(tx *sql.Tx, nodeId string, pi *PackageInfo, quanlity uint32) []byte {
-	var lastInsertId []byte
-	// TODO
+func buyPackage(tx *sql.Tx, nodeId string, pi *PackageInfo, quanlity uint32, renew bool, endTime time.Time, upgrade bool) (id []byte) {
+	// TODO upgrade
 	err := tx.QueryRow("insert into CLIENT_ORDER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,PACKAGE_ID,QUANTITY,TOTAL_AMOUNT,UPGRADED,DISCOUNT,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,VALID_DAYS,START_TIME,END_TIME) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING ID",
-		nodeId, pi.Id, quanlity, uint64(quanlity)*pi.Price, false, 1, pi.Volume, quanlity*pi.Netflow, quanlity*pi.UpNetflow, quanlity*pi.DownNetflow, quanlity*pi.ValidDays, nil, nil).Scan(&lastInsertId)
+		nodeId, pi.Id, quanlity, uint64(quanlity)*pi.Price, false, 1, pi.Volume, quanlity*pi.Netflow, quanlity*pi.UpNetflow, quanlity*pi.DownNetflow, quanlity*pi.ValidDays, nil, nil).Scan(&id)
 	checkErr(err)
-	return lastInsertId
+	return
+}
+
+func PayOrder(nodeId string, orderId []byte) {
+
 }
