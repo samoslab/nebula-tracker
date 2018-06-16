@@ -1,12 +1,15 @@
 package provider_chooser
 
 import (
+	"context"
 	"fmt"
 	"nebula-tracker/db"
 	"sync/atomic"
 	"time"
 
 	"github.com/robfig/cron"
+	provider_pb "github.com/samoslab/nebula/provider/pb"
+	"google.golang.org/grpc"
 )
 
 var cronRunner *cron.Cron
@@ -77,7 +80,33 @@ func update() {
 func filter(all []db.ProviderInfo) (*[]db.ProviderInfo, map[string]*db.ProviderInfo) {
 	m := make(map[string]*db.ProviderInfo, len(all))
 	for _, pi := range all {
-		m[pi.NodeId] = &pi
+		if check(&pi) {
+			m[pi.NodeId] = &pi
+		}
 	}
 	return &all, m
+}
+
+func check(pi *db.ProviderInfo) bool {
+	var hostStr string // prefer
+	if len(pi.Host) > 0 {
+		hostStr = pi.Host
+	} else if len(pi.DynamicDomain) > 0 {
+		hostStr = pi.DynamicDomain
+	}
+	providerAddr := fmt.Sprintf("%s:%d", hostStr, pi.Port)
+	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+	psc := provider_pb.NewProviderServiceClient(conn)
+	return pingProvider(psc) == nil
+}
+
+func pingProvider(client provider_pb.ProviderServiceClient) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_, err := client.Ping(ctx, &provider_pb.PingReq{})
+	return err
 }

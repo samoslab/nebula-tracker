@@ -159,7 +159,7 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 		return &pb.RegisterResp{Code: 25, ErrMsg: "host is required"}, nil
 	}
 	var hostStr string
-	if host != nil && len(host) > 0 {
+	if host != nil && len(host) > 0 { // prefer
 		hostStr = string(host)
 	} else if dynamicDomain != nil && len(dynamicDomain) > 0 {
 		hostStr = string(dynamicDomain)

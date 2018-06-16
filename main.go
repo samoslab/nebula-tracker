@@ -32,6 +32,7 @@ func main() {
 	grpcServer := grpc.NewServer()
 	pbrp.RegisterProviderRegisterServiceServer(grpcServer, register_pimpl.NewProviderRegisterService())
 	pbrc.RegisterClientRegisterServiceServer(grpcServer, register_cimpl.NewClientRegisterService())
+	pbrc.RegisterOrderServiceServer(grpcServer, register_cimpl.NewClientOrderService())
 	pbm.RegisterMatadataServiceServer(grpcServer, metadata_impl.NewMatadataService())
 
 	grpcServer.Serve(lis)

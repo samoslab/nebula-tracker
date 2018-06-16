@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"nebula-tracker/config"
 	"time"
 
 	cache "github.com/patrickmn/go-cache"
@@ -212,7 +213,7 @@ func clientAllPubKeyBytes(tx *sql.Tx) map[string][]byte {
 }
 
 func clientDeposit(tx *sql.Tx, address string, amount uint64) {
-	stmt, err := tx.Prepare("update CLIENT set BALANCE=BALANCE+$2,VERSION=VERSION+1,LAST_MODIFIED=now() where ADDRESS=$1")
+	stmt, err := tx.Prepare("update CLIENT set BALANCE=BALANCE+$2,LAST_MODIFIED=now() where ADDRESS=$1")
 	defer stmt.Close()
 	checkErr(err)
 	rs, err := stmt.Exec(address, amount)
@@ -250,10 +251,11 @@ func getRechargeAddress(tx *sql.Tx, nodeId string) (address string) {
 	checkErr(err)
 	defer rows.Close()
 	var checksum string
+	addressChecksumToken := config.GetTrackerConfig().AddressChecksumToken
 	for rows.Next() {
 		err = rows.Scan(&address, &checksum)
 		checkErr(err)
-		if verifyChecksum(address, checksum) {
+		if verifyChecksum(address, checksum, addressChecksumToken) {
 			return
 		} else {
 			err := fmt.Errorf("client recharge address checksum error, nodeId: %s, address: %s, checksum: %s", nodeId, address, checksum)
@@ -273,7 +275,16 @@ func getRechargeAddress(tx *sql.Tx, nodeId string) (address string) {
 	}
 }
 
-func getBalance(tx *sql.Tx, nodeId string) (balance int64) {
+func GetBalance(nodeId string) (balance uint64) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	balance = getBalance(tx, nodeId)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func getBalance(tx *sql.Tx, nodeId string) (balance uint64) {
 	rows, err := tx.Query("SELECT BALANCE FROM CLIENT where NODE_ID=$1", nodeId)
 	checkErr(err)
 	defer rows.Close()
@@ -282,27 +293,53 @@ func getBalance(tx *sql.Tx, nodeId string) (balance int64) {
 		checkErr(err)
 		return
 	}
-	return -1
+	panic("no record found for nodeId: " + nodeId)
 }
 
-func getCurrentPackage(tx *sql.Tx, nodeId string) (inService bool, level int32, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
-	rows, err := tx.Query("SELECT PACKAGE_LEVEL,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,END_TIME FROM CLIENT where NODE_ID=$1 and END_TIME is not null and now()<END_TIME", nodeId)
+func reduceBalanceToPayOrder(tx *sql.Tx, nodeId string, amount uint64) {
+	stmt, err := tx.Prepare("update CLIENT set BALANCE=BALANCE-$2,LAST_MODIFIED=now() where NODE_ID=$1 and BALANCE>=$3")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(nodeId, amount, amount)
+	checkErr(err)
+	rowsAffected, err := rs.RowsAffected()
+	checkErr(err)
+	if rowsAffected == 0 {
+		panic(fmt.Errorf("pay order failed, nodeId: %s, amount: %d", nodeId, amount))
+	}
+}
+
+func getCurrentPackage(tx *sql.Tx, nodeId string) (inService bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
+	rows, err := tx.Query("SELECT PACKAGE_ID,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,END_TIME FROM CLIENT where NODE_ID=$1 and END_TIME is not null and now()<END_TIME", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
 		inService = true
-		err = rows.Scan(&level, &volume, &netflow, &upNetflow, &downNetflow, &endTime)
+		err = rows.Scan(&packageId, &volume, &netflow, &upNetflow, &downNetflow, &endTime)
 		checkErr(err)
 		return
 	}
 	return false, 0, 0, 0, 0, 0, time.Now()
 }
 
-func GetCurrentPackage(nodeId string) (inService bool, level int32, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
+func GetCurrentPackage(nodeId string) (inService bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	inService, level, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeId)
+	inService, packageId, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeId)
 	checkErr(tx.Commit())
 	commit = true
 	return
+}
+
+func updateCurrentPackage(tx *sql.Tx, nodeId string, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
+	stmt, err := tx.Prepare("update CLIENT set PACKAGE_ID=$2,VOLUME=$3,NETFLOW=$4,UP_NETFLOW=$5,DOWN_NETFLOW=$6,END_TIME=$7,LAST_MODIFIED=now() where NODE_ID=$1")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(packageId, nodeId, volume, netflow, upNetflow, downNetflow, endTime)
+	checkErr(err)
+	rowsAffected, err := rs.RowsAffected()
+	checkErr(err)
+	if rowsAffected == 0 {
+		panic(fmt.Errorf("update current package failed, nodeId: %s, packageId: %d, volume: %d", nodeId, packageId, volume))
+	}
 }

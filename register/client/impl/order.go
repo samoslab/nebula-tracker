@@ -31,7 +31,6 @@ func (self *ClientOrderService) AllPackage(ctx context.Context, req *pb.AllPacka
 func convertPackageInfo(p *db.PackageInfo) *pb.Package {
 	return &pb.Package{Id: p.Id,
 		Name:        p.Name,
-		Level:       p.Level,
 		Price:       p.Price,
 		Volume:      p.Volume,
 		Netflow:     p.Netflow,
@@ -43,7 +42,7 @@ func convertPackageInfo(p *db.PackageInfo) *pb.Package {
 
 func convertOrderInfo(o *db.OrderInfo) *pb.Order {
 	return &pb.Order{Id: o.Id,
-		Creation:    o.Creation,
+		Creation:    uint64(o.Creation.Unix()),
 		PackageId:   o.PackageId,
 		Package:     convertPackageInfo(o.Package),
 		Quanlity:    o.Quanlity,
@@ -86,23 +85,28 @@ func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPacka
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.BuyPackageResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
+	if !found || !emailVerified {
+		return &pb.BuyPackageResp{Code: 9, ErrMsg: "email not verified"}, nil
+	}
 	pi := db.GetPackageInfo(req.PackageId)
 	if pi == nil {
 		return &pb.BuyPackageResp{Code: 21, ErrMsg: "package not found"}, nil
 	}
-	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
-	inService, level, _, _, _, _, endTime := db.GetCurrentPackage(nodeId)
+
+	inService, packageId, volume, _, _, _, endTime := db.GetCurrentPackage(nodeId)
 	var renew, upgrade bool
 	if inService {
-		if pi.Level < level {
-			return &pb.BuyPackageResp{Code: 22, ErrMsg: "can not buy a package which level is less than current"}, nil
-		} else if pi.Level == level {
+		if pi.Volume < volume {
+			return &pb.BuyPackageResp{Code: 22, ErrMsg: "can not buy a package which volume is less than current"}, nil
+		} else if pi.Volume == volume {
 			renew = true
 		} else {
 			upgrade = true
 		}
 	}
-	oi := db.BuyPackage(nodeId, req.PackageId, req.Quanlity, req.CancelUnpaid, renew, endTime, upgrade)
+	oi := db.BuyPackage(nodeId, req.PackageId, req.Quanlity, req.CancelUnpaid, renew, endTime, upgrade, packageId)
 	return &pb.BuyPackageResp{Order: convertOrderInfo(oi)}, nil
 }
 
@@ -124,6 +128,10 @@ func (self *ClientOrderService) MyAllOrder(ctx context.Context, req *pb.MyAllOrd
 		return &pb.MyAllOrderResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
+	if !found || !emailVerified {
+		return &pb.MyAllOrderResp{Code: 9, ErrMsg: "email not verified"}, nil
+	}
 	all := db.MyAllOrder(nodeId, req.OnlyNotExpired)
 	res := make([]*pb.Order, 0, len(all))
 	for _, o := range all {
@@ -153,6 +161,11 @@ func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfo
 		return &pb.OrderInfoResp{Code: 15, ErrMsg: "orderId is required"}, nil
 	}
 	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
+	if !found || !emailVerified {
+		return &pb.OrderInfoResp{Code: 9, ErrMsg: "email not verified"}, nil
+	}
+
 	oi := db.GetOrderInfo(nodeId, req.OrderId)
 	return &pb.OrderInfoResp{Order: convertOrderInfo(oi)}, nil
 }
@@ -175,8 +188,12 @@ func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.Rec
 		return &pb.RechargeAddressResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
+	if !found || !emailVerified {
+		return &pb.RechargeAddressResp{Code: 9, ErrMsg: "email not verified"}, nil
+	}
 	addr := db.GetRechargeAddress(nodeId)
-	return &pb.RechargeAddressResp{RechargeAddress: addr}, nil
+	return &pb.RechargeAddressResp{RechargeAddress: addr, Balance: db.GetBalance(nodeId)}, nil
 }
 
 func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderReq) (*pb.PayOrderResp, error) {
@@ -199,10 +216,52 @@ func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderRe
 	if len(req.OrderId) == 0 {
 		return &pb.PayOrderResp{Code: 15, ErrMsg: "orderId is required"}, nil
 	}
-	// TODO
-	return nil, nil
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
+	if !found || !emailVerified {
+		return &pb.PayOrderResp{Code: 9, ErrMsg: "email not verified"}, nil
+	}
+	oi := db.GetOrderInfo(nodeId, req.OrderId)
+	if oi.Paid {
+		return &pb.PayOrderResp{Code: 16, ErrMsg: "order is paid"}, nil
+	}
+	balance := db.GetBalance(nodeId)
+	if balance < oi.TotalAmount {
+		return &pb.PayOrderResp{Code: 20, ErrMsg: "balance is not enough"}, nil
+	}
+	db.PayOrder(nodeId, req.OrderId, oi.TotalAmount, oi.ValidDays, oi.PackageId, oi.Volume, oi.Netflow, oi.UpNetflow, oi.DownNetflow)
+	return &pb.PayOrderResp{}, nil
 }
 
 func (self *ClientOrderService) UsageAmount(ctx context.Context, req *pb.UsageAmountReq) (*pb.UsageAmountResp, error) {
-	return nil, nil
+	if req.NodeId == nil {
+		return &pb.UsageAmountResp{Code: 2, ErrMsg: "NodeId is required"}, nil
+	}
+	if len(req.NodeId) != 20 {
+		return &pb.UsageAmountResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
+	}
+	pubKey := db.ClientGetPubKey(req.NodeId)
+	if pubKey == nil {
+		return &pb.UsageAmountResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
+	}
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.UsageAmountResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.UsageAmountResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
+	}
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, packageId, volume, netflow, upNetflow, downNetflow, endTime := db.GetCurrentPackage(nodeId)
+	if !inService {
+		return &pb.UsageAmountResp{}, nil
+	}
+	return &pb.UsageAmountResp{PackageId: packageId, Volume: volume,
+		Netflow:     netflow,
+		UpNetflow:   upNetflow,
+		DownNetflow: downNetflow,
+		// UsageVolume
+		// UsageNetflow
+		// UsageUpNetflow
+		// UsageDownNetflow
+		EndTime: uint64(endTime.Unix())}, nil
 }

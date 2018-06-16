@@ -12,10 +12,11 @@ var initTrackerConfig = false
 var trackerConfig *TrackerConfig
 
 type TrackerConfig struct {
-	Db       Db
-	Server   Server
-	Smtps    Smtps
-	TestMode bool `default:"false"`
+	Db                   Db
+	Server               Server
+	Smtps                Smtps
+	AddressChecksumToken string `default:"test-checksum-token"` // for testing convenience, must be specified other string in config.toml
+	TestMode             bool   `default:"false"`
 }
 
 type Db struct {
@@ -92,9 +93,9 @@ type ApiForTellerConfig struct {
 	ListenIp             string `default:"127.0.0.1"`
 	ListenPort           int    `default:"6688"`
 	AuthToken            string
-	AuthValidSec         int `default:"15"`
-	AddressChecksumToken string
-	Debug                bool `default:"false"`
+	AuthValidSec         int    `default:"15"`
+	AddressChecksumToken string `default:"test-checksum-token"` // for testing convenience, must be specified other string in config.toml
+	Debug                bool   `default:"false"`
 }
 
 var initApiForTellerConfig = false

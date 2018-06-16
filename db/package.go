@@ -8,7 +8,6 @@ import (
 type PackageInfo struct {
 	Id           int64
 	Name         string
-	Level        int32
 	Price        uint64
 	Creation     time.Time
 	LastModified time.Time
@@ -39,7 +38,7 @@ func GetPackageInfo(id int64) (pi *PackageInfo) {
 }
 
 func allPackageInfo(tx *sql.Tx) []*PackageInfo {
-	rows, err := tx.Query("select ID,NAME,LEVEL,PRICE,CREATION,LAST_MODIFIED,REMOVED,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,VALID_DAYS,REMARK from PACKAGE where REMOVED=false")
+	rows, err := tx.Query("select ID,NAME,PRICE,CREATION,LAST_MODIFIED,REMOVED,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,VALID_DAYS,REMARK from PACKAGE where REMOVED=false")
 	checkErr(err)
 	defer rows.Close()
 	res := make([]*PackageInfo, 0, 8)
@@ -51,13 +50,17 @@ func allPackageInfo(tx *sql.Tx) []*PackageInfo {
 
 func buildPackageInfo(rows *sql.Rows) *PackageInfo {
 	pi := PackageInfo{}
-	err := rows.Scan(&pi.Id, &pi.Name, &pi.Level, &pi.Price, &pi.Creation, &pi.LastModified, &pi.Removed, &pi.Volume, &pi.Netflow, &pi.UpNetflow, &pi.DownNetflow, &pi.ValidDays, &pi.Remark)
+	var remarkNullable sql.NullString
+	err := rows.Scan(&pi.Id, &pi.Name, &pi.Price, &pi.Creation, &pi.LastModified, &pi.Removed, &pi.Volume, &pi.Netflow, &pi.UpNetflow, &pi.DownNetflow, &pi.ValidDays, &remarkNullable)
 	checkErr(err)
+	if remarkNullable.Valid {
+		pi.Remark = remarkNullable.String
+	}
 	return &pi
 }
 
 func getPackageInfo(tx *sql.Tx, id int64) *PackageInfo {
-	rows, err := tx.Query("select ID,NAME,LEVEL,PRICE,CREATION,LAST_MODIFIED,REMOVED,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,VALID_DAYS,REMARK from PACKAGE where REMOVED=false and ID=$1", id)
+	rows, err := tx.Query("select ID,NAME,PRICE,CREATION,LAST_MODIFIED,REMOVED,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,VALID_DAYS,REMARK from PACKAGE where REMOVED=false and ID=$1", id)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
