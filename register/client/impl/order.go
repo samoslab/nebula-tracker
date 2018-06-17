@@ -68,6 +68,15 @@ func (self *ClientOrderService) PackageInfo(ctx context.Context, req *pb.Package
 	return &pb.PackageInfoResp{Package: convertPackageInfo(pi)}, nil
 }
 
+func (self *ClientOrderService) PackageDiscount(ctx context.Context, req *pb.PackageDiscountReq) (*pb.PackageDiscountResp, error) {
+	m := db.GetPackageDiscount(req.PackageId)
+	res := make(map[uint32]string, len(m))
+	for k, v := range m {
+		res[k] = v.String()
+	}
+	return &pb.PackageDiscountResp{Discount: res}, nil
+}
+
 func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPackageReq) (*pb.BuyPackageResp, error) {
 	if req.NodeId == nil {
 		return &pb.BuyPackageResp{Code: 2, ErrMsg: "NodeId is required"}, nil
