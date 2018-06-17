@@ -91,7 +91,7 @@ func GetInterfaceConfig() *InterfaceConfig {
 type ApiForTellerConfig struct {
 	Db                   Db
 	ListenIp             string `default:"127.0.0.1"`
-	ListenPort           int    `default:"6688"`
+	ListenPort           int    `default:"6699"`
 	AuthToken            string
 	AuthValidSec         int    `default:"15"`
 	AddressChecksumToken string `default:"test-checksum-token"` // for testing convenience, must be specified other string in config.toml
