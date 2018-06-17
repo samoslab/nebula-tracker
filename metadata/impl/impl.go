@@ -496,6 +496,9 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 	if size != req.FileSize {
 		return &pb.RetrieveFileResp{Code: 8, ErrMsg: "file data size is not equal fileSize"}, nil
 	}
+	if size == 0 {
+		return &pb.RetrieveFileResp{Code: 0, FileData: []byte{}}, nil
+	}
 	if len(fileData) > 0 {
 		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
 	}

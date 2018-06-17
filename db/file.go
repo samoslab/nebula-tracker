@@ -109,9 +109,7 @@ func fileSave(tx *sql.Tx, nodeId string, hash string, size uint64, fileData []by
 func FileSaveTiny(existId []byte, nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, parentId []byte) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	// if size > 0 {
-	// 	fileSave(tx, nodeId, hash, size, fileData, true, size*3)
-	// }
+	fileSave(tx, nodeId, hash, size, fileData, true, size*3)
 	if len(existId) > 0 {
 		updateFileOwnerNewVersion(tx, existId, nodeId, modTime, hash, size)
 	} else {
