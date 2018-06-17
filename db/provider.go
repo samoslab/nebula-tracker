@@ -188,6 +188,9 @@ func ProviderGetPubKey(nodeId []byte) *rsa.PublicKey {
 	// 	return b
 	// } else {
 	pubKeyBytes := getProviderPublicKeyBytes(nodeIdStr)
+	if len(pubKeyBytes) == 0 {
+		return nil
+	}
 	pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
 	if err != nil {
 		panic(err)

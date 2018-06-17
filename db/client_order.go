@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type OrderInfo struct {
@@ -18,7 +20,7 @@ type OrderInfo struct {
 	Quanlity     uint32
 	TotalAmount  uint64
 	Upgraded     bool
-	Discount     float32
+	Discount     decimal.Decimal
 	Volume       uint32
 	Netflow      uint32
 	UpNetflow    uint32
@@ -52,7 +54,7 @@ func GetOrderInfo(nodeId string, id []byte) (oi *OrderInfo) {
 func myAllOrder(tx *sql.Tx, nodeId string, onlyNotExpired bool) []*OrderInfo {
 	sqlStr := "select o.ID,o.REMOVED,o.CREATION,o.LAST_MODIFIED,o.NODE_ID,o.PACKAGE_ID,o.QUANTITY,o.TOTAL_AMOUNT,o.UPGRADED,o.DISCOUNT,o.VOLUME,o.NETFLOW,o.UP_NETFLOW,o.DOWN_NETFLOW,o.VALID_DAYS,o.START_TIME,o.END_TIME,o.PAY_TIME,o.REMARK,p.ID,p.NAME,p.PRICE,p.CREATION,p.LAST_MODIFIED,p.REMOVED,p.VOLUME,p.NETFLOW,p.UP_NETFLOW,p.DOWN_NETFLOW,p.VALID_DAYS,p.REMARK from CLIENT_ORDER o,PACKAGE p where o.NODE_ID=$1 and o.PACKAGE_ID=p.ID and o.REMOVED=false"
 	if onlyNotExpired {
-		sqlStr += " and END_TIME>now()"
+		sqlStr += " and (END_TIME is null or END_TIME>now())"
 	}
 	rows, err := tx.Query(sqlStr, nodeId)
 	checkErr(err)
@@ -118,7 +120,8 @@ func BuyPackage(nodeId string, packageId int64, quanlity uint32, cancelUnpaid bo
 			priceOffset = pi.Price - oldPi.Price
 		}
 	}
-	id := buyPackage(tx, nodeId, pi, quanlity, renew, endTime, upgrade, oldPackageId, priceOffset)
+	discount := getPackageQuantityDiscount(tx, pi.Id, quanlity)
+	id := buyPackage(tx, nodeId, pi, quanlity, discount, renew, endTime, upgrade, oldPackageId, priceOffset)
 	oi = getOrderInfo(tx, nodeId, id)
 	checkErr(tx.Commit())
 	commit = true
@@ -148,8 +151,8 @@ func updatePayTime(tx *sql.Tx, nodeId string, id []byte, startTime time.Time, en
 	}
 }
 
-func buyPackage(tx *sql.Tx, nodeId string, pi *PackageInfo, quanlity uint32, renew bool, endTime time.Time, upgrade bool, oldPackageId int64, priceOffset uint64) (id []byte) {
-	totalAmount := uint64(quanlity) * pi.Price
+func buyPackage(tx *sql.Tx, nodeId string, pi *PackageInfo, quanlity uint32, discount decimal.Decimal, renew bool, endTime time.Time, upgrade bool, oldPackageId int64, priceOffset uint64) (id []byte) {
+	totalAmount := uint64(decimal.New(int64(uint64(quanlity)*pi.Price), 0).Mul(discount).IntPart())
 	remark := ""
 	if upgrade {
 		now := time.Now().UTC()
@@ -160,7 +163,7 @@ func buyPackage(tx *sql.Tx, nodeId string, pi *PackageInfo, quanlity uint32, ren
 
 	}
 	err := tx.QueryRow("insert into CLIENT_ORDER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,PACKAGE_ID,QUANTITY,TOTAL_AMOUNT,UPGRADED,DISCOUNT,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,VALID_DAYS,REMARK) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING ID",
-		nodeId, pi.Id, quanlity, totalAmount, upgrade, 1, pi.Volume, quanlity*pi.Netflow, quanlity*pi.UpNetflow, quanlity*pi.DownNetflow, quanlity*pi.ValidDays, remark).Scan(&id)
+		nodeId, pi.Id, quanlity, totalAmount, upgrade, discount, pi.Volume, quanlity*pi.Netflow, quanlity*pi.UpNetflow, quanlity*pi.DownNetflow, quanlity*pi.ValidDays, remark).Scan(&id)
 	checkErr(err)
 	return
 }
@@ -171,14 +174,17 @@ func PayOrder(nodeId string, orderId []byte, amount uint64, validDays uint32, pa
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	reduceBalanceToPayOrder(tx, nodeId, amount)
-	inService, _, _, _, _, _, endServiceTime := getCurrentPackage(tx, nodeId)
+	inService, _, _, _, _, _, _, endServiceTime := getCurrentPackage(tx, nodeId)
 	if inService {
 		startTime = endServiceTime
 	}
 	dd, _ := time.ParseDuration(strconv.Itoa(24*int(validDays)) + "h")
 	endTime := startTime.Add(dd)
 	updatePayTime(tx, nodeId, orderId, startTime, endTime, payTime)
-	updateCurrentPackage(tx, nodeId, packageId, volume, netflow, upNetflow, downNetflow, endTime)
+	updateCurrentPackage(tx, nodeId, packageId, volume, netflow, upNetflow, downNetflow, endTime, inService)
+	if !inService {
+		resetClientUsageAmountNetflow(tx, nodeId)
+	}
 	checkErr(tx.Commit())
 	commit = true
 	return

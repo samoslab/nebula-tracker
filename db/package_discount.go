@@ -21,6 +21,24 @@ func getPackageDiscount(tx *sql.Tx, id int64) map[uint32]*decimal.Decimal {
 	return m
 }
 
+func getPackageQuantityDiscount(tx *sql.Tx, id int64, quantity uint32) decimal.Decimal {
+	m := getPackageDiscount(tx, id)
+	if len(m) == 0 {
+		return decimal.New(1, 0)
+	}
+	var key uint32 = 0
+	for k, _ := range m {
+		if k <= quantity && k > key {
+			key = k
+		}
+	}
+	if key == 0 {
+		return decimal.New(1, 0)
+	} else {
+		return *(m[key])
+	}
+}
+
 func GetPackageDiscount(id int64) (m map[uint32]*decimal.Decimal) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)

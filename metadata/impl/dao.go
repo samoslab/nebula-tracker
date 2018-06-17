@@ -3,6 +3,7 @@ package impl
 import (
 	"crypto/rsa"
 	"nebula-tracker/db"
+	"time"
 )
 
 type dao interface {
@@ -20,6 +21,8 @@ type dao interface {
 	FileOwnerRemove(nodeId string, pathId []byte, recursive bool) (res bool)
 	FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte, isFolder bool)
 	FileOwnerCheckId(id []byte) (nodeId string, isFolder bool)
+	UsageAmount(nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32,
+		downNetflow uint32, usageVolume uint32, usageNetflow uint32, usageUpNetflow uint32, usageDownNetflow uint32, endTime time.Time)
 }
 type daoImpl struct {
 }
@@ -65,4 +68,8 @@ func (self *daoImpl) FileOwnerIdOfFilePath(nodeId string, path string) (found bo
 }
 func (self *daoImpl) FileOwnerCheckId(id []byte) (nodeId string, isFolder bool) {
 	return db.FileOwnerCheckId(id)
+}
+func (self *daoImpl) UsageAmount(nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32,
+	downNetflow uint32, usageVolume uint32, usageNetflow uint32, usageUpNetflow uint32, usageDownNetflow uint32, endTime time.Time) {
+	return db.UsageAmount(nodeId)
 }

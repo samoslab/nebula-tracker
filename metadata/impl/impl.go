@@ -60,6 +60,13 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 		}
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, _, _, _, _, _, _, _, _, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return &pb.MkFolderResp{Code: 400, ErrMsg: "email not verified"}, nil
+	}
+	if !inService {
+		return &pb.MkFolderResp{Code: 401, ErrMsg: "not found any package order"}, nil
+	}
 	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.MkFolderResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
@@ -120,6 +127,26 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		return &pb.CheckFileExistResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, volume, netflow, upNetflow,
+		_, usageVolume, usageNetflow, usageUpNetflow, _, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return &pb.CheckFileExistResp{Code: 400, ErrMsg: "email not verified"}, nil
+	}
+	if !inService {
+		return &pb.CheckFileExistResp{Code: 401, ErrMsg: "not found any package order"}, nil
+	}
+	if volume <= usageVolume {
+		return &pb.CheckFileExistResp{Code: 410, ErrMsg: "storage volume exceed"}, nil
+	}
+	if netflow <= usageNetflow {
+		return &pb.CheckFileExistResp{Code: 411, ErrMsg: "netflow exceed"}, nil
+	}
+	if upNetflow <= usageUpNetflow {
+		return &pb.CheckFileExistResp{Code: 412, ErrMsg: "upload netflow exceed"}, nil
+	}
+	// if downNetflow <= usageDownNetflow {
+	// 	return &pb.CheckFileExistResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
+	// }
 	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.CheckFileExistResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
@@ -152,7 +179,6 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			}
 		}
 	}
-	//check available space
 	exist, active, done, size, selfCreate, doneExpired := self.d.FileCheckExist(nodeIdStr, hashStr, done_expired)
 	if exist {
 		if size != req.FileSize {
@@ -177,6 +203,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		self.d.FileSaveTiny(existId, nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
 		return &pb.CheckFileExistResp{Code: 0}, nil
 	}
+
 	resp = &pb.CheckFileExistResp{Code: 1}
 	providerCnt := self.c.Count()
 	conf := config.GetTrackerConfig()
@@ -269,6 +296,29 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 	if err := req.VerifySign(pubKey); err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, volume, netflow, upNetflow,
+		_, usageVolume, usageNetflow, usageUpNetflow, _, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return nil, status.Error(codes.PermissionDenied, "email not verified")
+	}
+	if !inService {
+		return nil, status.Error(codes.PermissionDenied, "not found any package order")
+	}
+
+	if volume <= usageVolume {
+		return nil, status.Error(codes.OutOfRange, "storage volume exceed")
+	}
+	if netflow <= usageNetflow {
+		return nil, status.Error(codes.OutOfRange, "netflow exceed")
+	}
+	if upNetflow <= usageUpNetflow {
+		return nil, status.Error(codes.OutOfRange, "upload netflow exceed")
+	}
+	// if downNetflow <= usageDownNetflow {
+	// 	return nil, status.Error(codes.OutOfRange, "download netflow exceed")
+	// }
+
 	if len(req.Partition) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "partition data is required")
 	}
@@ -369,6 +419,26 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		return &pb.UploadFileDoneResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, volume, netflow, upNetflow,
+		_, usageVolume, usageNetflow, usageUpNetflow, _, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return &pb.UploadFileDoneResp{Code: 400, ErrMsg: "email not verified"}, nil
+	}
+	if !inService {
+		return &pb.UploadFileDoneResp{Code: 401, ErrMsg: "not found any package order"}, nil
+	}
+	if volume <= usageVolume {
+		return &pb.UploadFileDoneResp{Code: 410, ErrMsg: "storage volume exceed"}, nil
+	}
+	if netflow <= usageNetflow {
+		return &pb.UploadFileDoneResp{Code: 411, ErrMsg: "netflow exceed"}, nil
+	}
+	if upNetflow <= usageUpNetflow {
+		return &pb.UploadFileDoneResp{Code: 412, ErrMsg: "upload netflow exceed"}, nil
+	}
+	// if downNetflow <= usageDownNetflow {
+	// 	return &pb.UploadFileDoneResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
+	// }
 	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.UploadFileDoneResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
@@ -401,7 +471,7 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 			}
 		}
 	}
-	//check available space
+
 	blocks, err := fromPartitions(req.Partition)
 	if err != nil {
 		return &pb.UploadFileDoneResp{Code: 9, ErrMsg: err.Error()}, nil
@@ -439,6 +509,26 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 		return &pb.ListFilesResp{Code: 6, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, _, netflow, _,
+		downNetflow, _, usageNetflow, _, usageDownNetflow, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return &pb.ListFilesResp{Code: 400, ErrMsg: "email not verified"}, nil
+	}
+	if !inService {
+		return &pb.ListFilesResp{Code: 401, ErrMsg: "not found any package order"}, nil
+	}
+	// if volume <= usageVolume {
+	// 	return &pb.ListFilesResp{Code: 410, ErrMsg: "storage volume exceed"}, nil
+	// }
+	if netflow <= usageNetflow {
+		return &pb.ListFilesResp{Code: 411, ErrMsg: "netflow exceed"}, nil
+	}
+	// if upNetflow <= usageUpNetflow {
+	// 	return &pb.ListFilesResp{Code: 412, ErrMsg: "upload netflow exceed"}, nil
+	// }
+	if downNetflow <= usageDownNetflow {
+		return &pb.ListFilesResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
+	}
 	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.ListFilesResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
@@ -485,6 +575,27 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.RetrieveFileResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, _, netflow, _,
+		downNetflow, _, usageNetflow, _, usageDownNetflow, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return &pb.RetrieveFileResp{Code: 400, ErrMsg: "email not verified"}, nil
+	}
+	if !inService {
+		return &pb.RetrieveFileResp{Code: 401, ErrMsg: "not found any package order"}, nil
+	}
+	// if volume <= usageVolume {
+	// 	return &pb.RetrieveFileResp{Code: 410, ErrMsg: "storage volume exceed"}, nil
+	// }
+	if netflow <= usageNetflow {
+		return &pb.RetrieveFileResp{Code: 411, ErrMsg: "netflow exceed"}, nil
+	}
+	// if upNetflow <= usageUpNetflow {
+	// 	return &pb.RetrieveFileResp{Code: 412, ErrMsg: "upload netflow exceed"}, nil
+	// }
+	if downNetflow <= usageDownNetflow {
+		return &pb.RetrieveFileResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
+	}
 	hash := base64.StdEncoding.EncodeToString(req.FileHash)
 	exist, active, fileData, partitionCount, blocks, size := self.d.FileRetrieve(hash)
 	if !exist {
@@ -503,7 +614,7 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
 	}
 	ts := uint64(time.Now().Unix())
-	parts, err := self.toRetrievePartition(base64.StdEncoding.EncodeToString(req.NodeId), req.FileHash, req.FileSize, blocks, partitionCount, ts)
+	parts, err := self.toRetrievePartition(nodeIdStr, req.FileHash, req.FileSize, blocks, partitionCount, ts)
 	if err != nil {
 		return &pb.RetrieveFileResp{Code: 9, ErrMsg: err.Error()}, nil
 	}
@@ -604,6 +715,15 @@ func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (res
 		return &pb.RemoveResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, _, _, _,
+		_, _, _, _, _, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return &pb.RemoveResp{Code: 400, ErrMsg: "email not verified"}, nil
+	}
+	if !inService {
+		return &pb.RemoveResp{Code: 401, ErrMsg: "not found any package order"}, nil
+	}
+
 	resobj, pathId := self.findPathId(nodeIdStr, req.Target, false)
 	if resobj != nil {
 		return &pb.RemoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil

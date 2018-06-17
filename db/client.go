@@ -175,6 +175,9 @@ func ClientGetPubKey(nodeId []byte) *rsa.PublicKey {
 		return b
 	} else {
 		pubKeyBytes := getPublicKeyBytes(nodeIdStr)
+		if len(pubKeyBytes) == 0 {
+			return nil
+		}
 		pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
 		if err != nil {
 			panic(err)
@@ -213,7 +216,7 @@ func clientAllPubKeyBytes(tx *sql.Tx) map[string][]byte {
 }
 
 func clientDeposit(tx *sql.Tx, address string, amount uint64) {
-	stmt, err := tx.Prepare("update CLIENT set BALANCE=BALANCE+$2,LAST_MODIFIED=now() where ADDRESS=$1")
+	stmt, err := tx.Prepare("update CLIENT set BALANCE=BALANCE+$2,LAST_MODIFIED=now() where RECHARGE_ADDRESS=$1")
 	defer stmt.Close()
 	checkErr(err)
 	rs, err := stmt.Exec(address, amount)
@@ -309,37 +312,89 @@ func reduceBalanceToPayOrder(tx *sql.Tx, nodeId string, amount uint64) {
 	}
 }
 
-func getCurrentPackage(tx *sql.Tx, nodeId string) (inService bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
-	rows, err := tx.Query("SELECT PACKAGE_ID,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,END_TIME FROM CLIENT where NODE_ID=$1 and END_TIME is not null and now()<END_TIME", nodeId)
+func getCurrentPackage(tx *sql.Tx, nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
+	rows, err := tx.Query("SELECT EMAIL_VERIFIED,PACKAGE_ID,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,END_TIME FROM CLIENT where NODE_ID=$1 and END_TIME is not null and now()<END_TIME", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
 		inService = true
-		err = rows.Scan(&packageId, &volume, &netflow, &upNetflow, &downNetflow, &endTime)
+		err = rows.Scan(&emailVerified, &packageId, &volume, &netflow, &upNetflow, &downNetflow, &endTime)
 		checkErr(err)
 		return
 	}
-	return false, 0, 0, 0, 0, 0, time.Now()
+	return
 }
 
-func GetCurrentPackage(nodeId string) (inService bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
+func GetCurrentPackage(nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	inService, packageId, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeId)
+	inService, emailVerified, packageId, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeId)
 	checkErr(tx.Commit())
 	commit = true
 	return
 }
 
-func updateCurrentPackage(tx *sql.Tx, nodeId string, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
-	stmt, err := tx.Prepare("update CLIENT set PACKAGE_ID=$2,VOLUME=$3,NETFLOW=$4,UP_NETFLOW=$5,DOWN_NETFLOW=$6,END_TIME=$7,LAST_MODIFIED=now() where NODE_ID=$1")
+func updateCurrentPackage(tx *sql.Tx, nodeId string, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time, inService bool) {
+	var sqlStr string
+	if inService {
+		sqlStr = "update CLIENT set PACKAGE_ID=$2,VOLUME=$3,NETFLOW=NETFLOW+$4,UP_NETFLOW=UP_NETFLOW+$5,DOWN_NETFLOW=DOWN_NETFLOW+$6,END_TIME=$7,LAST_MODIFIED=now() where NODE_ID=$1"
+	} else {
+		sqlStr = "update CLIENT set PACKAGE_ID=$2,VOLUME=$3,NETFLOW=$4,UP_NETFLOW=$5,DOWN_NETFLOW=$6,END_TIME=$7,LAST_MODIFIED=now() where NODE_ID=$1"
+	}
+	stmt, err := tx.Prepare(sqlStr)
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(packageId, nodeId, volume, netflow, upNetflow, downNetflow, endTime)
+	rs, err := stmt.Exec(nodeId, packageId, volume, netflow, upNetflow, downNetflow, endTime)
 	checkErr(err)
 	rowsAffected, err := rs.RowsAffected()
 	checkErr(err)
 	if rowsAffected == 0 {
 		panic(fmt.Errorf("update current package failed, nodeId: %s, packageId: %d, volume: %d", nodeId, packageId, volume))
 	}
+}
+
+func UsageAmount(nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32,
+	downNetflow uint32, usageVolume uint32, usageNetflow uint32, usageUpNetflow uint32, usageDownNetflow uint32, endTime time.Time) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	inService, emailVerified, packageId, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeId)
+	// TODO usageXxx
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func usageAmount(tx *sql.Tx, nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32,
+	downNetflow uint32, usageVolume uint32, usageNetflow uint32, usageUpNetflow uint32, usageDownNetflow uint32, endTime time.Time) {
+	rows, err := tx.Query("SELECT c.EMAIL_VERIFIED,c.PACKAGE_ID,c.VOLUME,c.NETFLOW,c.UP_NETFLOW,c.DOWN_NETFLOW,c.END_TIME,a.VOLUME,a.NETFLOW,a.UP_NETFLOW,a.DOWN_NETFLOW FROM CLIENT c LEFT OUTER JOIN CLIENT_USAGE_AMOUNT a on c.NODE_ID=a.NODE_ID where c.NODE_ID=$1 and c.END_TIME is not null and now()<c.END_TIME", nodeId)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		inService = true
+		var usageVolumeNullable, usageNetflowNullable, usageUpNetflowNullable, usageDownNetflowNullable sql.NullInt64
+		err = rows.Scan(&emailVerified, &packageId, &volume, &netflow, &upNetflow, &downNetflow, &endTime, &usageVolumeNullable, &usageNetflowNullable, &usageUpNetflowNullable, &usageDownNetflowNullable)
+		if usageVolumeNullable.Valid {
+			usageVolume = uint32(usageVolumeNullable.Int64)
+		}
+		if usageNetflowNullable.Valid {
+			usageNetflow = uint32(usageNetflowNullable.Int64)
+		}
+		if usageUpNetflowNullable.Valid {
+			usageUpNetflow = uint32(usageUpNetflowNullable.Int64)
+		}
+		if usageDownNetflowNullable.Valid {
+			usageDownNetflow = uint32(usageDownNetflowNullable.Int64)
+		}
+		checkErr(err)
+		return
+	}
+	return
+}
+
+func resetClientUsageAmountNetflow(tx *sql.Tx, nodeId string) {
+	stmt, err := tx.Prepare("update CLIENT_USAGE_AMOUNT set NETFLOW=0,UP_NETFLOW=0,DOWN_NETFLOW=0,LAST_MODIFIED=now() where NODE_ID=$1")
+	defer stmt.Close()
+	checkErr(err)
+	_, err = stmt.Exec(nodeId)
+	checkErr(err)
 }

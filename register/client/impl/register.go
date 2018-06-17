@@ -133,7 +133,7 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 		self.reGenerateVerifyCode(nodeIdStr, contactEmail)
 		return &pb.VerifyContactEmailResp{Code: 8, ErrMsg: "wrong verified code, will send verify email again"}, nil
 	}
-	if subM := time.Now().Sub(sendTime).Minutes(); subM > 120 {
+	if subM := time.Now().UTC().Sub(sendTime).Minutes(); subM > 120 {
 		self.reGenerateVerifyCode(nodeIdStr, contactEmail)
 		return &pb.VerifyContactEmailResp{Code: 9, ErrMsg: "verify code expired, will send verify email again"}, nil
 	}

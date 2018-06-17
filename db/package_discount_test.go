@@ -41,4 +41,22 @@ func TestPackageDiscount(t *testing.T) {
 	if m[5].String() != "0.8" {
 		t.Error("failed")
 	}
+	if getPackageQuantityDiscount(tx, packageId, 2).String() != "1" {
+		t.Error("failed")
+	}
+	if getPackageQuantityDiscount(tx, packageId, 3).String() != "0.9" {
+		t.Error("failed")
+	}
+	if getPackageQuantityDiscount(tx, packageId, 4).String() != "0.9" {
+		t.Error("failed")
+	}
+	if getPackageQuantityDiscount(tx, packageId, 5).String() != "0.8" {
+		t.Error("failed")
+	}
+	if getPackageQuantityDiscount(tx, packageId, 6).String() != "0.8" {
+		t.Error("failed")
+	}
+	if getPackageQuantityDiscount(tx, packageId, 7).String() != "0.8" {
+		t.Error("failed")
+	}
 }

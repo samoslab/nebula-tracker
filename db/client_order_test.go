@@ -5,6 +5,8 @@ import (
 	"nebula-tracker/config"
 	"testing"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 func TestClientOrder(t *testing.T) {
@@ -27,7 +29,7 @@ func TestClientOrder(t *testing.T) {
 		t.Errorf("Failed.")
 	}
 	count := len(myAllOrder(tx, nodeId, false))
-	orderId := buyPackage(tx, nodeId, pi, 3, false, time.Now(), false, 0, 0)
+	orderId := buyPackage(tx, nodeId, pi, 3, decimal.New(1, 0), false, time.Now(), false, 0, 0)
 	if len(orderId) == 0 {
 		t.Error("failed")
 	}

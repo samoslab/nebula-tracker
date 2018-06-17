@@ -48,7 +48,7 @@ func convertOrderInfo(o *db.OrderInfo) *pb.Order {
 		Quanlity:    o.Quanlity,
 		TotalAmount: o.TotalAmount,
 		Upgraded:    o.Upgraded,
-		Discount:    o.Discount,
+		Discount:    o.Discount.String(),
 		Volume:      o.Volume,
 		Netflow:     o.Netflow,
 		UpNetflow:   o.UpNetflow,
@@ -104,7 +104,7 @@ func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPacka
 		return &pb.BuyPackageResp{Code: 21, ErrMsg: "package not found"}, nil
 	}
 
-	inService, packageId, volume, _, _, _, endTime := db.GetCurrentPackage(nodeId)
+	inService, _, packageId, volume, _, _, _, endTime := db.GetCurrentPackage(nodeId)
 	var renew, upgrade bool
 	if inService {
 		if pi.Volume < volume {
@@ -260,17 +260,17 @@ func (self *ClientOrderService) UsageAmount(ctx context.Context, req *pb.UsageAm
 		return &pb.UsageAmountResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
-	inService, packageId, volume, netflow, upNetflow, downNetflow, endTime := db.GetCurrentPackage(nodeId)
+	inService, _, packageId, volume, netflow, upNetflow, downNetflow, usageVolume, usageNetflow, usageUpNetflow, usageDownNetflow, endTime := db.UsageAmount(nodeId)
 	if !inService {
 		return &pb.UsageAmountResp{}, nil
 	}
 	return &pb.UsageAmountResp{PackageId: packageId, Volume: volume,
-		Netflow:     netflow,
-		UpNetflow:   upNetflow,
-		DownNetflow: downNetflow,
-		// UsageVolume
-		// UsageNetflow
-		// UsageUpNetflow
-		// UsageDownNetflow
-		EndTime: uint64(endTime.Unix())}, nil
+		Netflow:          netflow,
+		UpNetflow:        upNetflow,
+		DownNetflow:      downNetflow,
+		UsageVolume:      usageVolume,
+		UsageNetflow:     usageNetflow,
+		UsageUpNetflow:   usageUpNetflow,
+		UsageDownNetflow: usageDownNetflow,
+		EndTime:          uint64(endTime.Unix())}, nil
 }
