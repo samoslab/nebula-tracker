@@ -65,7 +65,7 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 		return &pb.MkFolderResp{Code: 400, ErrMsg: "email not verified"}, nil
 	}
 	if !inService {
-		return &pb.MkFolderResp{Code: 401, ErrMsg: "not found any package order"}, nil
+		return &pb.MkFolderResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
 	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
@@ -133,7 +133,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		return &pb.CheckFileExistResp{Code: 400, ErrMsg: "email not verified"}, nil
 	}
 	if !inService {
-		return &pb.CheckFileExistResp{Code: 401, ErrMsg: "not found any package order"}, nil
+		return &pb.CheckFileExistResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
 	if volume <= usageVolume {
 		return &pb.CheckFileExistResp{Code: 410, ErrMsg: "storage volume exceed"}, nil
@@ -303,7 +303,7 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 		return nil, status.Error(codes.PermissionDenied, "email not verified")
 	}
 	if !inService {
-		return nil, status.Error(codes.PermissionDenied, "not found any package order")
+		return nil, status.Error(codes.PermissionDenied, "not buy any package order")
 	}
 
 	if volume <= usageVolume {
@@ -425,7 +425,7 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		return &pb.UploadFileDoneResp{Code: 400, ErrMsg: "email not verified"}, nil
 	}
 	if !inService {
-		return &pb.UploadFileDoneResp{Code: 401, ErrMsg: "not found any package order"}, nil
+		return &pb.UploadFileDoneResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
 	if volume <= usageVolume {
 		return &pb.UploadFileDoneResp{Code: 410, ErrMsg: "storage volume exceed"}, nil
@@ -515,7 +515,7 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 		return &pb.ListFilesResp{Code: 400, ErrMsg: "email not verified"}, nil
 	}
 	if !inService {
-		return &pb.ListFilesResp{Code: 401, ErrMsg: "not found any package order"}, nil
+		return &pb.ListFilesResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
 	// if volume <= usageVolume {
 	// 	return &pb.ListFilesResp{Code: 410, ErrMsg: "storage volume exceed"}, nil
@@ -582,7 +582,7 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 400, ErrMsg: "email not verified"}, nil
 	}
 	if !inService {
-		return &pb.RetrieveFileResp{Code: 401, ErrMsg: "not found any package order"}, nil
+		return &pb.RetrieveFileResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
 	// if volume <= usageVolume {
 	// 	return &pb.RetrieveFileResp{Code: 410, ErrMsg: "storage volume exceed"}, nil
@@ -721,7 +721,7 @@ func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (res
 		return &pb.RemoveResp{Code: 400, ErrMsg: "email not verified"}, nil
 	}
 	if !inService {
-		return &pb.RemoveResp{Code: 401, ErrMsg: "not found any package order"}, nil
+		return &pb.RemoveResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
 
 	resobj, pathId := self.findPathId(nodeIdStr, req.Target, false)
