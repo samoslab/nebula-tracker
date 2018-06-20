@@ -299,3 +299,22 @@ func (self *ProviderRegisterService) GetCollectorServer(ctx context.Context, req
 	// TODO
 	return nil, nil
 }
+
+func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.RefreshIpReq) (*pb.RefreshIpResp, error) {
+	pubKey := db.ProviderGetPubKey(req.NodeId)
+	if pubKey == nil {
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
+	}
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
+	}
+	ip := getClientIp(ctx)
+	if err == nil && len(ip) >= 7 {
+		nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+		db.UpdateProviderHost(nodeIdStr, ip)
+	}
+	return &pb.RefreshIpResp{Ip: ip}, nil
+}

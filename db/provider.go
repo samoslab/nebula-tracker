@@ -336,3 +336,22 @@ func providerAllPubKeyBytes(tx *sql.Tx) map[string][]byte {
 	}
 	return m
 }
+
+func updateProviderHost(tx *sql.Tx, nodeId string, ip string) {
+	stmt, err := tx.Prepare("update PROVIDER set HOST=$2,LAST_MODIFIED=now() where NODE_ID=$1 and REMOVED=false and HOST<>$3")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(nodeId, ip, ip)
+	checkErr(err)
+	_, err = rs.RowsAffected()
+	checkErr(err)
+}
+
+func UpdateProviderHost(nodeId string, ip string) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	updateProviderHost(tx, nodeId, ip)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
