@@ -311,7 +311,7 @@ func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.Refr
 	if err := req.VerifySign(pubKey); err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
-	ip := getClientIp(ctx)
+	ip, err := getClientIp(ctx)
 	if err == nil && len(ip) >= 7 {
 		nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 		db.UpdateProviderHost(nodeIdStr, ip)

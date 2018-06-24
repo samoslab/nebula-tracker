@@ -812,3 +812,50 @@ func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
 	}
 	return res, nil
 }
+
+func (self *MatadataService) Move(ctx context.Context, req *pb.MoveReq) (resp *pb.MoveResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.MoveResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return &pb.MoveResp{Code: checkRes.Code, ErrMsg: checkRes.ErrMsg}, nil
+	}
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.MoveResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.MoveResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, _, _, _,
+		_, _, _, _, _, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return &pb.MoveResp{Code: 400, ErrMsg: "email not verified"}, nil
+	}
+	if !inService {
+		return &pb.MoveResp{Code: 401, ErrMsg: "not buy any package order"}, nil
+	}
+
+	resobj, source := self.findPathId(nodeIdStr, req.Source, false)
+	if resobj != nil {
+		return &pb.MoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
+	}
+	if len(source) == 0 {
+		return &pb.MoveResp{Code: 6, ErrMsg: "source path not exists"}, nil
+	}
+
+	// resobj, dest := self.findPathId(nodeIdStr, req.Dest, false)
+	// if resobj != nil {
+	// 	return &pb.MoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
+	// }
+	// if len(dest) == 0 {
+	// 	return &pb.MoveResp{Code: 7, ErrMsg: " destination path not exists"}, nil
+	// }
+
+	return &pb.MoveResp{Code: 0}, nil
+
+}
