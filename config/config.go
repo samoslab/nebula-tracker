@@ -40,7 +40,7 @@ type Smtps struct {
 	Host     string `default:"smtp.163.com"`
 	Port     int    `default:"465"`
 	Username string `default:"silveradmin@163.com"`
-	Password string `default:"unknown"`
+	Password string `default:"adminsilver"`
 }
 
 func GetTrackerConfig() *TrackerConfig {
