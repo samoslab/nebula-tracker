@@ -29,6 +29,9 @@ type Db struct {
 	SslMode         string `default:"disable"`
 	MaxOpenConns    int    `default:"500"`
 	MaxIdleConns    int    `default:"50"`
+	SslCert         string
+	SslRootCert     string
+	SslKey          string
 }
 
 type Server struct {
