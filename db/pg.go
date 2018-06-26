@@ -25,8 +25,12 @@ var db *sql.DB
 
 func OpenDb(dbConfig *config.Db) *sql.DB {
 	//	conn_str := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s", dbConfig.Host, dbConfig.Port, dbConfig.User, dbConfig.Password, dbConfig.Name, dbConfig.SslMode)
-	conn_str := fmt.Sprintf("postgresql://%s@%s:%d/%s?application_name=%s&sslmode=%s", dbConfig.User, dbConfig.Host, dbConfig.Port, dbConfig.Name, dbConfig.ApplicationName, dbConfig.SslMode)
-
+	var conn_str string
+	if dbConfig.SslMode == "disable" {
+		conn_str = fmt.Sprintf("postgresql://%s@%s:%d/%s?application_name=%s&sslmode=%s", dbConfig.User, dbConfig.Host, dbConfig.Port, dbConfig.Name, dbConfig.ApplicationName, dbConfig.SslMode)
+	} else {
+		conn_str = fmt.Sprintf("postgresql://%s@%s:%d/%s?sslmode=%s&sslrootcert=%s&sslcert=%s&sslkey=%s", dbConfig.User, dbConfig.Host, dbConfig.Port, dbConfig.Name, dbConfig.SslMode, dbConfig.SslRootCert, dbConfig.SslCert, dbConfig.SslKey)
+	}
 	//	fmt.Println(conn_str)
 	var err error
 	db, err = sql.Open("postgres", conn_str)
