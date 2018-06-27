@@ -2,6 +2,7 @@ package impl
 
 import (
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -17,18 +18,28 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	util_hash "github.com/samoslab/nebula/util/hash"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
 type MatadataService struct {
-	c providerChooser
-	d dao
+	PubKey      *rsa.PublicKey
+	PriKey      *rsa.PrivateKey
+	PubKeyBytes []byte
+	PriKeyHash  []byte
+	c           providerChooser
+	d           dao
 }
 
-func NewMatadataService() *MatadataService {
-	return &MatadataService{c: &chooserImpl{}, d: &daoImpl{}}
+func NewMatadataService(pk *rsa.PrivateKey) (ms *MatadataService) {
+	ms = &MatadataService{c: &chooserImpl{}, d: &daoImpl{}}
+	ms.PriKey = pk
+	ms.PubKey = &pk.PublicKey
+	ms.PubKeyBytes = x509.MarshalPKCS1PublicKey(ms.PubKey)
+	ms.PriKeyHash = util_hash.Sha1(ms.PubKeyBytes)
+	return
 }
 
 func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) (resp *pb.MkFolderResp, err error) {
@@ -246,7 +257,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 const done_expired = 1800
 
 func uuidStr() string {
-	u := uuid.Must(uuid.NewV4())
+	u := uuid.NewV4()
 	return "-" + base64.StdEncoding.EncodeToString(u[:])
 }
 func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {

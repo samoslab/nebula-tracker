@@ -1,6 +1,8 @@
 package impl
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"nebula-tracker/db"
 	"time"
@@ -11,11 +13,16 @@ import (
 )
 
 type ClientOrderService struct {
+	PubKey      *rsa.PublicKey
+	PriKey      *rsa.PrivateKey
+	PubKeyBytes []byte
 }
 
-func NewClientOrderService() *ClientOrderService {
+func NewClientOrderService(pk *rsa.PrivateKey) *ClientOrderService {
 	cos := &ClientOrderService{}
-
+	cos.PriKey = pk
+	cos.PubKey = &pk.PublicKey
+	cos.PubKeyBytes = x509.MarshalPKCS1PublicKey(cos.PubKey)
 	return cos
 }
 

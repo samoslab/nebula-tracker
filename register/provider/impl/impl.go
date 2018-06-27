@@ -2,7 +2,6 @@ package impl
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -15,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
@@ -36,12 +34,8 @@ type ProviderRegisterService struct {
 	PubKeyBytes []byte
 }
 
-func NewProviderRegisterService() *ProviderRegisterService {
+func NewProviderRegisterService(pk *rsa.PrivateKey) *ProviderRegisterService {
 	prs := &ProviderRegisterService{}
-	pk, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		log.Fatalf("GenerateKey failed:%s", err.Error())
-	}
 	prs.PriKey = pk
 	prs.PubKey = &pk.PublicKey
 	prs.PubKeyBytes = x509.MarshalPKCS1PublicKey(prs.PubKey)

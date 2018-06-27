@@ -2,7 +2,6 @@ package impl
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	util_hash "github.com/samoslab/nebula/util/hash"
@@ -28,17 +26,15 @@ type ClientRegisterService struct {
 	PubKey      *rsa.PublicKey
 	PriKey      *rsa.PrivateKey
 	PubKeyBytes []byte
+	PriKeyHash  []byte
 }
 
-func NewClientRegisterService() *ClientRegisterService {
+func NewClientRegisterService(pk *rsa.PrivateKey) *ClientRegisterService {
 	crs := &ClientRegisterService{}
-	pk, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		log.Fatalf("GenerateKey failed:%s", err.Error())
-	}
 	crs.PriKey = pk
 	crs.PubKey = &pk.PublicKey
 	crs.PubKeyBytes = x509.MarshalPKCS1PublicKey(crs.PubKey)
+	crs.PriKeyHash = util_hash.Sha1(crs.PubKeyBytes)
 	return crs
 }
 
