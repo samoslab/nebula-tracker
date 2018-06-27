@@ -1,0 +1,135 @@
+syntax = "proto3";
+package register_provider_pb;
+
+service ProviderRegisterService {
+
+    rpc GetPublicKey(GetPublicKeyReq) returns (GetPublicKeyResp){}
+
+    rpc Register(RegisterReq) returns (RegisterResp){}
+
+    rpc VerifyBillEmail(VerifyBillEmailReq) returns (VerifyBillEmailResp){}
+
+    rpc ResendVerifyCode(ResendVerifyCodeReq) returns (ResendVerifyCodeResp){}
+
+    rpc AddExtraStorage(AddExtraStorageReq)returns(AddExtraStorageResp){}
+    
+    rpc GetTrackerServer(GetTrackerServerReq)returns (GetTrackerServerResp){}
+
+    rpc GetCollectorServer(GetCollectorServerReq)returns (GetCollectorServerResp){}
+
+    rpc RefreshIp(RefreshIpReq)returns (RefreshIpResp){}
+
+}
+message GetPublicKeyReq {
+    uint32 version =1;
+}
+
+message GetPublicKeyResp {
+    bytes publicKey=1;
+    string ip=2;
+}
+
+message RegisterReq{
+    uint32 version =1;
+    uint64 timestamp=2;
+    bytes nodeIdEnc = 3;
+    bytes publicKeyEnc = 4;
+    bytes encryptKeyEnc = 5;
+    bytes walletAddressEnc=6;
+    bytes billEmailEnc=7;
+    uint64 mainStorageVolume=8;
+    uint64 upBandwidth=9;
+    uint64 downBandwidth=10;
+    uint64 testUpBandwidth=11;
+    uint64 testDownBandwidth=12;
+    double availability=13;
+    uint32 port=14;
+    bytes hostEnc=15;
+    bytes dynamicDomainEnc=16;
+    repeated uint64 extraStorageVolume=17;
+    bytes sign=18;
+}
+
+message RegisterResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+}
+
+message VerifyBillEmailReq{
+    uint32 version = 1;
+    bytes nodeId = 2;
+    uint64 timestamp=3;
+    string verifyCode=4;
+    bytes sign = 5;
+}
+
+message VerifyBillEmailResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+}
+
+message ResendVerifyCodeReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message ResendVerifyCodeResp{
+    bool success=1;
+}
+
+message AddExtraStorageReq{
+    uint32 version = 1;
+    bytes nodeId = 2;
+    uint64 timestamp=3;
+    uint64 volume=4;
+    bytes sign = 5;
+}
+
+message AddExtraStorageResp{
+    bool success=1;
+}
+
+message GetTrackerServerReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message GetTrackerServerResp{
+    repeated TrackerServer server=1;
+}
+
+message TrackerServer{
+    string server=1;
+    uint32 port=2;
+}
+
+message GetCollectorServerReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4; 
+}
+
+message GetCollectorServerResp{
+    repeated CollectorServer server=1;
+}
+
+message CollectorServer{
+    string server=1;
+    uint32 port=2;
+}
+
+message RefreshIpReq{
+    uint32 version = 1;
+    bytes nodeId = 2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message RefreshIpResp{
+    string ip=1;
+}
