@@ -9,6 +9,7 @@ import (
 
 	client "nebula-tracker/collector/tracker_client"
 
+	"github.com/gogo/protobuf/proto"
 	cache "github.com/patrickmn/go-cache"
 	pb "github.com/samoslab/nebula/tracker/collector/client/pb"
 	log "github.com/sirupsen/logrus"
@@ -80,6 +81,12 @@ func (self *ClientCollectorService) Collect(stream pb.ClientCollectorService_Col
 		// 	return err
 		// }
 		// db.SaveFromClient(nodeIdStr, req.Timestamp, req.ActionLog)
-		fmt.Printf("%+v\n", req)
+		// fmt.Printf("%+v\n", req)
+		fmt.Println(len(req.Data))
+		umData := &pb.Batch{}
+		err = proto.Unmarshal(req.Data, umData)
+		if err == nil {
+			fmt.Printf("%+v\n", umData)
+		}
 	}
 }
