@@ -754,7 +754,7 @@ func (self *MatadataService) findPathId(nodeId string, filePath *pb.FilePath, ne
 		if len(v.Id) == 0 {
 			return
 		}
-		ni, isFolder := self.d.FileOwnerCheckId(v.Id)
+		ni, isFolder := self.d.FileOwnerCheckId(v.Id, filePath.SpaceNo)
 		if len(ni) == 0 {
 			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
 		} else if ni != nodeId {

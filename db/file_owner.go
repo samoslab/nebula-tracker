@@ -12,22 +12,22 @@ import (
 
 const slash = "/"
 
-func FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte, isFolder bool) {
+func FileOwnerIdOfFilePath(nodeId string, path string, spaceNo uint32) (found bool, id []byte, isFolder bool) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	found, id, isFolder = queryIdRecursion(tx, nodeId, path)
+	found, id, isFolder = queryIdRecursion(tx, nodeId, path, spaceNo)
 	checkErr(tx.Commit())
 	commit = true
 	return
 }
 
-func queryIdRecursion(tx *sql.Tx, nodeId string, path string) (found bool, id []byte, isFolder bool) {
+func queryIdRecursion(tx *sql.Tx, nodeId string, path string, spaceNo uint32) (found bool, id []byte, isFolder bool) {
 	if path[len(path)-1] == '/' {
 		path = path[0 : len(path)-1]
 	}
 	paths := strings.Split(path[1:], slash)
 	for _, p := range paths {
-		found, id, isFolder = queryId(tx, nodeId, id, p)
+		found, id, isFolder = queryId(tx, nodeId, id, p, spaceNo)
 		if !found {
 			return
 		}
@@ -35,14 +35,14 @@ func queryIdRecursion(tx *sql.Tx, nodeId string, path string) (found bool, id []
 	return
 }
 
-func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string) (found bool, id []byte, isFolder bool) {
+func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string, spaceNo uint32) (found bool, id []byte, isFolder bool) {
 	var rows *sql.Rows
 	var err error
-	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and PARENT_ID%s and FOLDER=true and REMOVED=false"
+	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and SPACE_NO=$3 and PARENT_ID%s and FOLDER=true and REMOVED=false"
 	if parent == nil || len(parent) == 0 {
-		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, folderName)
+		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, folderName, spaceNo)
 	} else {
-		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$3"), nodeId, folderName, parent)
+		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$4"), nodeId, folderName, spaceNo, parent)
 	}
 	checkErr(err)
 	defer rows.Close()
@@ -287,8 +287,8 @@ func fileOwnerRemove(tx *sql.Tx, nodeId string, pathId []byte) {
 	}
 }
 
-func fileOwnerCheckId(tx *sql.Tx, id []byte) (nodeId string, isFolder bool) {
-	rows, err := tx.Query("SELECT NODE_ID,FOLDER FROM FILE_OWNER where ID=$1 and REMOVED=false", id)
+func fileOwnerCheckId(tx *sql.Tx, id []byte, spaceNo uint32) (nodeId string, isFolder bool) {
+	rows, err := tx.Query("SELECT NODE_ID,FOLDER FROM FILE_OWNER where ID=$1 and SPACE_NO=$2 and REMOVED=false", id, spaceNo)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
@@ -299,10 +299,10 @@ func fileOwnerCheckId(tx *sql.Tx, id []byte) (nodeId string, isFolder bool) {
 	return "", false
 }
 
-func FileOwnerCheckId(id []byte) (nodeId string, isFolder bool) {
+func FileOwnerCheckId(id []byte, spaceNo uint32) (nodeId string, isFolder bool) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	nodeId, isFolder = fileOwnerCheckId(tx, id)
+	nodeId, isFolder = fileOwnerCheckId(tx, id, spaceNo)
 	checkErr(tx.Commit())
 	commit = true
 	return

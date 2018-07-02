@@ -19,8 +19,8 @@ type dao interface {
 	FileRetrieve(hash string) (exist bool, active bool, fileData []byte, partitionCount int, blocks []string, size uint64)
 	ProviderFindOne(nodeId string) (p *db.ProviderInfo)
 	FileOwnerRemove(nodeId string, pathId []byte, recursive bool) (res bool)
-	FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte, isFolder bool)
-	FileOwnerCheckId(id []byte) (nodeId string, isFolder bool)
+	FileOwnerIdOfFilePath(nodeId string, path string, spaceNo uint32) (found bool, id []byte, isFolder bool)
+	FileOwnerCheckId(id []byte, spaceNo uint32) (nodeId string, isFolder bool)
 	UsageAmount(nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32,
 		downNetflow uint32, usageVolume uint32, usageNetflow uint32, usageUpNetflow uint32, usageDownNetflow uint32, endTime time.Time)
 }
@@ -63,11 +63,11 @@ func (self *daoImpl) ProviderFindOne(nodeId string) (p *db.ProviderInfo) {
 func (self *daoImpl) FileOwnerRemove(nodeId string, pathId []byte, recursive bool) (res bool) {
 	return db.FileOwnerRemove(nodeId, pathId, recursive)
 }
-func (self *daoImpl) FileOwnerIdOfFilePath(nodeId string, path string) (found bool, id []byte, isFolder bool) {
-	return db.FileOwnerIdOfFilePath(nodeId, path)
+func (self *daoImpl) FileOwnerIdOfFilePath(nodeId string, path string, spaceNo uint32) (found bool, id []byte, isFolder bool) {
+	return db.FileOwnerIdOfFilePath(nodeId, path, spaceNo)
 }
-func (self *daoImpl) FileOwnerCheckId(id []byte) (nodeId string, isFolder bool) {
-	return db.FileOwnerCheckId(id)
+func (self *daoImpl) FileOwnerCheckId(id []byte, spaceNo uint32) (nodeId string, isFolder bool) {
+	return db.FileOwnerCheckId(id, spaceNo)
 }
 func (self *daoImpl) UsageAmount(nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32,
 	downNetflow uint32, usageVolume uint32, usageNetflow uint32, usageUpNetflow uint32, usageDownNetflow uint32, endTime time.Time) {
