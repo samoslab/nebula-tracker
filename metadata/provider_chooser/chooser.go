@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	gosync "github.com/lrita/gosync"
 	"github.com/robfig/cron"
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	"google.golang.org/grpc"
@@ -70,7 +71,14 @@ func Get(nodeId string) *db.ProviderInfo {
 	}
 }
 
+var running gosync.Mutex = gosync.NewMutex()
+
 func update() {
+	if running.TryLock() {
+		defer running.UnLock()
+	} else {
+		return
+	}
 	all := db.ProviderFindAll()
 	providers, providerMap = filter(all)
 	initialized = true
@@ -78,13 +86,15 @@ func update() {
 }
 
 func filter(all []db.ProviderInfo) (*[]db.ProviderInfo, map[string]*db.ProviderInfo) {
+	slice := make([]db.ProviderInfo, 0, len(all))
 	m := make(map[string]*db.ProviderInfo, len(all))
 	for _, pi := range all {
-		if check(&pi) {
+		if check(&pi) || check(&pi) || check(&pi) {
 			m[pi.NodeId] = &pi
+			slice = append(slice, pi)
 		}
 	}
-	return &all, m
+	return &slice, m
 }
 
 func check(pi *db.ProviderInfo) bool {
@@ -105,7 +115,7 @@ func check(pi *db.ProviderInfo) bool {
 }
 
 func pingProvider(client provider_pb.ProviderServiceClient) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	_, err := client.Ping(ctx, &provider_pb.PingReq{})
 	return err
