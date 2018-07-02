@@ -54,7 +54,7 @@
   version = "1.1.0"
 
 [[constraint]]
-  branch = "master"
+  branch = "develop"
   name = "github.com/samoslab/nebula"
 
 [[constraint]]

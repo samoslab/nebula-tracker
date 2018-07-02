@@ -65,6 +65,12 @@
   revision = "90697d60dd844d5ef6ff15135d0203f65d2f53b8"
 
 [[projects]]
+  name = "github.com/nsqio/go-nsq"
+  packages = ["."]
+  revision = "eee57a3ac4174c55924125bb15eeeda8cffb6e6f"
+  version = "v1.0.7"
+
+[[projects]]
   name = "github.com/patrickmn/go-cache"
   packages = ["."]
   revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
@@ -89,7 +95,7 @@
   version = "v1.1"
 
 [[projects]]
-  branch = "master"
+  branch = "develop"
   name = "github.com/samoslab/nebula"
   packages = [
     "provider/config",
@@ -108,7 +114,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "b8793d4440ce347cc0ad8124f576ecdca5cf8f28"
+  revision = "1b4999c6b17b3f99fd8d0b03da1c778c76f4e469"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -180,7 +186,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "afe8f62b1d6bbd81f31868121a50b06d8188e1f9"
+  revision = "e514e69ffb8bc3c76a71ae40de0118d794855992"
 
 [[projects]]
   branch = "master"
@@ -189,7 +195,7 @@
     "unix",
     "windows"
   ]
-  revision = "c4afb3effaa53fd9a06ca61262dc7ce8df4c081b"
+  revision = "7138fd3d9dc8335c567ca206f4333fb75eb05d56"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -216,7 +222,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "80063a038e333bbe006c878e4c5ce4c74d055498"
+  revision = "ff3583edef7de132f219f0efc00e097cabcc0ec0"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -259,6 +265,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ae2b330fedadae8f99a9bf9523fe59197d24da20431be3a400540572173512e7"
+  inputs-digest = "2a4b620b3525803b64ec199cd6390d5959719aa20faed412b5fe07cfe0e826eb"
   solver-name = "gps-cdcl"
   solver-version = 1
