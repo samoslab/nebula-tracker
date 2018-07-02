@@ -65,6 +65,12 @@
   revision = "90697d60dd844d5ef6ff15135d0203f65d2f53b8"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/lrita/gosync"
+  packages = ["."]
+  revision = "17c653898443bb72af8a8a168ddd93b86b3134ae"
+
+[[projects]]
   name = "github.com/nsqio/go-nsq"
   packages = ["."]
   revision = "eee57a3ac4174c55924125bb15eeeda8cffb6e6f"
@@ -114,7 +120,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "1b4999c6b17b3f99fd8d0b03da1c778c76f4e469"
+  revision = "f4909e2e31de5c999bb59de8020be7ec044fa9df"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -186,7 +192,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "e514e69ffb8bc3c76a71ae40de0118d794855992"
+  revision = "4cb1c02c05b0e749b0365f61ae859a8e0cfceed9"
 
 [[projects]]
   branch = "master"
@@ -265,6 +271,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2a4b620b3525803b64ec199cd6390d5959719aa20faed412b5fe07cfe0e826eb"
+  inputs-digest = "b6f6d30618c347d4750d3842d1c505d695abcf651a1995a4002aea007316b3e8"
   solver-name = "gps-cdcl"
   solver-version = 1

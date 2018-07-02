@@ -2,28 +2,25 @@ package impl
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"nebula-tracker/db"
+	"strconv"
 	"time"
 
 	"golang.org/x/net/context"
 
+	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
+	util_rsa "github.com/samoslab/nebula/util/rsa"
+	"github.com/shopspring/decimal"
 )
 
 type ClientOrderService struct {
-	PubKey      *rsa.PublicKey
-	PriKey      *rsa.PrivateKey
-	PubKeyBytes []byte
 }
 
 func NewClientOrderService(pk *rsa.PrivateKey) *ClientOrderService {
-	cos := &ClientOrderService{}
-	cos.PriKey = pk
-	cos.PubKey = &pk.PublicKey
-	cos.PubKeyBytes = x509.MarshalPKCS1PublicKey(cos.PubKey)
-	return cos
+	return &ClientOrderService{}
 }
 
 func (self *ClientOrderService) AllPackage(ctx context.Context, req *pb.AllPackageReq) (*pb.AllPackageResp, error) {
@@ -108,7 +105,7 @@ func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPacka
 	}
 	pi := db.GetPackageInfo(req.PackageId)
 	if pi == nil {
-		return &pb.BuyPackageResp{Code: 21, ErrMsg: "package not found"}, nil
+		return &pb.BuyPackageResp{Code: 21, ErrMsg: "package not found, id: " + strconv.FormatInt(req.PackageId, 10)}, nil
 	}
 
 	inService, _, packageId, volume, _, _, _, endTime := db.GetCurrentPackage(nodeId)
@@ -183,6 +180,9 @@ func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfo
 	}
 
 	oi := db.GetOrderInfo(nodeId, req.OrderId)
+	if oi == nil {
+		return &pb.OrderInfoResp{Code: 16, ErrMsg: "order not found, id: " + hex.EncodeToString(req.OrderId)}, nil
+	}
 	return &pb.OrderInfoResp{Order: convertOrderInfo(oi)}, nil
 }
 
@@ -209,7 +209,11 @@ func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.Rec
 		return &pb.RechargeAddressResp{Code: 9, ErrMsg: "email not verified"}, nil
 	}
 	addr := db.GetRechargeAddress(nodeId)
-	return &pb.RechargeAddressResp{RechargeAddress: addr, Balance: db.GetBalance(nodeId)}, nil
+	rechargeAddressEnc, err := util_rsa.EncryptLong(pubKey, []byte(addr), node.RSA_KEY_BYTES)
+	if err != nil {
+		return &pb.RechargeAddressResp{Code: 20, ErrMsg: "encrypt rechargeAddress failed: " + err.Error()}, nil
+	}
+	return &pb.RechargeAddressResp{RechargeAddressEnc: rechargeAddressEnc, Balance: db.GetBalance(nodeId)}, nil
 }
 
 func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderReq) (*pb.PayOrderResp, error) {
@@ -238,12 +242,15 @@ func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderRe
 		return &pb.PayOrderResp{Code: 9, ErrMsg: "email not verified"}, nil
 	}
 	oi := db.GetOrderInfo(nodeId, req.OrderId)
+	if oi == nil {
+		return &pb.PayOrderResp{Code: 17, ErrMsg: "order not found, id: " + hex.EncodeToString(req.OrderId)}, nil
+	}
 	if oi.Paid {
 		return &pb.PayOrderResp{Code: 16, ErrMsg: "order is paid"}, nil
 	}
 	balance := db.GetBalance(nodeId)
 	if balance < oi.TotalAmount {
-		return &pb.PayOrderResp{Code: 20, ErrMsg: "balance is not enough"}, nil
+		return &pb.PayOrderResp{Code: 20, ErrMsg: "balance is not enough, margin: " + decimal.New(int64(oi.TotalAmount-balance), 0).String()}, nil
 	}
 	db.PayOrder(nodeId, req.OrderId, oi.TotalAmount, oi.ValidDays, oi.PackageId, oi.Volume, oi.Netflow, oi.UpNetflow, oi.DownNetflow)
 	return &pb.PayOrderResp{}, nil
@@ -267,9 +274,12 @@ func (self *ClientOrderService) UsageAmount(ctx context.Context, req *pb.UsageAm
 		return &pb.UsageAmountResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
-	inService, _, packageId, volume, netflow, upNetflow, downNetflow, usageVolume, usageNetflow, usageUpNetflow, usageDownNetflow, endTime := db.UsageAmount(nodeId)
+	inService, emailVerified, packageId, volume, netflow, upNetflow, downNetflow, usageVolume, usageNetflow, usageUpNetflow, usageDownNetflow, endTime := db.UsageAmount(nodeId)
+	if !emailVerified {
+		return &pb.UsageAmountResp{Code: 400, ErrMsg: "email not verified"}, nil
+	}
 	if !inService {
-		return &pb.UsageAmountResp{}, nil
+		return &pb.UsageAmountResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
 	return &pb.UsageAmountResp{PackageId: packageId, Volume: volume,
 		Netflow:          netflow,

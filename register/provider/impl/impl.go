@@ -32,6 +32,7 @@ type ProviderRegisterService struct {
 	PubKey      *rsa.PublicKey
 	PriKey      *rsa.PrivateKey
 	PubKeyBytes []byte
+	PriKeyHash  []byte
 }
 
 func NewProviderRegisterService(pk *rsa.PrivateKey) *ProviderRegisterService {
@@ -39,6 +40,7 @@ func NewProviderRegisterService(pk *rsa.PrivateKey) *ProviderRegisterService {
 	prs.PriKey = pk
 	prs.PubKey = &pk.PublicKey
 	prs.PubKeyBytes = x509.MarshalPKCS1PublicKey(prs.PubKey)
+	prs.PriKeyHash = util_hash.Sha1(prs.PubKeyBytes)
 	return prs
 }
 
@@ -109,9 +111,9 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if !email_re.MatchString(string(billEmail)) {
 		return &pb.RegisterResp{Code: 12, ErrMsg: "Bill Email is invalid."}, nil
 	}
-	if db.ProviderExistsBillEmail(string(billEmail)) {
-		return &pb.RegisterResp{Code: 13, ErrMsg: "This Bill Email is already registered"}, nil
-	}
+	// if db.ProviderExistsBillEmail(string(billEmail)) {
+	// 	return &pb.RegisterResp{Code: 13, ErrMsg: "This Bill Email is already registered"}, nil
+	// }
 	if req.EncryptKeyEnc == nil || len(req.EncryptKeyEnc) == 0 {
 		return &pb.RegisterResp{Code: 14, ErrMsg: "EncryptKeyEnc is required"}, nil
 	}
@@ -186,7 +188,7 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 }
 
 func pingProvider(client provider_pb.ProviderServiceClient) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := client.Ping(ctx, &provider_pb.PingReq{})
 	return err
@@ -306,9 +308,26 @@ func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.Refr
 		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
 	ip, err := getClientIp(ctx)
-	if err == nil && len(ip) >= 7 {
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "get provider ip failed， error: %s", err)
+	}
+	if len(ip) >= 7 {
+		resp := &pb.RefreshIpResp{Ip: ip}
+		addr := fmt.Sprintf("%s:%d", ip, req.Port)
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			return resp, status.Errorf(codes.Unavailable, "can not connect to %s, error: %s", addr, err)
+		}
+		defer conn.Close()
+		psc := provider_pb.NewProviderServiceClient(conn)
+		err = pingProvider(psc)
+		if err != nil {
+			return resp, status.Errorf(codes.Unavailable, "ping %s failed, error: %s", addr, err)
+		}
 		nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 		db.UpdateProviderHost(nodeIdStr, ip)
+		return resp, nil
+	} else {
+		return &pb.RefreshIpResp{}, nil
 	}
-	return &pb.RefreshIpResp{Ip: ip}, nil
 }

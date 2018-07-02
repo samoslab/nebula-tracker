@@ -313,13 +313,33 @@ func reduceBalanceToPayOrder(tx *sql.Tx, nodeId string, amount uint64) {
 }
 
 func getCurrentPackage(tx *sql.Tx, nodeId string) (inService bool, emailVerified bool, packageId int64, volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, endTime time.Time) {
-	rows, err := tx.Query("SELECT EMAIL_VERIFIED,PACKAGE_ID,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,END_TIME FROM CLIENT where NODE_ID=$1 and END_TIME is not null and now()<END_TIME", nodeId)
+	rows, err := tx.Query("SELECT EMAIL_VERIFIED,PACKAGE_ID,VOLUME,NETFLOW,UP_NETFLOW,DOWN_NETFLOW,END_TIME FROM CLIENT where NODE_ID=$1", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
-		inService = true
-		err = rows.Scan(&emailVerified, &packageId, &volume, &netflow, &upNetflow, &downNetflow, &endTime)
+		var packageIdNullable, volumeNullable, netflowNullable, upNetflowNullable, downNetflowNullable sql.NullInt64
+		var endTimeNullable NullTime
+		err = rows.Scan(&emailVerified, &packageIdNullable, &volumeNullable, &netflowNullable, &upNetflowNullable, &downNetflowNullable, &endTimeNullable)
 		checkErr(err)
+		if endTimeNullable.Valid && endTimeNullable.Time.Unix() > time.Now().Unix() {
+			inService = true
+			endTime = endTimeNullable.Time
+			if packageIdNullable.Valid {
+				packageId = packageIdNullable.Int64
+			}
+			if volumeNullable.Valid {
+				volume = uint32(volumeNullable.Int64)
+			}
+			if netflowNullable.Valid {
+				netflow = uint32(netflowNullable.Int64)
+			}
+			if upNetflowNullable.Valid {
+				upNetflow = uint32(upNetflowNullable.Int64)
+			}
+			if downNetflowNullable.Valid {
+				downNetflow = uint32(downNetflowNullable.Int64)
+			}
+		}
 		return
 	}
 	return
