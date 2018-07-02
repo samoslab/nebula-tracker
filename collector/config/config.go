@@ -15,6 +15,7 @@ type CollectorConfig struct {
 	Db               Db
 	Server           Server
 	TrackerInterface TrackerInterface
+	NsqAddrs         []string
 	TestMode         bool `default:"false"`
 }
 
