@@ -82,7 +82,7 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 	if resobj != nil {
 		return &pb.MkFolderResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
-	duplicateFile, duplicateFolder := self.d.FileOwnerMkFolders(req.Interactive, nodeIdStr, parentId, req.Folder)
+	duplicateFile, duplicateFolder := self.d.FileOwnerMkFolders(req.Interactive, nodeIdStr, req.Parent.SpaceNo, parentId, req.Folder)
 	if req.Interactive {
 		if len(duplicateFile)+len(duplicateFolder) > 0 {
 			if len(duplicateFile) == 0 {

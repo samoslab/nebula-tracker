@@ -7,7 +7,7 @@ import (
 )
 
 type dao interface {
-	FileOwnerMkFolders(interactive bool, nodeId string, parent []byte, folders []string) (duplicateFileName []string, duplicateFolderName []string)
+	FileOwnerMkFolders(interactive bool, nodeId string, spaceNo uint32, parent []byte, folders []string) (duplicateFileName []string, duplicateFolderName []string)
 	ClientGetPubKey(nodeId []byte) *rsa.PublicKey
 	FileOwnerFileExists(nodeId string, parent []byte, name string) (id []byte, isFolder bool, hash string)
 	FileCheckExist(nodeId string, hash string, doneExpSecs int) (exist bool, active bool, done bool, size uint64, selfCreate bool, doneExpired bool)
@@ -27,8 +27,8 @@ type dao interface {
 type daoImpl struct {
 }
 
-func (self *daoImpl) FileOwnerMkFolders(interactive bool, nodeId string, parent []byte, folders []string) (duplicateFileName []string, duplicateFolderName []string) {
-	return db.FileOwnerMkFolders(interactive, nodeId, parent, folders)
+func (self *daoImpl) FileOwnerMkFolders(interactive bool, nodeId string, spaceNo uint32, parent []byte, folders []string) (duplicateFileName []string, duplicateFolderName []string) {
+	return db.FileOwnerMkFolders(interactive, nodeId, spaceNo, parent, folders)
 }
 func (self *daoImpl) ClientGetPubKey(nodeId []byte) *rsa.PublicKey {
 	return db.ClientGetPubKey(nodeId)

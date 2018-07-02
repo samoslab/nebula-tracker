@@ -86,15 +86,15 @@ func fileOwnerFileExists(tx *sql.Tx, nodeId string, parent []byte, name string) 
 	return nil, false, ""
 }
 
-func fileOwnerBatchFileExists(tx *sql.Tx, nodeId string, parent []byte, names []string) map[string]bool {
-	sqlStr := "SELECT NAME,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME in " + inClause(len(names), 2) + " and PARENT_ID%s and REMOVED=false"
+func fileOwnerBatchFileExists(tx *sql.Tx, nodeId string, spaceNo uint32, parent []byte, names []string) map[string]bool {
+	sqlStr := "SELECT NAME,FOLDER FROM FILE_OWNER where NODE_ID=$1 and SPACE_NO=$2 and NAME in " + inClause(len(names), 3) + " and PARENT_ID%s and REMOVED=false"
 	if len(parent) == 0 {
 		sqlStr = fmt.Sprintf(sqlStr, " is null")
 	} else {
-		sqlStr = fmt.Sprintf(sqlStr, "=$"+strconv.Itoa(len(names)+2))
+		sqlStr = fmt.Sprintf(sqlStr, "=$"+strconv.Itoa(len(names)+3))
 	}
-	args := make([]interface{}, 1, len(names)+2)
-	args[0] = nodeId
+	args := make([]interface{}, 2, len(names)+3)
+	args[0], args[1] = nodeId, spaceNo
 	for _, name := range names {
 		args = append(args, name)
 	}
@@ -116,9 +116,9 @@ func fileOwnerBatchFileExists(tx *sql.Tx, nodeId string, parent []byte, names []
 
 }
 
-func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, parent interface{}, modTime uint64, hash *sql.NullString, size uint64) []byte {
+func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, spaceNo uint32, parent interface{}, modTime uint64, hash *sql.NullString, size uint64) []byte {
 	var lastInsertId []byte
-	err := tx.QueryRow("insert into FILE_OWNER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,FOLDER,NAME,PARENT_ID,MOD_TIME,HASH,SIZE) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7) RETURNING ID", nodeId, isFolder, name, parent, time.Unix(int64(modTime), 0), hash, size).Scan(&lastInsertId)
+	err := tx.QueryRow("insert into FILE_OWNER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,FOLDER,NAME,SPACE_NO,PARENT_ID,MOD_TIME,HASH,SIZE) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7,$8) RETURNING ID", nodeId, isFolder, name, spaceNo, parent, time.Unix(int64(modTime), 0), hash, size).Scan(&lastInsertId)
 	checkErr(err)
 	return lastInsertId
 }
@@ -136,10 +136,10 @@ func updateFileOwnerNewVersion(tx *sql.Tx, existId []byte, nodeId string, modTim
 	}
 }
 
-func FileOwnerMkFolders(interactive bool, nodeId string, parent []byte, folders []string) (duplicateFileName []string, duplicateFolderName []string) {
+func FileOwnerMkFolders(interactive bool, nodeId string, spaceNo uint32, parent []byte, folders []string) (duplicateFileName []string, duplicateFolderName []string) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	duplicate := fileOwnerMkFolders(tx, interactive, nodeId, parent, folders)
+	duplicate := fileOwnerMkFolders(tx, interactive, nodeId, spaceNo, parent, folders)
 	checkErr(tx.Commit())
 	commit = true
 	duplicateFileName = make([]string, 0, len(duplicate))
@@ -154,8 +154,8 @@ func FileOwnerMkFolders(interactive bool, nodeId string, parent []byte, folders 
 	return
 }
 
-func fileOwnerMkFolders(tx *sql.Tx, interactive bool, nodeId string, parent []byte, folders []string) (duplicate map[string]bool) {
-	duplicate = fileOwnerBatchFileExists(tx, nodeId, parent, folders)
+func fileOwnerMkFolders(tx *sql.Tx, interactive bool, nodeId string, spaceNo uint32, parent []byte, folders []string) (duplicate map[string]bool) {
+	duplicate = fileOwnerBatchFileExists(tx, nodeId, spaceNo, parent, folders)
 	if !interactive || len(duplicate) == 0 {
 		modTime := uint64(time.Now().Unix())
 		hash := &sql.NullString{}
@@ -165,7 +165,7 @@ func fileOwnerMkFolders(tx *sql.Tx, interactive bool, nodeId string, parent []by
 		}
 		for _, name := range folders {
 			if _, ok := duplicate[name]; !ok {
-				saveFileOwner(tx, nodeId, true, name, parentId, modTime, hash, 0)
+				saveFileOwner(tx, nodeId, true, name, spaceNo, parentId, modTime, hash, 0)
 			}
 		}
 	}
