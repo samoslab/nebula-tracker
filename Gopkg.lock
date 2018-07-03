@@ -120,7 +120,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "f4909e2e31de5c999bb59de8020be7ec044fa9df"
+  revision = "7d76dde3cb5954313e01b9ff59274337dd83b61d"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -192,7 +192,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "4cb1c02c05b0e749b0365f61ae859a8e0cfceed9"
+  revision = "ed29d75add3d7c4bf7ca65aac0c6df3d1420216f"
 
 [[projects]]
   branch = "master"
@@ -271,6 +271,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b6f6d30618c347d4750d3842d1c505d695abcf651a1995a4002aea007316b3e8"
+  inputs-digest = "59b92e95c5210af8858d0da2b4801a744e1275e20b088911db5215573922caf0"
   solver-name = "gps-cdcl"
   solver-version = 1
