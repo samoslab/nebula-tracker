@@ -88,7 +88,8 @@ func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPacka
 	if len(req.NodeId) != 20 {
 		return &pb.BuyPackageResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := db.ClientGetPubKey(req.NodeId)
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return &pb.BuyPackageResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -98,7 +99,6 @@ func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPacka
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.BuyPackageResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
-	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
 	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
 	if !found || !emailVerified {
 		return &pb.BuyPackageResp{Code: 9, ErrMsg: "email not verified"}, nil
@@ -130,7 +130,8 @@ func (self *ClientOrderService) MyAllOrder(ctx context.Context, req *pb.MyAllOrd
 	if len(req.NodeId) != 20 {
 		return &pb.MyAllOrderResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := db.ClientGetPubKey(req.NodeId)
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return &pb.MyAllOrderResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -140,7 +141,6 @@ func (self *ClientOrderService) MyAllOrder(ctx context.Context, req *pb.MyAllOrd
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.MyAllOrderResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
-	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
 	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
 	if !found || !emailVerified {
 		return &pb.MyAllOrderResp{Code: 9, ErrMsg: "email not verified"}, nil
@@ -160,7 +160,8 @@ func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfo
 	if len(req.NodeId) != 20 {
 		return &pb.OrderInfoResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := db.ClientGetPubKey(req.NodeId)
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return &pb.OrderInfoResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -173,7 +174,6 @@ func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfo
 	if len(req.OrderId) == 0 {
 		return &pb.OrderInfoResp{Code: 15, ErrMsg: "orderId is required"}, nil
 	}
-	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
 	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
 	if !found || !emailVerified {
 		return &pb.OrderInfoResp{Code: 9, ErrMsg: "email not verified"}, nil
@@ -193,7 +193,8 @@ func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.Rec
 	if len(req.NodeId) != 20 {
 		return &pb.RechargeAddressResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := db.ClientGetPubKey(req.NodeId)
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return &pb.RechargeAddressResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -203,7 +204,6 @@ func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.Rec
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.RechargeAddressResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
-	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
 	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
 	if !found || !emailVerified {
 		return &pb.RechargeAddressResp{Code: 9, ErrMsg: "email not verified"}, nil
@@ -223,7 +223,8 @@ func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderRe
 	if len(req.NodeId) != 20 {
 		return &pb.PayOrderResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := db.ClientGetPubKey(req.NodeId)
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return &pb.PayOrderResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -236,7 +237,6 @@ func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderRe
 	if len(req.OrderId) == 0 {
 		return &pb.PayOrderResp{Code: 15, ErrMsg: "orderId is required"}, nil
 	}
-	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
 	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
 	if !found || !emailVerified {
 		return &pb.PayOrderResp{Code: 9, ErrMsg: "email not verified"}, nil
@@ -263,7 +263,8 @@ func (self *ClientOrderService) UsageAmount(ctx context.Context, req *pb.UsageAm
 	if len(req.NodeId) != 20 {
 		return &pb.UsageAmountResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := db.ClientGetPubKey(req.NodeId)
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return &pb.UsageAmountResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -273,7 +274,6 @@ func (self *ClientOrderService) UsageAmount(ctx context.Context, req *pb.UsageAm
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.UsageAmountResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
-	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
 	inService, emailVerified, packageId, volume, netflow, upNetflow, downNetflow, usageVolume, usageNetflow, usageUpNetflow, usageDownNetflow, endTime := db.UsageAmount(nodeId)
 	if !emailVerified {
 		return &pb.UsageAmountResp{Code: 400, ErrMsg: "email not verified"}, nil

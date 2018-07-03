@@ -164,8 +164,7 @@ func updateVerifyCode(tx *sql.Tx, nodeId string, randomCode string) {
 
 var pubKeyCache = cache.New(20*time.Minute, 10*time.Minute)
 
-func ClientGetPubKey(nodeId []byte) *rsa.PublicKey {
-	nodeIdStr := base64.StdEncoding.EncodeToString(nodeId)
+func ClientGetPubKey(nodeIdStr string) *rsa.PublicKey {
 	pubKey, found := pubKeyCache.Get(nodeIdStr)
 	if found {
 		b, ok := pubKey.(*rsa.PublicKey)

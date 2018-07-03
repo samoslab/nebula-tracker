@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"bytes"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -13,22 +14,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/samoslab/nebula/provider/node"
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	pb "github.com/samoslab/nebula/tracker/metadata/pb"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	util_hash "github.com/samoslab/nebula/util/hash"
+	util_rsa "github.com/samoslab/nebula/util/rsa"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type MatadataService struct {
 	PubKey      *rsa.PublicKey
 	PriKey      *rsa.PrivateKey
 	PubKeyBytes []byte
-	PriKeyHash  []byte
+	PubKeyHash  []byte
 	c           providerChooser
 	d           dao
 }
@@ -38,7 +40,7 @@ func NewMatadataService(pk *rsa.PrivateKey) (ms *MatadataService) {
 	ms.PriKey = pk
 	ms.PubKey = &pk.PublicKey
 	ms.PubKeyBytes = x509.MarshalPKCS1PublicKey(ms.PubKey)
-	ms.PriKeyHash = util_hash.Sha1(ms.PubKeyBytes)
+	ms.PubKeyHash = util_hash.Sha1(ms.PubKeyBytes)
 	return
 }
 
@@ -78,7 +80,7 @@ func (self *MatadataService) MkFolder(ctx context.Context, req *pb.MkFolderReq) 
 	if !inService {
 		return &pb.MkFolderResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
-	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
+	resobj, _, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.MkFolderResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -113,7 +115,7 @@ func (self *MatadataService) checkNodeId(nodeId []byte) (*resObj, *rsa.PublicKey
 	if len(nodeId) != 20 {
 		return &resObj{Code: 101, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := self.d.ClientGetPubKey(nodeId)
+	pubKey := self.d.ClientGetPubKey(base64.StdEncoding.EncodeToString(nodeId))
 	if pubKey == nil {
 		return &resObj{Code: 102, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -158,7 +160,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 	// if downNetflow <= usageDownNetflow {
 	// 	return &pb.CheckFileExistResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
 	// }
-	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
+	resobj, _, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.CheckFileExistResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -167,7 +169,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 	}
 	fileName := req.FileName
 	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
-	existId, isFolder, hash := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	existId, isFolder, hash := self.d.FileOwnerFileExists(nodeIdStr, req.Parent.SpaceNo, parentId, req.FileName)
 	if len(existId) > 0 {
 		if isFolder {
 			if req.Interactive {
@@ -190,7 +192,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			}
 		}
 	}
-	exist, active, done, size, selfCreate, doneExpired := self.d.FileCheckExist(nodeIdStr, hashStr, done_expired)
+	exist, active, done, fileType, size, selfCreate, doneExpired := self.d.FileCheckExist(nodeIdStr, hashStr, done_expired)
 	if exist {
 		if size != req.FileSize {
 			log.Warnf("hash: %s size is %d, new upload file size is %d", hashStr, size, req.FileSize)
@@ -199,7 +201,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			return &pb.CheckFileExistResp{Code: 9, ErrMsg: "this file can not upload because of laws and regulations"}, nil
 		}
 		if done {
-			self.d.FileReuse(existId, nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId)
+			self.d.FileReuse(existId, nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, req.Parent.SpaceNo, parentId, fileType)
 			return &pb.CheckFileExistResp{Code: 0}, nil
 		} else {
 			if !selfCreate && !doneExpired {
@@ -211,7 +213,17 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		if req.FileSize != uint64(len(req.FileData)) {
 			return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
 		}
-		self.d.FileSaveTiny(existId, nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, parentId)
+		if bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+			return &pb.CheckFileExistResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
+		}
+		var encryptKey []byte
+		if len(req.EncryptKey) > 0 {
+			encryptKey, err = util_rsa.DecryptLong(self.PriKey, req.EncryptKey, node.RSA_KEY_BYTES)
+			if err != nil {
+				return &pb.CheckFileExistResp{Code: 20, ErrMsg: "decrypt EncryptKey failed: " + err.Error()}, nil
+			}
+		}
+		self.d.FileSaveTiny(existId, nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, req.Parent.SpaceNo, parentId, req.FileType, encryptKey)
 		return &pb.CheckFileExistResp{Code: 0}, nil
 	}
 
@@ -226,7 +238,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		}
 		resp.Provider = self.prepareReplicaProvider(nodeIdStr, int(resp.ReplicaCount), req.FileHash, req.FileSize)
 		if !exist {
-			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
+			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileType, req.FileSize, 0)
 		}
 	} else {
 		resp.StoreType = pb.FileStoreType_ErasureCode
@@ -247,7 +259,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			resp.VerifyPieceCount = 1
 		}
 		if !exist {
-			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileSize, 0)
+			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileType, req.FileSize, 0)
 		}
 	}
 	return resp, nil
@@ -450,7 +462,7 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	// if downNetflow <= usageDownNetflow {
 	// 	return &pb.UploadFileDoneResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
 	// }
-	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
+	resobj, _, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.UploadFileDoneResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -459,7 +471,7 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 	}
 	fileName := req.FileName
 	hashStr := base64.StdEncoding.EncodeToString(req.FileHash)
-	existId, isFolder, hash := self.d.FileOwnerFileExists(nodeIdStr, parentId, req.FileName)
+	existId, isFolder, hash := self.d.FileOwnerFileExists(nodeIdStr, req.Parent.SpaceNo, parentId, req.FileName)
 	if len(existId) > 0 {
 		if isFolder {
 			if req.Interactive {
@@ -494,7 +506,17 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
 		}
 	}
-	self.d.FileSaveDone(existId, nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, parentId, len(req.Partition), blocks, storeVolume)
+	if bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+		return &pb.UploadFileDoneResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
+	}
+	var encryptKey []byte
+	if len(req.EncryptKey) > 0 {
+		encryptKey, err = util_rsa.DecryptLong(self.PriKey, req.EncryptKey, node.RSA_KEY_BYTES)
+		if err != nil {
+			return &pb.UploadFileDoneResp{Code: 20, ErrMsg: "decrypt EncryptKey failed: " + err.Error()}, nil
+		}
+	}
+	self.d.FileSaveDone(existId, nodeIdStr, hashStr, fileName, req.FileType, req.FileSize, req.FileModTime, req.Parent.SpaceNo, parentId, len(req.Partition), blocks, storeVolume, encryptKey)
 	return &pb.UploadFileDoneResp{Code: 0}, nil
 }
 
@@ -540,7 +562,7 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 	if downNetflow <= usageDownNetflow {
 		return &pb.ListFilesResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
 	}
-	resobj, parentId := self.findPathId(nodeIdStr, req.Parent, true)
+	resobj, _, parentId := self.findPathId(nodeIdStr, req.Parent, true)
 	if resobj != nil {
 		return &pb.ListFilesResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
@@ -554,7 +576,7 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 	} else {
 		return &pb.ListFilesResp{Code: 9, ErrMsg: "must specified sortType"}, nil
 	}
-	total, fofs := self.d.FileOwnerListOfPath(nodeIdStr, parentId, req.PageSize, req.PageNum, sortField, req.AscOrder)
+	total, fofs := self.d.FileOwnerListOfPath(nodeIdStr, req.Parent.SpaceNo, parentId, req.PageSize, req.PageNum, sortField, req.AscOrder)
 	return &pb.ListFilesResp{Code: 0, TotalRecord: total, Fof: toFileOrFolderSlice(fofs)}, nil
 }
 
@@ -564,7 +586,7 @@ func toFileOrFolderSlice(fofs []*db.Fof) []*pb.FileOrFolder {
 	}
 	res := make([]*pb.FileOrFolder, 0, len(fofs))
 	for _, fof := range fofs {
-		res = append(res, &pb.FileOrFolder{Id: fof.Id, Folder: fof.IsFolder, Name: fof.Name, FileHash: fof.FileHash, FileSize: fof.FileSize, ModTime: fof.ModTime})
+		res = append(res, &pb.FileOrFolder{Id: fof.Id, Folder: fof.IsFolder, Name: fof.Name, FileType: fof.Type, FileHash: fof.FileHash, FileSize: fof.FileSize, ModTime: fof.ModTime})
 	}
 	return res
 }
@@ -608,7 +630,7 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
 	}
 	hash := base64.StdEncoding.EncodeToString(req.FileHash)
-	exist, active, fileData, partitionCount, blocks, size := self.d.FileRetrieve(hash)
+	exist, active, fileData, partitionCount, blocks, size, fileType, encryptKey := self.d.FileRetrieve(hash)
 	if !exist {
 		return &pb.RetrieveFileResp{Code: 6, ErrMsg: "file not exist"}, nil
 	}
@@ -619,17 +641,17 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 8, ErrMsg: "file data size is not equal fileSize"}, nil
 	}
 	if size == 0 {
-		return &pb.RetrieveFileResp{Code: 0, FileData: []byte{}}, nil
+		return &pb.RetrieveFileResp{Code: 0, FileData: []byte{}, FileType: fileType}, nil
 	}
 	if len(fileData) > 0 {
-		return &pb.RetrieveFileResp{Code: 0, FileData: fileData}, nil
+		return &pb.RetrieveFileResp{Code: 0, FileData: fileData, FileType: fileType, EncryptKey: encryptKey}, nil
 	}
 	ts := uint64(time.Now().Unix())
 	parts, err := self.toRetrievePartition(nodeIdStr, req.FileHash, req.FileSize, blocks, partitionCount, ts)
 	if err != nil {
 		return &pb.RetrieveFileResp{Code: 9, ErrMsg: err.Error()}, nil
 	}
-	return &pb.RetrieveFileResp{Code: 0, Partition: parts, Timestamp: ts}, nil
+	return &pb.RetrieveFileResp{Code: 0, Partition: parts, Timestamp: ts, FileType: fileType, EncryptKey: encryptKey}, nil
 }
 
 func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte, fileSize uint64, blocks []string, partitionsCount int, ts uint64) ([]*pb.RetrievePartition, error) {
@@ -735,54 +757,57 @@ func (self *MatadataService) Remove(ctx context.Context, req *pb.RemoveReq) (res
 		return &pb.RemoveResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
 
-	resobj, pathId := self.findPathId(nodeIdStr, req.Target, false)
+	resobj, _, pathId := self.findPathId(nodeIdStr, req.Target, false)
 	if resobj != nil {
 		return &pb.RemoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	if len(pathId) == 0 {
 		return &pb.RemoveResp{Code: 6, ErrMsg: "path not exists"}, nil
 	}
-	if !self.d.FileOwnerRemove(nodeIdStr, pathId, req.Recursive) {
+	if !self.d.FileOwnerRemove(nodeIdStr, req.Target.SpaceNo, pathId, req.Recursive) {
 		return &pb.RemoveResp{Code: 7, ErrMsg: "folder not empty"}, nil
 	}
 	return &pb.RemoveResp{Code: 0}, nil
 }
 
-func (self *MatadataService) findPathId(nodeId string, filePath *pb.FilePath, needFolder bool) (res *resObj, pathId []byte) {
+func (self *MatadataService) findPathId(nodeId string, filePath *pb.FilePath, needFolder bool) (res *resObj, parentId, pathId []byte) {
 	switch v := filePath.OneOfPath.(type) {
 	case *pb.FilePath_Id:
 		if len(v.Id) == 0 {
 			return
 		}
-		ni, isFolder := self.d.FileOwnerCheckId(v.Id, filePath.SpaceNo)
+		ni, parentId, isFolder := self.d.FileOwnerCheckId(v.Id, filePath.SpaceNo)
 		if len(ni) == 0 {
-			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
+			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil, nil
 		} else if ni != nodeId {
-			return &resObj{Code: 202, ErrMsg: "wrong path owner"}, nil
+			return &resObj{Code: 202, ErrMsg: "wrong path owner"}, nil, nil
 		}
 		if needFolder && !isFolder {
-			return &resObj{Code: 203, ErrMsg: "path is not a folder"}, nil
+			return &resObj{Code: 203, ErrMsg: "path is not a folder"}, nil, nil
 		}
-		return nil, v.Id
+		return nil, parentId, v.Id
 	case *pb.FilePath_Path:
 		path := v.Path
 		if path == "" || path == "/" {
 			return
 		}
 		if path[0] != '/' {
-			return &resObj{Code: 200, ErrMsg: "path must start with slash /"}, nil
+			return &resObj{Code: 200, ErrMsg: "path must start with slash /"}, nil, nil
+		}
+		if path[len(path)-1] == '/' {
+			path = path[:len(path)-1]
 		}
 		var found, isFolder bool
-		found, pathId, isFolder = self.d.FileOwnerIdOfFilePath(nodeId, path)
+		found, parentId, pathId, isFolder = self.d.FileOwnerIdOfFilePath(nodeId, path, filePath.SpaceNo)
 		if !found {
-			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil
+			return &resObj{Code: 201, ErrMsg: "path is not exists"}, nil, nil
 		}
 		if needFolder && !isFolder {
-			return &resObj{Code: 203, ErrMsg: "path is not a folder"}, nil
+			return &resObj{Code: 203, ErrMsg: "path is not a folder"}, nil, nil
 		}
 		return
 	}
-	return &resObj{Code: 204, ErrMsg: "path is not exists"}, nil
+	return &resObj{Code: 204, ErrMsg: "path is not exists"}, nil, nil
 }
 
 const block_sep = ";"
@@ -850,23 +875,45 @@ func (self *MatadataService) Move(ctx context.Context, req *pb.MoveReq) (resp *p
 	if !inService {
 		return &pb.MoveResp{Code: 401, ErrMsg: "not buy any package order"}, nil
 	}
-
-	resobj, source := self.findPathId(nodeIdStr, req.Source, false)
+	if req.Dest == "" {
+		return &pb.MoveResp{Code: 6, ErrMsg: "destination path is required"}, nil
+	}
+	if req.Dest == "/" {
+		return &pb.MoveResp{Code: 7, ErrMsg: "destination path can not be root"}, nil
+	}
+	resobj, parent, source := self.findPathId(nodeIdStr, req.Source, false)
 	if resobj != nil {
 		return &pb.MoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
 	}
 	if len(source) == 0 {
-		return &pb.MoveResp{Code: 6, ErrMsg: "source path not exists"}, nil
+		return &pb.MoveResp{Code: 8, ErrMsg: "source path not exists"}, nil
 	}
-
-	// resobj, dest := self.findPathId(nodeIdStr, req.Dest, false)
-	// if resobj != nil {
-	// 	return &pb.MoveResp{Code: resobj.Code, ErrMsg: resobj.ErrMsg}, nil
-	// }
-	// if len(dest) == 0 {
-	// 	return &pb.MoveResp{Code: 7, ErrMsg: " destination path not exists"}, nil
-	// }
-
+	if req.Dest[0] == '/' {
+		path := req.Dest
+		if path[len(path)-1] == '/' {
+			path = path[:len(path)-1]
+		}
+		found, _, pathId, isFolder := self.d.FileOwnerIdOfFilePath(nodeIdStr, path, req.Source.SpaceNo)
+		if !found {
+			return &pb.MoveResp{Code: 9, ErrMsg: "move destination path not exists"}, nil
+		}
+		if !isFolder {
+			return &pb.MoveResp{Code: 10, ErrMsg: "move destination path is not folder"}, nil
+		}
+		self.d.FileOwnerMove(source, req.Source.SpaceNo, pathId)
+	} else {
+		if strings.ContainsAny(req.Dest, "/") {
+			return &pb.MoveResp{Code: 11, ErrMsg: "destination name can not contains slash /"}, nil
+		}
+		existId, _, _ := self.d.FileOwnerFileExists(nodeIdStr, req.Source.SpaceNo, parent, req.Dest)
+		if len(existId) > 0 {
+			return &pb.MoveResp{Code: 12, ErrMsg: "destination name already exists"}, nil
+		}
+		self.d.FileOwnerRename(source, req.Source.SpaceNo, req.Dest)
+	}
 	return &pb.MoveResp{Code: 0}, nil
+}
 
+func (self *MatadataService) GetPublicKey(ctx context.Context, req *pb.GetPublicKeyReq) (resp *pb.GetPublicKeyResp, err error) {
+	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes, PublicKeyHash: self.PubKeyHash}, nil
 }
