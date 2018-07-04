@@ -192,8 +192,8 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			}
 		}
 	}
-	exist, active, done, fileType, size, selfCreate, doneExpired := self.d.FileCheckExist(nodeIdStr, hashStr, done_expired)
-	if exist {
+	id, active, done, fileType, size, selfCreate, doneExpired := self.d.FileCheckExist(nodeIdStr, hashStr, req.Parent.SpaceNo, done_expired)
+	if len(id) > 0 {
 		if size != req.FileSize {
 			log.Warnf("hash: %s size is %d, new upload file size is %d", hashStr, size, req.FileSize)
 		}
@@ -201,7 +201,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			return &pb.CheckFileExistResp{Code: 9, ErrMsg: "this file can not upload because of laws and regulations"}, nil
 		}
 		if done {
-			self.d.FileReuse(existId, nodeIdStr, hashStr, fileName, req.FileSize, req.FileModTime, req.Parent.SpaceNo, parentId, fileType)
+			self.d.FileReuse(existId, nodeIdStr, id, hashStr, fileName, req.FileSize, req.FileModTime, req.Parent.SpaceNo, parentId, fileType)
 			return &pb.CheckFileExistResp{Code: 0}, nil
 		} else {
 			if !selfCreate && !doneExpired {
@@ -237,8 +237,8 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			resp.ReplicaCount = uint32(providerCnt)
 		}
 		resp.Provider = self.prepareReplicaProvider(nodeIdStr, int(resp.ReplicaCount), req.FileHash, req.FileSize)
-		if !exist {
-			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileType, req.FileSize, 0)
+		if len(id) == 0 {
+			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileType, req.FileSize, 0, req.Parent.SpaceNo)
 		}
 	} else {
 		resp.StoreType = pb.FileStoreType_ErasureCode
@@ -258,8 +258,8 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			resp.DataPieceCount = 2
 			resp.VerifyPieceCount = 1
 		}
-		if !exist {
-			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileType, req.FileSize, 0)
+		if len(id) == 0 {
+			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileType, req.FileSize, 0, req.Parent.SpaceNo)
 		}
 	}
 	return resp, nil
@@ -630,7 +630,7 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 		return &pb.RetrieveFileResp{Code: 413, ErrMsg: "download netflow exceed"}, nil
 	}
 	hash := base64.StdEncoding.EncodeToString(req.FileHash)
-	exist, active, fileData, partitionCount, blocks, size, fileType, encryptKey := self.d.FileRetrieve(hash)
+	exist, active, fileData, partitionCount, blocks, size, fileType, encryptKey := self.d.FileRetrieve(nodeIdStr, hash, req.SpaceNo)
 	if !exist {
 		return &pb.RetrieveFileResp{Code: 6, ErrMsg: "file not exist"}, nil
 	}
@@ -900,7 +900,7 @@ func (self *MatadataService) Move(ctx context.Context, req *pb.MoveReq) (resp *p
 		if !isFolder {
 			return &pb.MoveResp{Code: 10, ErrMsg: "move destination path is not folder"}, nil
 		}
-		self.d.FileOwnerMove(source, req.Source.SpaceNo, pathId)
+		self.d.FileOwnerMove(nodeIdStr, source, req.Source.SpaceNo, pathId)
 	} else {
 		if strings.ContainsAny(req.Dest, "/") {
 			return &pb.MoveResp{Code: 11, ErrMsg: "destination name can not contains slash /"}, nil
@@ -909,7 +909,7 @@ func (self *MatadataService) Move(ctx context.Context, req *pb.MoveReq) (resp *p
 		if len(existId) > 0 {
 			return &pb.MoveResp{Code: 12, ErrMsg: "destination name already exists"}, nil
 		}
-		self.d.FileOwnerRename(source, req.Source.SpaceNo, req.Dest)
+		self.d.FileOwnerRename(nodeIdStr, source, req.Source.SpaceNo, req.Dest)
 	}
 	return &pb.MoveResp{Code: 0}, nil
 }

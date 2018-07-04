@@ -199,7 +199,7 @@ func fileOwnerListOfPath(tx *sql.Tx, nodeId string, spaceNo uint32, parent []byt
 		sqlStr = fmt.Sprintf(sqlStr, " is null")
 		args = []interface{}{nodeId, spaceNo}
 	} else {
-		sqlStr = fmt.Sprintf(sqlStr, "=$2")
+		sqlStr = fmt.Sprintf(sqlStr, "=$3")
 		args = []interface{}{nodeId, spaceNo, parent}
 	}
 	sqlStr += " and REMOVED=false order by FOLDER desc, "
@@ -313,19 +313,19 @@ func FileOwnerCheckId(id []byte, spaceNo uint32) (nodeId string, parentId []byte
 	return
 }
 
-func FileOwnerRename(id []byte, spaceNo uint32, newName string) {
+func FileOwnerRename(nodeId string, id []byte, spaceNo uint32, newName string) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	fileOwnerRename(tx, id, spaceNo, newName)
+	fileOwnerRename(tx, nodeId, id, spaceNo, newName)
 	checkErr(tx.Commit())
 	commit = true
 }
 
-func fileOwnerRename(tx *sql.Tx, id []byte, spaceNo uint32, newName string) {
-	stmt, err := tx.Prepare("update FILE_OWNER set NAME=$3 where ID=$1 and SPACE_NO=$2")
+func fileOwnerRename(tx *sql.Tx, nodeId string, id []byte, spaceNo uint32, newName string) {
+	stmt, err := tx.Prepare("update FILE_OWNER set NAME=$3 where ID=$1 and SPACE_NO=$2 and NODE_ID=$4")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(id, spaceNo, newName)
+	rs, err := stmt.Exec(id, spaceNo, newName, nodeId)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -334,16 +334,16 @@ func fileOwnerRename(tx *sql.Tx, id []byte, spaceNo uint32, newName string) {
 	}
 }
 
-func FileOwnerMove(id []byte, spaceNo uint32, newId []byte) {
+func FileOwnerMove(nodeId string, id []byte, spaceNo uint32, newId []byte) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	fileOwnerMove(tx, id, spaceNo, newId)
+	fileOwnerMove(tx, nodeId, id, spaceNo, newId)
 	checkErr(tx.Commit())
 	commit = true
 }
 
-func fileOwnerMove(tx *sql.Tx, id []byte, spaceNo uint32, newId []byte) {
-	stmt, err := tx.Prepare("update FILE_OWNER set PARENT_ID=$3 where ID=$1 and SPACE_NO=$2")
+func fileOwnerMove(tx *sql.Tx, nodeId string, id []byte, spaceNo uint32, newId []byte) {
+	stmt, err := tx.Prepare("update FILE_OWNER set PARENT_ID=$3 where ID=$1 and SPACE_NO=$2 and NODE_ID=$3")
 	defer stmt.Close()
 	checkErr(err)
 	rs, err := stmt.Exec(id, spaceNo, newId)

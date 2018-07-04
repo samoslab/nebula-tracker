@@ -17,24 +17,24 @@ func TestFileTiny(t *testing.T) {
 	defer tx.Rollback()
 	nodeId := base64.StdEncoding.EncodeToString(sha1Sum([]byte("test node id")))
 	hash := base64.StdEncoding.EncodeToString(sha1Sum([]byte("test hash")))
-	fileSave(tx, nodeId, hash, 123123, nil, true, 123123*3)
-	incrementRefCount(tx, hash)
-	exist, active, removed, done, size, creatorNodeId, lastModified := fileCheckExist(tx, hash)
-	if !exist || !active || removed || !done || creatorNodeId != nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
+	fileSave(tx, nodeId, hash, nil, "", 123123, nil, true, 123123*3, false)
+	fileId, active, removed, done, _, size, creatorNodeId, lastModified := fileCheckExist(tx, nodeId, hash, 0)
+	incrementRefCount(tx, fileId)
+	if len(fileId) == 0 || !active || removed || !done || creatorNodeId != nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
 		t.Errorf("Failed.")
 	}
-	fileChangeRemoved(tx, hash, true)
-	exist, active, removed, done, size, creatorNodeId, lastModified = fileCheckExist(tx, hash)
-	if !exist || !active || !removed || !done || creatorNodeId != nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
+	fileChangeRemoved(tx, fileId, true)
+	fileId, active, removed, done, _, size, creatorNodeId, lastModified = fileCheckExist(tx, nodeId, hash, 0)
+	if len(fileId) == 0 || !active || !removed || !done || creatorNodeId != nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
 		t.Errorf("Failed.")
 	}
-	fileChangeCreatorNodeId(tx, hash, "test-new-node-id")
-	exist, active, removed, done, size, creatorNodeId, lastModified = fileCheckExist(tx, hash)
-	if !exist || !active || removed || !done || creatorNodeId == nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
+	fileChangeCreatorNodeId(tx, fileId, "test-new-node-id")
+	fileId, active, removed, done, _, size, creatorNodeId, lastModified = fileCheckExist(tx, nodeId, hash, 0)
+	if len(fileId) == 0 || !active || removed || !done || creatorNodeId == nodeId || time.Now().Unix()-lastModified.Unix() > 15 {
 		t.Errorf("Failed.")
 	}
-	exist, active, data, partitionCount, blocks, size := fileRetrieve(tx, hash)
-	if !exist {
+	fileId, active, data, partitionCount, blocks, size, _, _ := fileRetrieve(tx, nodeId, hash, 0)
+	if len(fileId) == 0 {
 		t.Errorf("Failed.")
 	}
 	if !active {
@@ -49,8 +49,10 @@ func TestFileTiny(t *testing.T) {
 	if data != nil && len(data) != 0 {
 		t.Errorf("Failed.")
 	}
-	fileSaveDone(tx, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2)
-	exist, active, data, partitionCount, blocks, size = fileRetrieve(tx, hash)
+	hash = base64.StdEncoding.EncodeToString(sha1Sum([]byte("test hash2")))
+	fileSave(tx, nodeId, hash, nil, "", 123123, nil, false, 123123*3, false)
+	fileSaveDone(tx, nodeId, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2, "", nil)
+	fileId, active, data, partitionCount, blocks, size, _, _ = fileRetrieve(tx, nodeId, hash, 0)
 	if len(blocks) != 2 {
 		t.Errorf("Failed. len: %d", len(blocks))
 	}
@@ -71,9 +73,9 @@ func TestFile(t *testing.T) {
 	nodeId := base64.StdEncoding.EncodeToString(sha1Sum([]byte("test node id")))
 	hash := base64.StdEncoding.EncodeToString(sha1Sum([]byte("test hash")))
 	fileData := sha1Sum([]byte("test hash"))
-	fileSave(tx, nodeId, hash, 123123, fileData, true, 123123*3)
-	exist, active, data, partitionCount, blocks, size := fileRetrieve(tx, hash)
-	if !exist {
+	fileSave(tx, nodeId, hash, nil, "", 123123, fileData, true, 123123*3, false)
+	fileId, active, data, partitionCount, blocks, size, _, _ := fileRetrieve(tx, nodeId, hash, 0)
+	if len(fileId) == 0 {
 		t.Errorf("Failed.")
 	}
 	if !active {
@@ -88,8 +90,10 @@ func TestFile(t *testing.T) {
 	if !bytes.Equal(fileData, data) {
 		t.Errorf("Failed.")
 	}
-	fileSaveDone(tx, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2)
-	exist, active, data, partitionCount, blocks, size = fileRetrieve(tx, hash)
+	hash = base64.StdEncoding.EncodeToString(sha1Sum([]byte("test hash2")))
+	fileSave(tx, nodeId, hash, nil, "", 123123, nil, false, 123123*3, false)
+	fileSaveDone(tx, nodeId, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2, "", nil)
+	fileId, active, data, partitionCount, blocks, size, _, _ = fileRetrieve(tx, nodeId, hash, 0)
 	if len(blocks) != 2 {
 		t.Errorf("Failed. len: %d", len(blocks))
 	}
