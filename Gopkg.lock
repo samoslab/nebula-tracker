@@ -120,7 +120,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "7d76dde3cb5954313e01b9ff59274337dd83b61d"
+  revision = "69bb4e2851ef57c95a65b2041fa8271a868492e3"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -201,7 +201,7 @@
     "unix",
     "windows"
   ]
-  revision = "7138fd3d9dc8335c567ca206f4333fb75eb05d56"
+  revision = "151529c776cdc58ddbe7963ba9af779f3577b419"
 
 [[projects]]
   name = "golang.org/x/text"
