@@ -17,6 +17,7 @@ import (
 	"github.com/samoslab/nebula/provider/node"
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	pb "github.com/samoslab/nebula/tracker/metadata/pb"
+	util_aes "github.com/samoslab/nebula/util/aes"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
 	uuid "github.com/satori/go.uuid"
@@ -210,17 +211,31 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		}
 	}
 	if req.FileSize <= embed_metadata_max_file_size {
-		if req.FileSize != uint64(len(req.FileData)) {
-			return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
-		}
-		if bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
-			return &pb.CheckFileExistResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
-		}
 		var encryptKey []byte
-		if len(req.EncryptKey) > 0 {
+		if len(req.EncryptKey) == 0 {
+			if req.FileSize != uint64(len(req.FileData)) {
+				return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
+			}
+			if bytes.Equal(req.FileHash, util_hash.Sha1(req.FileData)) {
+				return &pb.CheckFileExistResp{Code: 15, ErrMsg: "fileData hash is not equal fileHash"}, nil
+			}
+		} else {
+			if bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+				return &pb.CheckFileExistResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
+			}
 			encryptKey, err = util_rsa.DecryptLong(self.PriKey, req.EncryptKey, node.RSA_KEY_BYTES)
 			if err != nil {
 				return &pb.CheckFileExistResp{Code: 20, ErrMsg: "decrypt EncryptKey failed: " + err.Error()}, nil
+			}
+			originData, err := util_aes.Decrypt(req.FileData, encryptKey)
+			if err != nil {
+				return &pb.CheckFileExistResp{Code: 21, ErrMsg: "encryptKey wrong, decrypt error: " + err.Error()}, nil
+			}
+			if req.FileSize != uint64(len(originData)) {
+				return &pb.CheckFileExistResp{Code: 14, ErrMsg: "decrypt data size is not equal fileSize"}, nil
+			}
+			if bytes.Equal(req.FileHash, util_hash.Sha1(originData)) {
+				return &pb.CheckFileExistResp{Code: 16, ErrMsg: "decrypt data hash is not equal fileHash"}, nil
 			}
 		}
 		self.d.FileSaveTiny(existId, nodeIdStr, hashStr, req.FileData, fileName, req.FileSize, req.FileModTime, req.Parent.SpaceNo, parentId, req.FileType, encryptKey)
@@ -236,7 +251,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 		if providerCnt < 5 {
 			resp.ReplicaCount = uint32(providerCnt)
 		}
-		resp.Provider = self.prepareReplicaProvider(nodeIdStr, int(resp.ReplicaCount), req.FileHash, req.FileSize)
+		// resp.Provider = self.prepareReplicaProvider(nodeIdStr, int(resp.ReplicaCount), req.FileHash, req.FileSize)
 		if len(id) == 0 {
 			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileType, req.FileSize, 0, req.Parent.SpaceNo)
 		}
@@ -349,6 +364,7 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 	if pieceCnt == 0 {
 		return nil, status.Error(codes.InvalidArgument, "piece data is required")
 	}
+
 	providerCnt := self.c.Count()
 	for _, p := range req.Partition {
 		if len(p.Piece) > providerCnt {
@@ -358,6 +374,14 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 			return nil, status.Error(codes.InvalidArgument, "all parition must have same number piece")
 		}
 	}
+	if len(req.Partition) == 1 && pieceCnt == 1 {
+		piece := req.Partition[0].Piece[0]
+		var replicaCount uint32 = 5
+		if providerCnt < 5 {
+			replicaCount = uint32(providerCnt)
+		}
+		return &pb.UploadFilePrepareResp{ReplicaCount: replicaCount, Provider: self.prepareReplicaProvider(nodeIdStr, int(replicaCount), piece.Hash, uint64(piece.Size))}, nil
+	}
 	backupProCnt := 10
 	if backupProCnt > pieceCnt {
 		backupProCnt = pieceCnt
@@ -365,7 +389,7 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 	if providerCnt-pieceCnt < backupProCnt {
 		backupProCnt = providerCnt - pieceCnt
 	}
-	return &pb.UploadFilePrepareResp{Partition: self.prepareErasureCodeProvider(base64.StdEncoding.EncodeToString(req.NodeId), req.FileHash, req.FileSize, req.Partition, pieceCnt, backupProCnt)}, nil
+	return &pb.UploadFilePrepareResp{Partition: self.prepareErasureCodeProvider(nodeIdStr, req.FileHash, req.FileSize, req.Partition, pieceCnt, backupProCnt)}, nil
 }
 
 func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash []byte, fileSize uint64, partition []*pb.SplitPartition, pieceCnt int, backupProCnt int) []*pb.ErasureCodePartition {
@@ -916,4 +940,57 @@ func (self *MatadataService) Move(ctx context.Context, req *pb.MoveReq) (resp *p
 
 func (self *MatadataService) GetPublicKey(ctx context.Context, req *pb.GetPublicKeyReq) (resp *pb.GetPublicKeyResp, err error) {
 	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes, PublicKeyHash: self.PubKeyHash}, nil
+}
+
+func (self *MatadataService) SpaceSysFile(ctx context.Context, req *pb.SpaceSysFileReq) (resp *pb.SpaceSysFileResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
+	checkRes, pubKey := self.checkNodeId(req.NodeId)
+	if checkRes != nil {
+		return nil, status.Error(codes.InvalidArgument, checkRes.ErrMsg)
+	}
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
+	}
+	// nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	// inService, emailVerified, _, volume, netflow, upNetflow,
+	// 	_, usageVolume, usageNetflow, usageUpNetflow, _, _ := self.d.UsageAmount(nodeIdStr)
+	// if !emailVerified {
+	// 	return nil, status.Error(codes.PermissionDenied, "email not verified")
+	// }
+	// if !inService {
+	// 	return nil, status.Error(codes.PermissionDenied, "not buy any package order")
+	// }
+
+	// if volume <= usageVolume {
+	// 	return nil, status.Error(codes.OutOfRange, "storage volume exceed")
+	// }
+	// if netflow <= usageNetflow {
+	// 	return nil, status.Error(codes.OutOfRange, "netflow exceed")
+	// }
+	// if upNetflow <= usageUpNetflow {
+	// 	return nil, status.Error(codes.OutOfRange, "upload netflow exceed")
+	// }
+	// if downNetflow <= usageDownNetflow {
+	// 	return nil, status.Error(codes.OutOfRange, "download netflow exceed")
+	// }
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	id, isFolder, hash := self.d.FileOwnerFileExists(nodeIdStr, req.SpaceNo, nil, db.SpaceSysFilename)
+	if len(id) > 0 && !isFolder {
+		exist, _, fileData, _, _, _, _, _ := self.d.FileRetrieve(nodeIdStr, hash, req.SpaceNo)
+		if exist && len(fileData) > 0 {
+			return &pb.SpaceSysFileResp{Data: fileData}, nil
+		} else {
+			return nil, status.Errorf(codes.NotFound, "not exist")
+		}
+	} else {
+		return nil, status.Errorf(codes.NotFound, "not exist")
+	}
 }

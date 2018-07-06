@@ -156,18 +156,19 @@ func TestMkFolder(t *testing.T) {
 	assert.Equal(uint32(401), resp.Code)
 	mockDao.AssertExpectations(t)
 
-	// mockDao = new(daoMock)
-	// ms = &MatadataService{d: mockDao}
-	// mockDao.On("ClientGetPubKey", nodeIdStr).Return(pubKey)
-	// mockDao.On("FileOwnerCheckId", parentId).Return("", false)
-	// req = pb.MkFolderReq{NodeId: nodeId,
-	// 	Timestamp: ts,
-	// 	Parent:    &pb.FilePath{&pb.FilePath_Id{parentId}},
-	// 	Folder:    folders}
-	// req.SignReq(priKey)
-	// resp, err = ms.MkFolder(ctx, &req)
-	// assert.Equal(uint32(201), resp.Code)
-	// mockDao.AssertExpectations(t)
+	mockDao = new(daoMock)
+	ms = &MatadataService{d: mockDao}
+	mockDao.On("ClientGetPubKey", nodeIdStr).Return(pubKey)
+	mockDao.On("UsageAmount", nodeIdStr).Return(true, true, int64(1212), uint32(1024), uint32(3072), uint32(3072), uint32(3072), uint32(512), uint32(512), uint32(512), uint32(512), time.Now())
+	mockDao.On("FileOwnerCheckId", parentId, spaceNo).Return("", nil, false)
+	req = pb.MkFolderReq{NodeId: nodeId,
+		Timestamp: ts,
+		Parent:    &pb.FilePath{SpaceNo: 0, OneOfPath: &pb.FilePath_Id{parentId}},
+		Folder:    folders}
+	req.SignReq(priKey)
+	resp, err = ms.MkFolder(ctx, &req)
+	assert.Equal(uint32(201), resp.Code)
+	mockDao.AssertExpectations(t)
 
 	// mockDao = new(daoMock)
 	// ms = &MatadataService{d: mockDao}
@@ -175,7 +176,7 @@ func TestMkFolder(t *testing.T) {
 	// mockDao.On("FileOwnerCheckId", parentId).Return("other", false)
 	// req = pb.MkFolderReq{NodeId: nodeId,
 	// 	Timestamp: ts,
-	// 	Parent:    &pb.FilePath{&pb.FilePath_Id{parentId}},
+	// 	Parent:    &pb.FilePath{SpaceNo: 0, OneOfPath: &pb.FilePath_Id{parentId}},
 	// 	Folder:    folders}
 	// req.SignReq(priKey)
 	// resp, err = ms.MkFolder(ctx, &req)
@@ -188,7 +189,7 @@ func TestMkFolder(t *testing.T) {
 	// mockDao.On("FileOwnerCheckId", parentId).Return(nodeIdStr, false)
 	// req = pb.MkFolderReq{NodeId: nodeId,
 	// 	Timestamp: ts,
-	// 	Parent:    &pb.FilePath{&pb.FilePath_Id{parentId}},
+	// 	Parent:    &pb.FilePath{SpaceNo: 0, OneOfPath: &pb.FilePath_Id{parentId}},
 	// 	Folder:    folders}
 	// req.SignReq(priKey)
 	// resp, err = ms.MkFolder(ctx, &req)
@@ -290,7 +291,7 @@ func TestMkFolder(t *testing.T) {
 	// mockDao.On("FileOwnerMkFolders", false, nodeIdStr, rootPathId, folders).Return(nil, nil)
 	// req = pb.MkFolderReq{NodeId: nodeId,
 	// 	Timestamp: ts,
-	// 	Parent:    &pb.FilePath{&pb.FilePath_Id{rootPathId}},
+	// 	Parent:    &pb.FilePath{SpaceNo: 0, OneOfPath: &pb.FilePath_Id{rootPathId}},
 	// 	Folder:    folders}
 	// req.SignReq(priKey)
 	// resp, err = ms.MkFolder(ctx, &req)

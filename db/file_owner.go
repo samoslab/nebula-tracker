@@ -55,6 +55,8 @@ func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string, spaceN
 	return false, nil, false
 }
 
+const SpaceSysFilename = ".nebula"
+
 func FileOwnerFileExists(nodeId string, spaceNo uint32, parent []byte, name string) (id []byte, isFolder bool, hash string) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
@@ -178,7 +180,7 @@ func fileOwnerListOfPathCount(tx *sql.Tx, nodeId string, spaceNo uint32, parent 
 	var err error
 	sqlStr := "SELECT count(1) FROM FILE_OWNER where NODE_ID=$1 and SPACE_NO=$2 and PARENT_ID%s and REMOVED=false"
 	if parent == nil || len(parent) == 0 {
-		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, spaceNo)
+		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null and NAME<>'"+SpaceSysFilename+"'"), nodeId, spaceNo)
 	} else {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$3"), nodeId, spaceNo, parent)
 	}
@@ -196,7 +198,7 @@ func fileOwnerListOfPath(tx *sql.Tx, nodeId string, spaceNo uint32, parent []byt
 	var args []interface{}
 	sqlStr := "SELECT ID,FOLDER,NAME,TYPE,MOD_TIME,HASH,SIZE FROM FILE_OWNER where NODE_ID=$1 and SPACE_NO=$2 and PARENT_ID%s"
 	if parent == nil || len(parent) == 0 {
-		sqlStr = fmt.Sprintf(sqlStr, " is null")
+		sqlStr = fmt.Sprintf(sqlStr, " is null and NAME<>'"+SpaceSysFilename+"'")
 		args = []interface{}{nodeId, spaceNo}
 	} else {
 		sqlStr = fmt.Sprintf(sqlStr, "=$3")
