@@ -246,7 +246,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 const done_expired = 1800
 
 func uuidStr() string {
-	u := uuid.Must(uuid.NewV4())
+	u := uuid.Must(uuid.NewV4(), nil)
 	return "-" + base64.StdEncoding.EncodeToString(u[:])
 }
 func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {
