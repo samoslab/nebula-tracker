@@ -20,7 +20,7 @@ func TestFileOwner(t *testing.T) {
 	hash := base64.StdEncoding.EncodeToString(sha1Sum([]byte("test hash")))
 	fileData := sha1Sum([]byte("test hash"))
 	fileSave(tx, nodeId, hash, nil, "", 123123, fileData, true, 123123*3, false)
-	id1 := saveFileOwner(tx, nodeId, true, "test-folder", 0, nil, "", uint64(time.Now().Unix()), &sql.NullString{}, 0)
+	id1 := saveFileOwner(tx, nodeId, true, "test-folder", 0, []byte{}, "", uint64(time.Now().Unix()), &sql.NullString{}, 0)
 	id2 := saveFileOwner(tx, nodeId, true, "test-folder2", 0, id1, "", uint64(time.Now().Unix()), &sql.NullString{}, 0)
 	found, resId, isFolder := queryId(tx, nodeId, nil, "test-folder", 0)
 	if !bytes.Equal(id1, resId) {

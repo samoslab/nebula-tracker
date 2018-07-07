@@ -69,7 +69,7 @@ func (self *ProviderRegisterService) GetPublicKey(ctx context.Context, req *pb.G
 }
 
 func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (*pb.RegisterResp, error) {
-	if bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+	if !bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
 		return &pb.RegisterResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
 	}
 	if req.NodeIdEnc == nil || len(req.NodeIdEnc) == 0 {

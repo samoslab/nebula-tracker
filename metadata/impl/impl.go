@@ -216,11 +216,11 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			if req.FileSize != uint64(len(req.FileData)) {
 				return &pb.CheckFileExistResp{Code: 11, ErrMsg: "file data size is not equal fileSize"}, nil
 			}
-			if bytes.Equal(req.FileHash, util_hash.Sha1(req.FileData)) {
+			if !bytes.Equal(req.FileHash, util_hash.Sha1(req.FileData)) {
 				return &pb.CheckFileExistResp{Code: 15, ErrMsg: "fileData hash is not equal fileHash"}, nil
 			}
 		} else {
-			if bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+			if !bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
 				return &pb.CheckFileExistResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
 			}
 			encryptKey, err = util_rsa.DecryptLong(self.PriKey, req.EncryptKey, node.RSA_KEY_BYTES)
@@ -234,7 +234,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			if req.FileSize != uint64(len(originData)) {
 				return &pb.CheckFileExistResp{Code: 14, ErrMsg: "decrypt data size is not equal fileSize"}, nil
 			}
-			if bytes.Equal(req.FileHash, util_hash.Sha1(originData)) {
+			if !bytes.Equal(req.FileHash, util_hash.Sha1(originData)) {
 				return &pb.CheckFileExistResp{Code: 16, ErrMsg: "decrypt data hash is not equal fileHash"}, nil
 			}
 		}
@@ -530,11 +530,11 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
 		}
 	}
-	if bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
-		return &pb.UploadFileDoneResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
-	}
 	var encryptKey []byte
 	if len(req.EncryptKey) > 0 {
+		if !bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+			return &pb.UploadFileDoneResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
+		}
 		encryptKey, err = util_rsa.DecryptLong(self.PriKey, req.EncryptKey, node.RSA_KEY_BYTES)
 		if err != nil {
 			return &pb.UploadFileDoneResp{Code: 20, ErrMsg: "decrypt EncryptKey failed: " + err.Error()}, nil

@@ -57,7 +57,7 @@ func (self *ClientRegisterService) Register(ctx context.Context, req *pb.Registe
 	if db.ClientExistsNodeId(nodeIdStr) {
 		return &pb.RegisterResp{Code: 4, ErrMsg: "This NodeId is already registered"}, nil
 	}
-	if bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+	if !bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
 		return &pb.RegisterResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
 	}
 	if req.PublicKeyEnc == nil || len(req.PublicKeyEnc) == 0 {

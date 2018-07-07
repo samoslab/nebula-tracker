@@ -119,9 +119,13 @@ func fileOwnerBatchFileExists(tx *sql.Tx, nodeId string, spaceNo uint32, parent 
 
 }
 
-func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, spaceNo uint32, parent interface{}, fileType string, modTime uint64, hash *sql.NullString, size uint64) []byte {
+func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, spaceNo uint32, parent []byte, fileType string, modTime uint64, hash *sql.NullString, size uint64) []byte {
+	var parentId interface{} = nil
+	if len(parent) > 0 {
+		parentId = parent
+	}
 	var lastInsertId []byte
-	err := tx.QueryRow("insert into FILE_OWNER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,FOLDER,NAME,SPACE_NO,PARENT_ID,TYPE,MOD_TIME,HASH,SIZE) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ID", nodeId, isFolder, name, spaceNo, parent, fileType, time.Unix(int64(modTime), 0), hash, size).Scan(&lastInsertId)
+	err := tx.QueryRow("insert into FILE_OWNER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,FOLDER,NAME,SPACE_NO,PARENT_ID,TYPE,MOD_TIME,HASH,SIZE) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ID", nodeId, isFolder, name, spaceNo, parentId, fileType, time.Unix(int64(modTime), 0), hash, size).Scan(&lastInsertId)
 	checkErr(err)
 	return lastInsertId
 }
@@ -162,13 +166,9 @@ func fileOwnerMkFolders(tx *sql.Tx, interactive bool, nodeId string, spaceNo uin
 	if !interactive || len(duplicate) == 0 {
 		modTime := uint64(time.Now().Unix())
 		hash := &sql.NullString{}
-		var parentId interface{} = nil
-		if len(parent) > 0 {
-			parentId = parent
-		}
 		for _, name := range folders {
 			if _, ok := duplicate[name]; !ok {
-				saveFileOwner(tx, nodeId, true, name, spaceNo, parentId, "", modTime, hash, 0)
+				saveFileOwner(tx, nodeId, true, name, spaceNo, parent, "", modTime, hash, 0)
 			}
 		}
 	}
