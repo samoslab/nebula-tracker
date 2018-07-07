@@ -1,0 +1,40 @@
+syntax = "proto3";
+package collector.client.pb;
+
+service ClientCollectorService {
+
+    rpc Collect(stream CollectReq)returns(CollectResp){}
+
+}
+
+
+
+message CollectReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    repeated ActionLog actionLog=4;
+    bytes sign=5;
+}
+
+message CollectResp{
+
+}
+
+message ActionLog{
+    uint32 type=1;// 1:Store, no need to collect action log for success store; 2:Retrieve
+    bytes oppositeNodeId=2;
+    string ticket=3;
+    bool success=4;
+    bytes fileHash=5;
+    uint64 fileSize=6;
+    uint32 partitionSeq=7;
+    bool checksum=8;
+    uint32 blockSeq=9;
+    bytes blockHash=10;
+    uint64 blockSize=11;
+    uint64 beginTime=12;
+    uint64 endTime=13;
+    uint64 transportSize=14;
+    string info=15;// error info
+}

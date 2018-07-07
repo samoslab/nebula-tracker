@@ -1,0 +1,34 @@
+syntax = "proto3";
+package collector.provider.pb;
+
+service ProviderCollectorService {
+
+    rpc Collect(stream CollectReq)returns(CollectResp){}
+
+}
+
+message CollectResp{
+
+}
+
+message CollectReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    repeated ActionLog actionLog=4;
+    bytes sign=5;
+}
+
+message ActionLog{
+    uint32 type=1;// 1:Store,  2:Retrieve
+    string ticket=2;
+    bool success=3;
+    bytes fileHash=4;
+    uint64 fileSize=5;
+    bytes blockHash=6;
+    uint64 blockSize=7;
+    uint64 beginTime=8;
+    uint64 endTime=9;
+    uint64 transportSize=10;
+    string info=11;// error info
+}

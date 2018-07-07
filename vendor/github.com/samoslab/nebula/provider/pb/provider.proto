@@ -1,0 +1,83 @@
+syntax = "proto3";
+package provider.pb;
+
+service ProviderService {
+	rpc Ping(PingReq) returns (PingResp){}
+
+	rpc Store(stream StoreReq) returns (StoreResp){}//fileSize must equal or more than 512KB
+
+	rpc StoreSmall(StoreReq)returns (StoreResp){}//fileSize must less than 512KB
+
+	rpc Retrieve(RetrieveReq) returns (stream RetrieveResp){}//fileSize must equal or more than 512KB
+
+	rpc RetrieveSmall(RetrieveReq) returns (RetrieveResp){}//fileSize must less than 512KB
+
+	rpc Remove(RemoveReq) returns (RemoveResp){}
+
+	rpc GetFragment(GetFragmentReq) returns (GetFragmentResp){}
+	
+}
+
+
+message PingReq {
+	uint32 version=1;
+}
+
+message PingResp{
+}
+
+message StoreReq {
+	bytes data=1;
+	uint32 version=2;
+	bytes auth = 3;
+	uint64 timestamp=4;
+	string ticket = 5;
+	bytes fileKey = 6;
+	uint64 fileSize=7;
+	bytes blockKey=8;//nil if equals fileKey
+	uint64 blockSize=9;//nil if equals fileSize
+}
+
+message StoreResp{
+	bool success = 1;
+}
+
+message RetrieveReq {
+	uint32 version =1;
+	bytes auth = 2;
+	uint64 timestamp=3;
+	string ticket = 4;
+	bytes fileKey = 5;
+	uint64 fileSize=6;
+	bytes blockKey=7;//nil if equals fileKey
+	uint64 blockSize=8;//nil if equals fileSize
+}
+
+message RetrieveResp {
+	bytes data=1;
+}
+
+message RemoveReq{
+	uint32 version =1;
+	bytes auth = 2;
+	uint64 timestamp=3;
+	bytes key = 4;
+	uint64 size=5;
+}
+
+message RemoveResp{
+	bool success = 1;
+}
+
+message GetFragmentReq {
+	uint32 version =1;
+	bytes auth = 2;
+	uint64 timestamp=3;
+	bytes key = 4;
+	uint32 size = 5;
+	bytes positions = 6;
+}
+
+message GetFragmentResp {
+	repeated bytes data=1;
+}

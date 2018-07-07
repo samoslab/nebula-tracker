@@ -1,0 +1,249 @@
+syntax = "proto3";
+package register.client.pb;
+
+service ClientRegisterService {
+
+    rpc GetPublicKey(GetPublicKeyReq) returns (GetPublicKeyResp){}
+
+    rpc Register(RegisterReq) returns (RegisterResp){}
+
+    rpc VerifyContactEmail(VerifyContactEmailReq) returns (VerifyContactEmailResp){}
+
+    rpc ResendVerifyCode(ResendVerifyCodeReq) returns (ResendVerifyCodeResp){}
+
+    rpc GetTrackerServer(GetTrackerServerReq)returns (GetTrackerServerResp){}
+}
+message GetPublicKeyReq {
+    uint32 version =1;
+}
+
+message GetPublicKeyResp {
+    bytes publicKey=1;
+}
+
+message RegisterReq{
+    uint32 version = 1;
+    bytes nodeId = 2;
+    bytes publicKeyEnc = 3;
+    bytes contactEmailEnc = 4;
+
+}
+
+message RegisterResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+}
+
+message VerifyContactEmailReq{
+    uint32 version = 1;
+    bytes nodeId = 2;
+    uint64 timestamp=3;
+    string verifyCode=4;
+    bytes sign = 5;
+}
+
+message VerifyContactEmailResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+}
+
+message ResendVerifyCodeReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message ResendVerifyCodeResp{
+    bool success=1;
+}
+
+message GetTrackerServerReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message GetTrackerServerResp{
+    repeated TrackerServer server=1;
+}
+
+message TrackerServer{
+    string server=1;
+    uint32 port=2;
+}
+
+
+service OrderService {
+
+    rpc AllPackage(AllPackageReq)returns(AllPackageResp){}
+
+    rpc PackageInfo(PackageInfoReq)returns(PackageInfoResp){}
+
+    rpc PackageDiscount(PackageDiscountReq)returns(PackageDiscountResp){}
+
+    rpc BuyPackage(BuyPackageReq)returns(BuyPackageResp){}
+
+    rpc MyAllOrder(MyAllOrderReq)returns(MyAllOrderResp){}
+
+    rpc OrderInfo(OrderInfoReq)returns(OrderInfoResp){}
+
+    rpc RechargeAddress(RechargeAddressReq)returns(RechargeAddressResp){}
+ 
+    rpc PayOrder(PayOrderReq)returns(PayOrderResp){}
+
+    rpc UsageAmount(UsageAmountReq)returns(UsageAmountResp){}
+}
+
+message AllPackageReq{
+    uint32 version =1;
+}
+
+message AllPackageResp{
+    repeated Package allPackage=1;
+}
+
+message Package{
+    sint64 id=1;
+    string name=2;
+    uint64 price=3;
+    uint32 volume=4;
+    uint32 netflow=5;
+    uint32 upNetflow=6;
+    uint32 downNetflow=7;
+    uint32 validDays=8;
+    string remark=9;
+}
+
+message PackageInfoReq{
+    uint32 version=1;
+    sint64 packageId=2;
+}
+
+message PackageInfoResp{
+    Package package=1;
+}
+
+message PackageDiscountReq{
+    uint32 version=1;
+    sint64 packageId=2;
+}
+
+message PackageDiscountResp{
+    map<uint32, string> discount = 1;
+}
+
+message BuyPackageReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    sint64 packageId=4;
+    uint32 quanlity=5;
+    bool cancelUnpaid=6;//if true will cancel exist unpaid order
+    bytes sign = 7;
+}
+
+message Order{
+    bytes id=1;
+    uint64 creation=2;
+    sint64 packageId=3;
+    Package package=4;
+    uint32 quanlity=5;
+    uint64 totalAmount=6;
+    bool upgraded=7;
+    string discount=8;
+    uint32 volume=9;
+    uint32 netflow=10;
+    uint32 upNetflow=11;
+    uint32 downNetflow=12;
+    uint32 validDays=13;
+    uint64 startTime=14;
+    uint64 endTime=15;
+    bool paid=16;
+    uint64 payTime=17;
+    string remark=18;
+}
+
+message BuyPackageResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+    Order order=3;
+}
+
+message MyAllOrderReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bool onlyNotExpired=4;
+    bytes sign = 5;
+}
+
+message MyAllOrderResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+    repeated Order myAllOrder=3;
+}
+
+message OrderInfoReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes orderId=4;
+    bytes sign = 5;
+}
+
+message OrderInfoResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+    Order order=3;
+}
+
+message RechargeAddressReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message RechargeAddressResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+    string rechargeAddress=3;
+    uint64 balance=4;
+}
+
+message PayOrderReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes orderId=4;
+    bytes sign = 5;
+}
+
+message PayOrderResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+}
+
+message UsageAmountReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message UsageAmountResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+    sint64 packageId=3;
+    uint32 volume=4;
+    uint32 netflow=5;
+    uint32 upNetflow=6;
+    uint32 downNetflow=7;
+    uint32 usageVolume=8;
+    uint32 usageNetflow=9;
+    uint32 usageUpNetflow=10;
+    uint32 usageDownNetflow=11;
+    uint64 endTime=12;
+}
