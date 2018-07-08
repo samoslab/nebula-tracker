@@ -287,7 +287,7 @@ func uuidStr() string {
 	u := uuid.NewV4()
 	return "-" + base64.StdEncoding.EncodeToString(u[:])
 }
-func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, fileHash []byte, fileSize uint64) []*pb.ReplicaProvider {
+func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, fileHash []byte, fileSize uint64, blockHash []byte, blockSize uint64) []*pb.ReplicaProvider {
 	pis := self.c.Choose(num)
 	res := make([]*pb.ReplicaProvider, 0, len(pis))
 	ts := uint64(time.Now().Unix())
@@ -298,7 +298,7 @@ func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, file
 			Server:    pi.Server(),
 			Timestamp: ts,
 			Ticket:    ticket,
-			Auth:      provider_pb.GenStoreAuth(pi.PublicKey, fileHash, fileSize, fileHash, fileSize, ts, ticket)})
+			Auth:      provider_pb.GenStoreAuth(pi.PublicKey, fileHash, fileSize, blockHash, blockSize, ts, ticket)})
 	}
 	return res
 }
@@ -380,7 +380,7 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 		if providerCnt < 5 {
 			replicaCount = uint32(providerCnt)
 		}
-		return &pb.UploadFilePrepareResp{ReplicaCount: replicaCount, Provider: self.prepareReplicaProvider(nodeIdStr, int(replicaCount), piece.Hash, uint64(piece.Size))}, nil
+		return &pb.UploadFilePrepareResp{ReplicaCount: replicaCount, Provider: self.prepareReplicaProvider(nodeIdStr, int(replicaCount), req.FileHash, req.FileSize, piece.Hash, uint64(piece.Size))}, nil
 	}
 	backupProCnt := 10
 	if backupProCnt > pieceCnt {
@@ -666,6 +666,12 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 	}
 	if size == 0 {
 		return &pb.RetrieveFileResp{Code: 0, FileData: []byte{}, FileType: fileType}, nil
+	}
+	if len(encryptKey) > 0 {
+		encryptKey, err = util_rsa.EncryptLong(pubKey, encryptKey, node.RSA_KEY_BYTES)
+		if err != nil {
+			return &pb.RetrieveFileResp{Code: 11, ErrMsg: "encrypt encryptKey failed: " + err.Error()}, nil
+		}
 	}
 	if len(fileData) > 0 {
 		return &pb.RetrieveFileResp{Code: 0, FileData: fileData, FileType: fileType, EncryptKey: encryptKey}, nil
