@@ -4,12 +4,12 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"nebula-tracker/collector/config"
 	"nebula-tracker/collector/db"
 	client "nebula-tracker/collector/tracker_client"
 
@@ -21,10 +21,13 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Printf("usage: %s nsq-address\n", os.Args[0])
-	}
-	consumer := initConsumer(topic, channel, os.Args[1])
+	// if len(os.Args) != 2 {
+	// 	fmt.Printf("usage: %s nsq-address\n", os.Args[0])
+	// }
+	conf := config.GetConsumerConfig()
+	dbo := db.OpenDb(&conf.Db)
+	defer dbo.Close()
+	consumer := initConsumer(topic, channel, conf.NsqLookupd)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan

@@ -2,6 +2,8 @@ package db
 
 import (
 	"database/sql"
+	"encoding/base64"
+	"fmt"
 	"strings"
 	"time"
 
@@ -15,7 +17,7 @@ func saveFromProvider(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcp_pb
 		"PVD_TRANSPORT_SIZE,PVD_ERROR_INFO) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) " +
 		"ON CONFLICT (TICKET) DO UPDATE SET PVD_NODE_ID=$3,PVD_TYPE=$4,PVD_TIMESTAMP=$5,PVD_SUCCESS=$6," +
 		"PVD_FILE_HASH=$7,PVD_FILE_SIZE=$8,PVD_BLOCK_HASH=$9,PVD_BLOCK_SIZE=$10,PVD_BEGIN_TIME=$11," +
-		"PVD_END_TIME=$12,PVD_TRANSPORT_SIZE=$13,PVD_ERROR_INFO=$14)")
+		"PVD_END_TIME=$12,PVD_TRANSPORT_SIZE=$13,PVD_ERROR_INFO=$14")
 	defer stmt.Close()
 	checkErr(err)
 	notPassAls := make([]*tcp_pb.ActionLog, 0, 4)
@@ -26,8 +28,11 @@ func saveFromProvider(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcp_pb
 			continue
 		}
 		_, err = stmt.Exec(al.Ticket, cltId, nodeId, al.Type, time.Unix(0, int64(timestamp)), al.Success,
-			al.FileHash, al.FileSize, al.BlockHash, al.BlockSize, time.Unix(0, int64(al.BeginTime)), time.Unix(0, int64(al.EndTime)),
+			base64.StdEncoding.EncodeToString(al.FileHash), al.FileSize, base64.StdEncoding.EncodeToString(al.BlockHash), al.BlockSize, time.Unix(0, int64(al.BeginTime)), time.Unix(0, int64(al.EndTime)),
 			al.TransportSize, al.Info)
+		if err != nil {
+			fmt.Printf("%+v\n", al)
+		}
 		checkErr(err)
 	}
 	// save notPassAls
@@ -50,7 +55,7 @@ func saveFromClient(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcc_pb.A
 			continue
 		}
 		_, err = stmt.Exec(al.Ticket, cltId, nodeId, al.Type, time.Unix(0, int64(timestamp)), al.Success,
-			al.FileHash, al.FileSize, al.BlockHash, al.BlockSize, time.Unix(0, int64(al.BeginTime)), time.Unix(0, int64(al.EndTime)),
+			base64.StdEncoding.EncodeToString(al.FileHash), al.FileSize, base64.StdEncoding.EncodeToString(al.BlockHash), al.BlockSize, time.Unix(0, int64(al.BeginTime)), time.Unix(0, int64(al.EndTime)),
 			al.TransportSize, al.Info, al.PartitionSeq, al.Checksum, al.BlockSeq)
 		checkErr(err)
 	}

@@ -21,8 +21,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	// dbo := db.OpenDb(&conf.Db)
-	// defer dbo.Close()
 	if len(conf.NsqAddrs) == 0 {
 		log.Fatal("nsq addr is required")
 	}
