@@ -51,6 +51,24 @@ func GetOrderInfo(nodeId string, id []byte) (oi *OrderInfo) {
 	return
 }
 
+func RemoveOrder(nodeId string, id []byte) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	removeOrder(tx, nodeId, id)
+	checkErr(tx.Commit())
+	commit = true
+}
+
+func removeOrder(tx *sql.Tx, nodeId string, id []byte) {
+	stmt, err := tx.Prepare("update CLIENT_ORDER set REMOVED=true,LAST_MODIFIED=now() where NODE_ID=$1 and ID=$2 and REMOVED=false and PAY_TIME is null")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(nodeId, id)
+	checkErr(err)
+	_, err = rs.RowsAffected()
+	checkErr(err)
+}
+
 func myAllOrder(tx *sql.Tx, nodeId string, onlyNotExpired bool) []*OrderInfo {
 	sqlStr := "select o.ID,o.REMOVED,o.CREATION,o.LAST_MODIFIED,o.NODE_ID,o.PACKAGE_ID,o.QUANTITY,o.TOTAL_AMOUNT,o.UPGRADED,o.DISCOUNT,o.VOLUME,o.NETFLOW,o.UP_NETFLOW,o.DOWN_NETFLOW,o.VALID_DAYS,o.START_TIME,o.END_TIME,o.PAY_TIME,o.REMARK,p.ID,p.NAME,p.PRICE,p.CREATION,p.LAST_MODIFIED,p.REMOVED,p.VOLUME,p.NETFLOW,p.UP_NETFLOW,p.DOWN_NETFLOW,p.VALID_DAYS,p.REMARK from CLIENT_ORDER o,PACKAGE p where o.NODE_ID=$1 and o.PACKAGE_ID=p.ID and o.REMOVED=false"
 	if onlyNotExpired {

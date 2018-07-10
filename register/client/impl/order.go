@@ -60,6 +60,7 @@ func convertOrderInfo(o *db.OrderInfo) *pb.Order {
 		ValidDays:   o.ValidDays,
 		StartTime:   o.StartTime,
 		EndTime:     o.EndTime,
+		Paid:        o.Paid,
 		PayTime:     o.PayTime,
 		Remark:      o.Remark}
 }
@@ -184,6 +185,43 @@ func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfo
 		return &pb.OrderInfoResp{Code: 16, ErrMsg: "order not found, id: " + hex.EncodeToString(req.OrderId)}, nil
 	}
 	return &pb.OrderInfoResp{Order: convertOrderInfo(oi)}, nil
+}
+
+func (self *ClientOrderService) RemoveOrder(ctx context.Context, req *pb.RemoveOrderReq) (*pb.RemoveOrderResp, error) {
+	if req.NodeId == nil {
+		return &pb.RemoveOrderResp{Code: 2, ErrMsg: "NodeId is required"}, nil
+	}
+	if len(req.NodeId) != 20 {
+		return &pb.RemoveOrderResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
+	}
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
+	if pubKey == nil {
+		return &pb.RemoveOrderResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
+	}
+	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+		return &pb.RemoveOrderResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.RemoveOrderResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
+	}
+	if len(req.OrderId) == 0 {
+		return &pb.RemoveOrderResp{Code: 15, ErrMsg: "orderId is required"}, nil
+	}
+	found, _, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
+	if !found || !emailVerified {
+		return &pb.RemoveOrderResp{Code: 9, ErrMsg: "email not verified"}, nil
+	}
+
+	oi := db.GetOrderInfo(nodeId, req.OrderId)
+	if oi == nil {
+		return &pb.RemoveOrderResp{Code: 16, ErrMsg: "order not found, id: " + hex.EncodeToString(req.OrderId)}, nil
+	}
+	if oi.Paid {
+		return &pb.RemoveOrderResp{Code: 17, ErrMsg: "can not remove order paid, id: " + hex.EncodeToString(req.OrderId)}, nil
+	}
+	db.RemoveOrder(nodeId, req.OrderId)
+	return &pb.RemoveOrderResp{}, nil
 }
 
 func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.RechargeAddressReq) (*pb.RechargeAddressResp, error) {
