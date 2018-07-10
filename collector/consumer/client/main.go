@@ -43,6 +43,7 @@ const (
 //see: https://segmentfault.com/a/1190000009194607
 func initConsumer(topic string, channel string, address string) (consumer *nsq.Consumer) {
 	cfg := nsq.NewConfig()
+	cfg.MaxInFlight = 3
 	cfg.LookupdPollInterval = time.Second
 	var err error
 	consumer, err = nsq.NewConsumer(topic, channel, cfg)
@@ -97,11 +98,8 @@ func getPubKey(nodeIdStr string) *rsa.PublicKey {
 		return b
 	} else {
 		pk := getPubKeyFromDbOrTracker(nodeIdStr)
-		if pk != nil {
-			pubKeyCache.Set(nodeIdStr, pk, cache.DefaultExpiration)
-			return pk
-		}
-		return nil
+		pubKeyCache.Set(nodeIdStr, pk, cache.DefaultExpiration)
+		return pk
 	}
 }
 

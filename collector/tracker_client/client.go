@@ -81,6 +81,9 @@ func getSingle(nodeId string, subPath string) (pubKey []byte, err error) {
 		return nil, err
 	}
 	if jsonObj.Code != 0 {
+		if jsonObj.Code == 2 {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("%s code:%d", jsonObj.ErrMsg, jsonObj.Code)
 	}
 	var str string
