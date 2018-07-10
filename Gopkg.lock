@@ -120,7 +120,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "9f6aeef89f256fb6662122cb3ffcccf44e79e9e6"
+  revision = "7aade444d1e029fea6f6a3ce432bb2098e4ea9a2"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -131,8 +131,8 @@
 [[projects]]
   name = "github.com/shopspring/decimal"
   packages = ["."]
-  revision = "69b3a8ad1f5f2c8bd855cb6506d18593064a346b"
-  version = "1.0.1"
+  revision = "cd690d0c9e2447b1ef2a129a6b7b49077da89b8e"
+  version = "1.1.0"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -172,7 +172,7 @@
     "leveldb/table",
     "leveldb/util"
   ]
-  revision = "0d5a0ceb10cf9ab89fdd744cc8c50a83134f6697"
+  revision = "c4c61651e9e37fa117f53c5a906d3b63090d8445"
 
 [[projects]]
   branch = "master"
@@ -192,7 +192,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "32a936f46389aa10549d60bd7833e54b01685d09"
+  revision = "292b43bbf7cb8d35ddf40f8d5100ef3837cced3f"
 
 [[projects]]
   branch = "master"
@@ -201,7 +201,7 @@
     "unix",
     "windows"
   ]
-  revision = "ce36f3865eeb42541ce3f87f32f8462c5687befa"
+  revision = "1b2967e3c290b7c545b3db0deeda16e9be4f98a2"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -228,7 +228,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "ff3583edef7de132f219f0efc00e097cabcc0ec0"
+  revision = "e92b116572682a5b432ddd840aeaba2a559eeff1"
 
 [[projects]]
   name = "google.golang.org/grpc"
