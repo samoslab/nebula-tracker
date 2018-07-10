@@ -120,7 +120,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "7aade444d1e029fea6f6a3ce432bb2098e4ea9a2"
+  revision = "b39a84b56179c4e587d399d9d0af9df6abf353f8"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
