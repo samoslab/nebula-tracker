@@ -94,7 +94,8 @@ func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPacka
 	if pubKey == nil {
 		return &pb.BuyPackageResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.BuyPackageResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -136,7 +137,8 @@ func (self *ClientOrderService) MyAllOrder(ctx context.Context, req *pb.MyAllOrd
 	if pubKey == nil {
 		return &pb.MyAllOrderResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.MyAllOrderResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -166,7 +168,8 @@ func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfo
 	if pubKey == nil {
 		return &pb.OrderInfoResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.OrderInfoResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -199,7 +202,8 @@ func (self *ClientOrderService) RemoveOrder(ctx context.Context, req *pb.RemoveO
 	if pubKey == nil {
 		return &pb.RemoveOrderResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.RemoveOrderResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -236,7 +240,8 @@ func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.Rec
 	if pubKey == nil {
 		return &pb.RechargeAddressResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.RechargeAddressResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -266,7 +271,8 @@ func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderRe
 	if pubKey == nil {
 		return &pb.PayOrderResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.PayOrderResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -306,7 +312,8 @@ func (self *ClientOrderService) UsageAmount(ctx context.Context, req *pb.UsageAm
 	if pubKey == nil {
 		return &pb.UsageAmountResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.UsageAmountResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {

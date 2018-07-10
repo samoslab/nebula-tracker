@@ -11,6 +11,8 @@ import (
 	"github.com/robfig/cron"
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var cronRunner *cron.Cron
@@ -111,12 +113,33 @@ func check(pi *db.ProviderInfo) bool {
 	}
 	defer conn.Close()
 	psc := provider_pb.NewProviderServiceClient(conn)
-	return pingProvider(psc) == nil
+	total, maxFileSize, err := checkAvailable(psc, pi.PublicKey)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if !ok || st.Code() != codes.DeadlineExceeded {
+			fmt.Printf("checkAvailable of provider [%s:%d] failed,  error: %v\n", hostStr, pi.Port, err)
+		}
+		return false
+	}
+	if total > giga && maxFileSize > giga {
+		return true
+	} else {
+		fmt.Printf("checkAvailable of provider [%s:%d] reply total: %d, maxFileSize: %d\n", hostStr, pi.Port, total, maxFileSize)
+		return false
+	}
 }
 
-func pingProvider(client provider_pb.ProviderServiceClient) error {
+var giga uint64 = 1024 * 1024 * 1024
+
+func checkAvailable(client provider_pb.ProviderServiceClient, publicKeyBytes []byte) (total uint64, maxFileSize uint64, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, err := client.Ping(ctx, &provider_pb.PingReq{})
-	return err
+	req := &provider_pb.CheckAvailableReq{Timestamp: uint64(time.Now().Unix())}
+	req.GenAuth(publicKeyBytes)
+	var resp *provider_pb.CheckAvailableResp
+	resp, err = client.CheckAvailable(ctx, req)
+	if err != nil {
+		return
+	}
+	return resp.Total, resp.MaxFileSize, nil
 }

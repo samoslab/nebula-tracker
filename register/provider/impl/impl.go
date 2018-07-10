@@ -97,7 +97,8 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if err != nil {
 		return &pb.RegisterResp{Code: 8, ErrMsg: "Public Key can not be parsed"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.RegisterResp{Code: 28, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err = req.VerifySign(pubKey); err != nil {
@@ -221,7 +222,8 @@ func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *p
 	if pubKey == nil {
 		return &pb.VerifyBillEmailResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.VerifyBillEmailResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -252,7 +254,8 @@ func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -275,7 +278,8 @@ func (self *ProviderRegisterService) AddExtraStorage(ctx context.Context, req *p
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -304,7 +308,8 @@ func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.Refr
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {

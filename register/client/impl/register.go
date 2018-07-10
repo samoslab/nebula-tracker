@@ -115,7 +115,8 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 	if pubKey == nil {
 		return &pb.VerifyContactEmailResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.VerifyContactEmailResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -146,7 +147,8 @@ func (self *ClientRegisterService) ResendVerifyCode(ctx context.Context, req *pb
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
