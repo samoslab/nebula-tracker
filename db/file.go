@@ -2,8 +2,13 @@ package db
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"errors"
+	"fmt"
+	"strconv"
 	"time"
+
+	pb "github.com/samoslab/nebula/tracker/metadata/pb"
 )
 
 func FileCheckExist(nodeId string, hash string, spaceNo uint32, doneExpSecs int) (id []byte, active bool, done bool, fileType string, size uint64, selfCreate bool, doneExpired bool) {
@@ -172,12 +177,12 @@ func FileSaveStep1(nodeId string, hash string, fileType string, size uint64, sto
 	commit = true
 }
 
-func fileSaveDone(tx *sql.Tx, nodeId string, hash string, partitionCount int, blocks []string, storeVolume uint64, fileType string, encryptKey interface{}) {
-	stmt, err := tx.Prepare("update FILE set PARTITION_COUNT=$3,BLOCKS=" + arrayClause(len(blocks), 7) + ",DONE=true,LAST_MODIFIED=now(),STORE_VOLUME=$4,TYPE=$5,ENCRYPT_KEY=$6 where HASH=$1 and CREATOR_NODE_ID=$2 and DONE=false")
+func fileSaveDone(tx *sql.Tx, nodeId string, hash string, partitionCount int, blocks []string, storeVolume uint64, fileType string, encryptKey interface{}, spaceNo uint32, fileId []byte) {
+	stmt, err := tx.Prepare("update FILE set PARTITION_COUNT=$4,BLOCKS=" + arrayClause(len(blocks), 8) + ",DONE=true,LAST_MODIFIED=now(),STORE_VOLUME=$5,TYPE=$6,ENCRYPT_KEY=$7 where ID=$1 and HASH=$2 and CREATOR_NODE_ID=$3 and DONE=false")
 	defer stmt.Close()
 	checkErr(err)
-	args := make([]interface{}, 6, len(blocks)+6)
-	args[0], args[1], args[2], args[3], args[4], args[5] = hash, nodeId, partitionCount, storeVolume, fileType, encryptKey
+	args := make([]interface{}, 7, len(blocks)+7)
+	args[0], args[1], args[2], args[3], args[4], args[5], args[6] = fileId, hash, nodeId, partitionCount, storeVolume, fileType, encryptKey
 	for _, str := range blocks {
 		args = append(args, str)
 	}
@@ -190,19 +195,60 @@ func fileSaveDone(tx *sql.Tx, nodeId string, hash string, partitionCount int, bl
 	}
 }
 
-func FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parent []byte, partitionCount int, blocks []string, storeVolume uint64, encryptKey []byte) {
+// func fileSaveDone(tx *sql.Tx, nodeId string, hash string, partitionCount int, blocks []string, storeVolume uint64, fileType string, encryptKey interface{}, spaceNo uint32) {
+// 	stmt, err := tx.Prepare("update FILE set PARTITION_COUNT=$4,BLOCKS=" + arrayClause(len(blocks), 8) + ",DONE=true,LAST_MODIFIED=now(),STORE_VOLUME=$4,TYPE=$6,ENCRYPT_KEY=$7 where HASH=$1 and CREATOR_NODE_ID=$2 and PRIVATE=$3 and DONE=false")
+// 	defer stmt.Close()
+// 	checkErr(err)
+// 	args := make([]interface{}, 7, len(blocks)+7)
+// 	args[0], args[1], args[2], args[3], args[4], args[5], args[6] = hash, nodeId, spaceNo > 0, partitionCount, storeVolume, fileType, encryptKey
+// 	for _, str := range blocks {
+// 		args = append(args, str)
+// 	}
+// 	rs, err := stmt.Exec(args...)
+// 	checkErr(err)
+// 	cnt, err := rs.RowsAffected()
+// 	checkErr(err)
+// 	if cnt == 0 {
+// 		panic(errors.New("no record found"))
+// 	}
+// }
+
+func FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parent []byte, partitionCount int, partitions []*pb.StorePartition, storeVolume uint64, encryptKey []byte) error {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	fileSaveDone(tx, nodeId, hash, partitionCount, blocks, storeVolume, fileType, encryptKey)
+	blocks, err := fromPartitions(partitions)
+	if err != nil {
+		return err
+	}
+	fileId := fileFindId(tx, nodeId, hash, spaceNo, false)
+	if len(fileId) == 0 {
+		panic(fmt.Sprintf("file not found, hash: %s, nodeId: %s, spaceNo: %d", hash, nodeId, spaceNo))
+	}
+	fileSaveDone(tx, nodeId, hash, partitionCount, blocks, storeVolume, fileType, encryptKey, spaceNo, fileId)
 	if len(existId) > 0 {
 		updateFileOwnerNewVersion(tx, existId, nodeId, modTime, hash, size)
 	} else {
 		existId = saveFileOwner(tx, nodeId, false, name, spaceNo, parent, fileType, modTime, &sql.NullString{Valid: true, String: hash}, size)
 	}
 	saveFileVersion(tx, existId, nodeId, hash, fileType)
+	saveBlocks(tx, fileId, time.Now().UTC(), partitions)
 	checkErr(tx.Commit())
 	commit = true
+	return nil
 }
+
+func fileFindId(tx *sql.Tx, nodeId string, hash string, spaceNo uint32, done bool) (id []byte) {
+	rows, err := tx.Query("SELECT ID FROM FILE where HASH=$1 and CREATOR_NODE_ID=$2 and PRIVATE=$3 and DONE=$4", hash, nodeId, spaceNo > 0, done)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&id)
+		checkErr(err)
+		return
+	}
+	return
+}
+
 func buildFileRetrieveRow(rows *sql.Rows) *fileRetrieveRow {
 	rr := fileRetrieveRow{}
 	err := rows.Scan(&rr.id, &rr.active, &rr.fileData, &rr.partitionCount, &rr.blocks, &rr.size, &rr.fileType, &rr.encryptKey, &rr.creatorNodeId)
@@ -273,4 +319,43 @@ func FileRetrieve(nodeId string, hash string, spaceNo uint32) (exist bool, activ
 	checkErr(tx.Commit())
 	commit = true
 	return
+}
+
+const BlockSep = ";"
+const BlockNodeIdSep = ","
+
+func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
+	if len(partitions) == 0 {
+		return nil, errors.New("empty partition")
+	}
+	res := make([]string, 0, len(partitions))
+	for _, p := range partitions {
+		if len(p.Block) == 0 {
+			return nil, errors.New("empty block")
+		}
+		for _, b := range p.Block {
+			if len(b.StoreNodeId) == 0 {
+				return nil, errors.New("empty store nodeId")
+			}
+			str := base64.StdEncoding.EncodeToString(b.Hash) + BlockSep + strconv.Itoa(int(b.Size)) + BlockSep + strconv.Itoa(int(b.BlockSeq)) + BlockSep
+			if b.Checksum {
+				str += "1"
+			} else {
+				str += "0"
+			}
+			str += BlockSep
+			first := true
+			for _, by := range b.StoreNodeId {
+				if first {
+					first = false
+				} else {
+					str += BlockNodeIdSep
+				}
+				str += base64.StdEncoding.EncodeToString(by)
+
+			}
+			res = append(res, str)
+		}
+	}
+	return res, nil
 }

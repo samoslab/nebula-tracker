@@ -3,6 +3,7 @@ package impl
 
 import db "nebula-tracker/db"
 
+import metadata_pb "github.com/samoslab/nebula/tracker/metadata/pb"
 import mock "github.com/stretchr/testify/mock"
 import rsa "crypto/rsa"
 import time "time"
@@ -331,9 +332,18 @@ func (_m *daoMock) FileReuse(existId []byte, nodeId string, id []byte, hash stri
 	_m.Called(existId, nodeId, id, hash, name, size, modTime, spaceNo, parentId, fileType)
 }
 
-// FileSaveDone provides a mock function with given fields: existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, blocks, storeVolume, encryptKey
-func (_m *daoMock) FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, partitionCount int, blocks []string, storeVolume uint64, encryptKey []byte) {
-	_m.Called(existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, blocks, storeVolume, encryptKey)
+// FileSaveDone provides a mock function with given fields: existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, partitions, storeVolume, encryptKey
+func (_m *daoMock) FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, partitionCount int, partitions []*metadata_pb.StorePartition, storeVolume uint64, encryptKey []byte) error {
+	ret := _m.Called(existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, partitions, storeVolume, encryptKey)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte, string, string, string, string, uint64, uint64, uint32, []byte, int, []*metadata_pb.StorePartition, uint64, []byte) error); ok {
+		r0 = rf(existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, partitions, storeVolume, encryptKey)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // FileSaveStep1 provides a mock function with given fields: nodeId, hash, fileType, size, storeVolume, spaceNo

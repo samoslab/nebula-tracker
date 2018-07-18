@@ -307,7 +307,7 @@ func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, file
 
 const embed_metadata_max_file_size = 8192
 
-const multi_replica_max_file_size = 1024 * 1024
+const multi_replica_max_file_size = 16 * 1024 * 1024
 
 func fixFileName(name string) string {
 	pos := strings.LastIndex(name, ".")
@@ -420,10 +420,12 @@ func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash 
 			res = append(res, &pb.ErasureCodePartition{ProviderAuth: proAuth, Timestamp: ts})
 			continue
 		}
-		each := pieceCnt * 2 / (len(pis) - pieceCnt)
+		multiple := 2
+		each := pieceCnt * multiple / (len(pis) - pieceCnt)
 		if len(pis)-pieceCnt == 1 {
 			each = pieceCnt
-		} else if pieceCnt*2%(len(pis)-pieceCnt) != 0 {
+			multiple = 1
+		} else if pieceCnt*multiple%(len(pis)-pieceCnt) != 0 {
 			each += 1
 		}
 		for i := pieceCnt; i < len(pis); i++ {
@@ -435,7 +437,7 @@ func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash 
 				HashAuth: make([]*pb.PieceHashAuth, 0, each)})
 		}
 
-		for i := 0; i < pieceCnt*2; i++ {
+		for i := 0; i < pieceCnt*multiple; i++ {
 			pi := pis[pieceCnt+i/each]
 			bpa := proAuth[pieceCnt+i/each]
 			piece := part.Piece[i%pieceCnt]
@@ -523,10 +525,6 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		}
 	}
 
-	blocks, err := fromPartitions(req.Partition)
-	if err != nil {
-		return &pb.UploadFileDoneResp{Code: 9, ErrMsg: err.Error()}, nil
-	}
 	var storeVolume uint64
 	for _, p := range req.Partition {
 		for _, b := range p.Block {
@@ -544,7 +542,9 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 			return &pb.UploadFileDoneResp{Code: 20, ErrMsg: "decrypt EncryptKey failed: " + err.Error()}, nil
 		}
 	}
-	self.d.FileSaveDone(existId, nodeIdStr, hashStr, fileName, req.FileType, req.FileSize, req.FileModTime, req.Parent.SpaceNo, parentId, len(req.Partition), blocks, storeVolume, encryptKey)
+	if err = self.d.FileSaveDone(existId, nodeIdStr, hashStr, fileName, req.FileType, req.FileSize, req.FileModTime, req.Parent.SpaceNo, parentId, len(req.Partition), req.Partition, storeVolume, encryptKey); err != nil {
+		return &pb.UploadFileDoneResp{Code: 9, ErrMsg: err.Error()}, nil
+	}
 	return &pb.UploadFileDoneResp{Code: 0}, nil
 }
 
@@ -702,7 +702,7 @@ func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte,
 	slice := make([]*pb.RetrieveBlock, 0, len(blocks))
 	providerMap := make(map[string]*db.ProviderInfo, 50)
 	for _, str := range blocks {
-		arr := strings.Split(str, block_sep)
+		arr := strings.Split(str, db.BlockSep)
 		if len(arr) != 5 {
 			return nil, fmt.Errorf("parse file: %s block str %s length error", base64.StdEncoding.EncodeToString(fileHash), str)
 		}
@@ -728,7 +728,7 @@ func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte,
 		} else {
 			return nil, errors.New("can not parse chechsum char:" + arr[3])
 		}
-		nodeIds := strings.Split(arr[4], block_node_id_sep)
+		nodeIds := strings.Split(arr[4], db.BlockNodeIdSep)
 		if len(nodeIds) == 0 {
 			return nil, fmt.Errorf("parse file: %s block str %s error, no store nodeId", base64.StdEncoding.EncodeToString(fileHash), str)
 		}
@@ -845,45 +845,6 @@ func (self *MatadataService) findPathId(nodeId string, filePath *pb.FilePath, ne
 		return
 	}
 	return &resObj{Code: 204, ErrMsg: "path is not exists"}, nil, nil
-}
-
-const block_sep = ";"
-const block_node_id_sep = ","
-
-func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
-	if len(partitions) == 0 {
-		return nil, errors.New("empty partition")
-	}
-	res := make([]string, 0, len(partitions))
-	for _, p := range partitions {
-		if len(p.Block) == 0 {
-			return nil, errors.New("empty block")
-		}
-		for _, b := range p.Block {
-			if len(b.StoreNodeId) == 0 {
-				return nil, errors.New("empty store nodeId")
-			}
-			str := base64.StdEncoding.EncodeToString(b.Hash) + block_sep + strconv.Itoa(int(b.Size)) + block_sep + strconv.Itoa(int(b.BlockSeq)) + block_sep
-			if b.Checksum {
-				str += "1"
-			} else {
-				str += "0"
-			}
-			str += block_sep
-			first := true
-			for _, by := range b.StoreNodeId {
-				if first {
-					first = false
-				} else {
-					str += block_node_id_sep
-				}
-				str += base64.StdEncoding.EncodeToString(by)
-
-			}
-			res = append(res, str)
-		}
-	}
-	return res, nil
 }
 
 func (self *MatadataService) Move(ctx context.Context, req *pb.MoveReq) (resp *pb.MoveResp, err error) {

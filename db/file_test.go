@@ -51,7 +51,8 @@ func TestFileTiny(t *testing.T) {
 	}
 	hash = base64.StdEncoding.EncodeToString(sha1Sum([]byte("test hash2")))
 	fileSave(tx, nodeId, hash, nil, "", 123123, nil, false, 123123*3, false)
-	fileSaveDone(tx, nodeId, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2, "", nil)
+	fileId = fileFindId(tx, nodeId, hash, 0, false)
+	fileSaveDone(tx, nodeId, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2, "", nil, 0, fileId)
 	fileId, active, data, partitionCount, blocks, size, _, _ = fileRetrieve(tx, nodeId, hash, 0)
 	if len(blocks) != 2 {
 		t.Errorf("Failed. len: %d", len(blocks))
@@ -92,7 +93,8 @@ func TestFile(t *testing.T) {
 	}
 	hash = base64.StdEncoding.EncodeToString(sha1Sum([]byte("test hash2")))
 	fileSave(tx, nodeId, hash, nil, "", 123123, nil, false, 123123*3, false)
-	fileSaveDone(tx, nodeId, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2, "", nil)
+	fileId = fileFindId(tx, nodeId, hash, 0, false)
+	fileSaveDone(tx, nodeId, hash, 2, []string{`'a,a;a'`, `b;b;b,c,c,c`}, 123123*2, "", nil, 0, fileId)
 	fileId, active, data, partitionCount, blocks, size, _, _ = fileRetrieve(tx, nodeId, hash, 0)
 	if len(blocks) != 2 {
 		t.Errorf("Failed. len: %d", len(blocks))

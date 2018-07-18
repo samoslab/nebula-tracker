@@ -91,15 +91,20 @@ func filter(all []db.ProviderInfo) (*[]db.ProviderInfo, map[string]*db.ProviderI
 	slice := make([]db.ProviderInfo, 0, len(all))
 	m := make(map[string]*db.ProviderInfo, len(all))
 	for _, pi := range all {
-		if check(&pi) || check(&pi) || check(&pi) {
+		start := time.Now().UTC()
+		available := false
+		if check(&pi, &available) || check(&pi, &available) || check(&pi, &available) {
 			m[pi.NodeId] = &pi
 			slice = append(slice, pi)
+		}
+		if !available {
+			db.SaveNaRecord(pi.NodeId, start, time.Now().UTC())
 		}
 	}
 	return &slice, m
 }
 
-func check(pi *db.ProviderInfo) bool {
+func check(pi *db.ProviderInfo, available *bool) bool {
 	var hostStr string // prefer
 	if len(pi.Host) > 0 {
 		hostStr = pi.Host
@@ -121,6 +126,7 @@ func check(pi *db.ProviderInfo) bool {
 		}
 		return false
 	}
+	*available = true
 	if total > giga && maxFileSize > giga {
 		return true
 	} else {

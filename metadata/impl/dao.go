@@ -4,6 +4,8 @@ import (
 	"crypto/rsa"
 	"nebula-tracker/db"
 	"time"
+
+	pb "github.com/samoslab/nebula/tracker/metadata/pb"
 )
 
 type dao interface {
@@ -14,7 +16,7 @@ type dao interface {
 	FileReuse(existId []byte, nodeId string, id []byte, hash string, name string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, fileType string)
 	FileSaveTiny(existId []byte, nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, fileType string, encryptKey []byte)
 	FileSaveStep1(nodeId string, hash string, fileType string, size uint64, storeVolume uint64, spaceNo uint32)
-	FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, partitionCount int, blocks []string, storeVolume uint64, encryptKey []byte)
+	FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, partitionCount int, partitions []*pb.StorePartition, storeVolume uint64, encryptKey []byte) error
 	FileOwnerListOfPath(nodeId string, spaceNo uint32, parentId []byte, pageSize uint32, pageNum uint32, sortField string, asc bool) (total uint32, fofs []*db.Fof)
 	FileRetrieve(nodeId string, hash string, spaceNo uint32) (exist bool, active bool, fileData []byte, partitionCount int, blocks []string, size uint64, fileType string, encryptKey []byte)
 	ProviderFindOne(nodeId string) (p *db.ProviderInfo)
@@ -50,8 +52,8 @@ func (self *daoImpl) FileSaveTiny(existId []byte, nodeId string, hash string, fi
 func (self *daoImpl) FileSaveStep1(nodeId string, hash string, fileType string, size uint64, storeVolume uint64, spaceNo uint32) {
 	db.FileSaveStep1(nodeId, hash, fileType, size, storeVolume, spaceNo)
 }
-func (self *daoImpl) FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, partitionCount int, blocks []string, storeVolume uint64, encryptKey []byte) {
-	db.FileSaveDone(existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, blocks, storeVolume, encryptKey)
+func (self *daoImpl) FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, partitionCount int, blocks []*pb.StorePartition, storeVolume uint64, encryptKey []byte) error {
+	return db.FileSaveDone(existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, blocks, storeVolume, encryptKey)
 }
 func (self *daoImpl) FileOwnerListOfPath(nodeId string, spaceNo uint32, parentId []byte, pageSize uint32, pageNum uint32, sortField string, asc bool) (total uint32, fofs []*db.Fof) {
 	return db.FileOwnerListOfPath(nodeId, spaceNo, parentId, pageSize, pageNum, sortField, asc)

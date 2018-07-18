@@ -203,6 +203,7 @@ func PayOrder(nodeId string, orderId []byte, amount uint64, validDays uint32, pa
 	if !inService {
 		resetClientUsageAmountNetflow(tx, nodeId)
 	}
+	// TODO remove other upgrade order
 	checkErr(tx.Commit())
 	commit = true
 	return
