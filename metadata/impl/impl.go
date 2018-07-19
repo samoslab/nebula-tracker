@@ -385,6 +385,17 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 		}
 		return &pb.UploadFilePrepareResp{ReplicaCount: replicaCount, Provider: self.prepareReplicaProvider(nodeIdStr, int(replicaCount), req.FileHash, req.FileSize, piece.Hash, uint64(piece.Size))}, nil
 	}
+	hashMap := make(map[string]bool, pieceCnt*len(req.Partition))
+	for _, part := range req.Partition {
+		for _, piece := range part.Piece {
+			hashStr := base64.StdEncoding.EncodeToString(piece.Hash)
+			if _, ok := hashMap[hashStr]; ok {
+				return nil, status.Error(codes.InvalidArgument, "mutilple piece have same hash")
+			} else {
+				hashMap[hashStr] = true
+			}
+		}
+	}
 	backupProCnt := 10
 	if backupProCnt > pieceCnt {
 		backupProCnt = pieceCnt
@@ -524,10 +535,26 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 			}
 		}
 	}
-
+	if len(req.Partition) == 0 {
+		return &pb.UploadFileDoneResp{Code: 25, ErrMsg: "partition is empty"}, nil
+	}
+	blockCnt := len(req.Partition[0].Block)
+	if blockCnt == 0 {
+		return &pb.UploadFileDoneResp{Code: 26, ErrMsg: "block of the first partition is empty"}, nil
+	}
+	hashMap := make(map[string]bool, blockCnt*len(req.Partition))
 	var storeVolume uint64
 	for _, p := range req.Partition {
+		if len(p.Block) != blockCnt {
+			return &pb.UploadFileDoneResp{Code: 27, ErrMsg: "all parition must have same number block"}, nil
+		}
 		for _, b := range p.Block {
+			hashStr := base64.StdEncoding.EncodeToString(b.Hash)
+			if _, ok := hashMap[hashStr]; ok {
+				return &pb.UploadFileDoneResp{Code: 28, ErrMsg: "mutilple block have same hash"}, nil
+			} else {
+				hashMap[hashStr] = true
+			}
 			// check size cheating, verify by auth
 			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
 		}

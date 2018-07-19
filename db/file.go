@@ -143,6 +143,7 @@ func FileReuse(existId []byte, nodeId string, id []byte, hash string, name strin
 		existId = saveFileOwner(tx, nodeId, false, name, spaceNo, parent, fileType, modTime, &sql.NullString{Valid: true, String: hash}, size)
 	}
 	saveFileVersion(tx, existId, nodeId, hash, fileType)
+	updateClientUsageAmount(tx, nodeId, size)
 	checkErr(tx.Commit())
 	commit = true
 }
@@ -165,6 +166,7 @@ func FileSaveTiny(existId []byte, nodeId string, hash string, fileData []byte, n
 		existId = saveFileOwner(tx, nodeId, false, name, spaceNo, parent, fileType, modTime, &sql.NullString{Valid: true, String: hash}, size)
 	}
 	saveFileVersion(tx, existId, nodeId, hash, fileType)
+	updateClientUsageAmount(tx, nodeId, size)
 	checkErr(tx.Commit())
 	commit = true
 }
@@ -232,6 +234,7 @@ func FileSaveDone(existId []byte, nodeId string, hash string, name string, fileT
 	}
 	saveFileVersion(tx, existId, nodeId, hash, fileType)
 	saveBlocks(tx, fileId, time.Now().UTC(), partitions)
+	updateClientUsageAmount(tx, nodeId, size)
 	checkErr(tx.Commit())
 	commit = true
 	return nil
