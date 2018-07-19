@@ -65,6 +65,18 @@
   revision = "90697d60dd844d5ef6ff15135d0203f65d2f53b8"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/lrita/gosync"
+  packages = ["."]
+  revision = "17c653898443bb72af8a8a168ddd93b86b3134ae"
+
+[[projects]]
+  name = "github.com/nsqio/go-nsq"
+  packages = ["."]
+  revision = "eee57a3ac4174c55924125bb15eeeda8cffb6e6f"
+  version = "v1.0.7"
+
+[[projects]]
   name = "github.com/patrickmn/go-cache"
   packages = ["."]
   revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
@@ -89,7 +101,7 @@
   version = "v1.1"
 
 [[projects]]
-  branch = "master"
+  branch = "develop"
   name = "github.com/samoslab/nebula"
   packages = [
     "provider/config",
@@ -108,7 +120,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "b8793d4440ce347cc0ad8124f576ecdca5cf8f28"
+  revision = "b39a84b56179c4e587d399d9d0af9df6abf353f8"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -119,8 +131,8 @@
 [[projects]]
   name = "github.com/shopspring/decimal"
   packages = ["."]
-  revision = "69b3a8ad1f5f2c8bd855cb6506d18593064a346b"
-  version = "1.0.1"
+  revision = "cd690d0c9e2447b1ef2a129a6b7b49077da89b8e"
+  version = "1.1.0"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -160,7 +172,7 @@
     "leveldb/table",
     "leveldb/util"
   ]
-  revision = "0d5a0ceb10cf9ab89fdd744cc8c50a83134f6697"
+  revision = "c4c61651e9e37fa117f53c5a906d3b63090d8445"
 
 [[projects]]
   branch = "master"
@@ -180,7 +192,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "afe8f62b1d6bbd81f31868121a50b06d8188e1f9"
+  revision = "292b43bbf7cb8d35ddf40f8d5100ef3837cced3f"
 
 [[projects]]
   branch = "master"
@@ -189,7 +201,7 @@
     "unix",
     "windows"
   ]
-  revision = "c4afb3effaa53fd9a06ca61262dc7ce8df4c081b"
+  revision = "1b2967e3c290b7c545b3db0deeda16e9be4f98a2"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -216,7 +228,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "80063a038e333bbe006c878e4c5ce4c74d055498"
+  revision = "e92b116572682a5b432ddd840aeaba2a559eeff1"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -259,6 +271,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ae2b330fedadae8f99a9bf9523fe59197d24da20431be3a400540572173512e7"
+  inputs-digest = "59b92e95c5210af8858d0da2b4801a744e1275e20b088911db5215573922caf0"
   solver-name = "gps-cdcl"
   solver-version = 1

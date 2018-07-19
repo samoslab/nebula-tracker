@@ -3,6 +3,7 @@ package impl
 
 import db "nebula-tracker/db"
 
+import metadata_pb "github.com/samoslab/nebula/tracker/metadata/pb"
 import mock "github.com/stretchr/testify/mock"
 import rsa "crypto/rsa"
 import time "time"
@@ -13,11 +14,11 @@ type daoMock struct {
 }
 
 // ClientGetPubKey provides a mock function with given fields: nodeId
-func (_m *daoMock) ClientGetPubKey(nodeId []byte) *rsa.PublicKey {
+func (_m *daoMock) ClientGetPubKey(nodeId string) *rsa.PublicKey {
 	ret := _m.Called(nodeId)
 
 	var r0 *rsa.PublicKey
-	if rf, ok := ret.Get(0).(func([]byte) *rsa.PublicKey); ok {
+	if rf, ok := ret.Get(0).(func(string) *rsa.PublicKey); ok {
 		r0 = rf(nodeId)
 	} else {
 		if ret.Get(0) != nil {
@@ -28,83 +29,13 @@ func (_m *daoMock) ClientGetPubKey(nodeId []byte) *rsa.PublicKey {
 	return r0
 }
 
-// FileCheckExist provides a mock function with given fields: nodeId, hash, doneExpSecs
-func (_m *daoMock) FileCheckExist(nodeId string, hash string, doneExpSecs int) (bool, bool, bool, uint64, bool, bool) {
-	ret := _m.Called(nodeId, hash, doneExpSecs)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(string, string, int) bool); ok {
-		r0 = rf(nodeId, hash, doneExpSecs)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(string, string, int) bool); ok {
-		r1 = rf(nodeId, hash, doneExpSecs)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	var r2 bool
-	if rf, ok := ret.Get(2).(func(string, string, int) bool); ok {
-		r2 = rf(nodeId, hash, doneExpSecs)
-	} else {
-		r2 = ret.Get(2).(bool)
-	}
-
-	var r3 uint64
-	if rf, ok := ret.Get(3).(func(string, string, int) uint64); ok {
-		r3 = rf(nodeId, hash, doneExpSecs)
-	} else {
-		r3 = ret.Get(3).(uint64)
-	}
-
-	var r4 bool
-	if rf, ok := ret.Get(4).(func(string, string, int) bool); ok {
-		r4 = rf(nodeId, hash, doneExpSecs)
-	} else {
-		r4 = ret.Get(4).(bool)
-	}
-
-	var r5 bool
-	if rf, ok := ret.Get(5).(func(string, string, int) bool); ok {
-		r5 = rf(nodeId, hash, doneExpSecs)
-	} else {
-		r5 = ret.Get(5).(bool)
-	}
-
-	return r0, r1, r2, r3, r4, r5
-}
-
-// FileOwnerCheckId provides a mock function with given fields: id
-func (_m *daoMock) FileOwnerCheckId(id []byte) (string, bool) {
-	ret := _m.Called(id)
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func([]byte) string); ok {
-		r0 = rf(id)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func([]byte) bool); ok {
-		r1 = rf(id)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
-// FileOwnerFileExists provides a mock function with given fields: nodeId, parent, name
-func (_m *daoMock) FileOwnerFileExists(nodeId string, parent []byte, name string) ([]byte, bool, string) {
-	ret := _m.Called(nodeId, parent, name)
+// FileCheckExist provides a mock function with given fields: nodeId, hash, spaceNo, doneExpSecs
+func (_m *daoMock) FileCheckExist(nodeId string, hash string, spaceNo uint32, doneExpSecs int) ([]byte, bool, bool, string, uint64, bool, bool) {
+	ret := _m.Called(nodeId, hash, spaceNo, doneExpSecs)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(string, []byte, string) []byte); ok {
-		r0 = rf(nodeId, parent, name)
+	if rf, ok := ret.Get(0).(func(string, string, uint32, int) []byte); ok {
+		r0 = rf(nodeId, hash, spaceNo, doneExpSecs)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -112,36 +43,64 @@ func (_m *daoMock) FileOwnerFileExists(nodeId string, parent []byte, name string
 	}
 
 	var r1 bool
-	if rf, ok := ret.Get(1).(func(string, []byte, string) bool); ok {
-		r1 = rf(nodeId, parent, name)
+	if rf, ok := ret.Get(1).(func(string, string, uint32, int) bool); ok {
+		r1 = rf(nodeId, hash, spaceNo, doneExpSecs)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
 
-	var r2 string
-	if rf, ok := ret.Get(2).(func(string, []byte, string) string); ok {
-		r2 = rf(nodeId, parent, name)
+	var r2 bool
+	if rf, ok := ret.Get(2).(func(string, string, uint32, int) bool); ok {
+		r2 = rf(nodeId, hash, spaceNo, doneExpSecs)
 	} else {
-		r2 = ret.Get(2).(string)
+		r2 = ret.Get(2).(bool)
 	}
 
-	return r0, r1, r2
+	var r3 string
+	if rf, ok := ret.Get(3).(func(string, string, uint32, int) string); ok {
+		r3 = rf(nodeId, hash, spaceNo, doneExpSecs)
+	} else {
+		r3 = ret.Get(3).(string)
+	}
+
+	var r4 uint64
+	if rf, ok := ret.Get(4).(func(string, string, uint32, int) uint64); ok {
+		r4 = rf(nodeId, hash, spaceNo, doneExpSecs)
+	} else {
+		r4 = ret.Get(4).(uint64)
+	}
+
+	var r5 bool
+	if rf, ok := ret.Get(5).(func(string, string, uint32, int) bool); ok {
+		r5 = rf(nodeId, hash, spaceNo, doneExpSecs)
+	} else {
+		r5 = ret.Get(5).(bool)
+	}
+
+	var r6 bool
+	if rf, ok := ret.Get(6).(func(string, string, uint32, int) bool); ok {
+		r6 = rf(nodeId, hash, spaceNo, doneExpSecs)
+	} else {
+		r6 = ret.Get(6).(bool)
+	}
+
+	return r0, r1, r2, r3, r4, r5, r6
 }
 
-// FileOwnerIdOfFilePath provides a mock function with given fields: nodeId, path
-func (_m *daoMock) FileOwnerIdOfFilePath(nodeId string, path string) (bool, []byte, bool) {
-	ret := _m.Called(nodeId, path)
+// FileOwnerCheckId provides a mock function with given fields: id, spaceNo
+func (_m *daoMock) FileOwnerCheckId(id []byte, spaceNo uint32) (string, []byte, bool) {
+	ret := _m.Called(id, spaceNo)
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(string, string) bool); ok {
-		r0 = rf(nodeId, path)
+	var r0 string
+	if rf, ok := ret.Get(0).(func([]byte, uint32) string); ok {
+		r0 = rf(id, spaceNo)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Get(0).(string)
 	}
 
 	var r1 []byte
-	if rf, ok := ret.Get(1).(func(string, string) []byte); ok {
-		r1 = rf(nodeId, path)
+	if rf, ok := ret.Get(1).(func([]byte, uint32) []byte); ok {
+		r1 = rf(id, spaceNo)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]byte)
@@ -149,8 +108,8 @@ func (_m *daoMock) FileOwnerIdOfFilePath(nodeId string, path string) (bool, []by
 	}
 
 	var r2 bool
-	if rf, ok := ret.Get(2).(func(string, string) bool); ok {
-		r2 = rf(nodeId, path)
+	if rf, ok := ret.Get(2).(func([]byte, uint32) bool); ok {
+		r2 = rf(id, spaceNo)
 	} else {
 		r2 = ret.Get(2).(bool)
 	}
@@ -158,20 +117,89 @@ func (_m *daoMock) FileOwnerIdOfFilePath(nodeId string, path string) (bool, []by
 	return r0, r1, r2
 }
 
-// FileOwnerListOfPath provides a mock function with given fields: nodeId, parentId, pageSize, pageNum, sortField, asc
-func (_m *daoMock) FileOwnerListOfPath(nodeId string, parentId []byte, pageSize uint32, pageNum uint32, sortField string, asc bool) (uint32, []*db.Fof) {
-	ret := _m.Called(nodeId, parentId, pageSize, pageNum, sortField, asc)
+// FileOwnerFileExists provides a mock function with given fields: nodeId, spaceNo, parent, name
+func (_m *daoMock) FileOwnerFileExists(nodeId string, spaceNo uint32, parent []byte, name string) ([]byte, bool, string) {
+	ret := _m.Called(nodeId, spaceNo, parent, name)
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(string, uint32, []byte, string) []byte); ok {
+		r0 = rf(nodeId, spaceNo, parent, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(string, uint32, []byte, string) bool); ok {
+		r1 = rf(nodeId, spaceNo, parent, name)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	var r2 string
+	if rf, ok := ret.Get(2).(func(string, uint32, []byte, string) string); ok {
+		r2 = rf(nodeId, spaceNo, parent, name)
+	} else {
+		r2 = ret.Get(2).(string)
+	}
+
+	return r0, r1, r2
+}
+
+// FileOwnerIdOfFilePath provides a mock function with given fields: nodeId, path, spaceNo
+func (_m *daoMock) FileOwnerIdOfFilePath(nodeId string, path string, spaceNo uint32) (bool, []byte, []byte, bool) {
+	ret := _m.Called(nodeId, path, spaceNo)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string, string, uint32) bool); ok {
+		r0 = rf(nodeId, path, spaceNo)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 []byte
+	if rf, ok := ret.Get(1).(func(string, string, uint32) []byte); ok {
+		r1 = rf(nodeId, path, spaceNo)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]byte)
+		}
+	}
+
+	var r2 []byte
+	if rf, ok := ret.Get(2).(func(string, string, uint32) []byte); ok {
+		r2 = rf(nodeId, path, spaceNo)
+	} else {
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).([]byte)
+		}
+	}
+
+	var r3 bool
+	if rf, ok := ret.Get(3).(func(string, string, uint32) bool); ok {
+		r3 = rf(nodeId, path, spaceNo)
+	} else {
+		r3 = ret.Get(3).(bool)
+	}
+
+	return r0, r1, r2, r3
+}
+
+// FileOwnerListOfPath provides a mock function with given fields: nodeId, spaceNo, parentId, pageSize, pageNum, sortField, asc
+func (_m *daoMock) FileOwnerListOfPath(nodeId string, spaceNo uint32, parentId []byte, pageSize uint32, pageNum uint32, sortField string, asc bool) (uint32, []*db.Fof) {
+	ret := _m.Called(nodeId, spaceNo, parentId, pageSize, pageNum, sortField, asc)
 
 	var r0 uint32
-	if rf, ok := ret.Get(0).(func(string, []byte, uint32, uint32, string, bool) uint32); ok {
-		r0 = rf(nodeId, parentId, pageSize, pageNum, sortField, asc)
+	if rf, ok := ret.Get(0).(func(string, uint32, []byte, uint32, uint32, string, bool) uint32); ok {
+		r0 = rf(nodeId, spaceNo, parentId, pageSize, pageNum, sortField, asc)
 	} else {
 		r0 = ret.Get(0).(uint32)
 	}
 
 	var r1 []*db.Fof
-	if rf, ok := ret.Get(1).(func(string, []byte, uint32, uint32, string, bool) []*db.Fof); ok {
-		r1 = rf(nodeId, parentId, pageSize, pageNum, sortField, asc)
+	if rf, ok := ret.Get(1).(func(string, uint32, []byte, uint32, uint32, string, bool) []*db.Fof); ok {
+		r1 = rf(nodeId, spaceNo, parentId, pageSize, pageNum, sortField, asc)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]*db.Fof)
@@ -181,13 +209,13 @@ func (_m *daoMock) FileOwnerListOfPath(nodeId string, parentId []byte, pageSize 
 	return r0, r1
 }
 
-// FileOwnerMkFolders provides a mock function with given fields: interactive, nodeId, parent, folders
-func (_m *daoMock) FileOwnerMkFolders(interactive bool, nodeId string, parent []byte, folders []string) ([]string, []string) {
-	ret := _m.Called(interactive, nodeId, parent, folders)
+// FileOwnerMkFolders provides a mock function with given fields: interactive, nodeId, spaceNo, parent, folders
+func (_m *daoMock) FileOwnerMkFolders(interactive bool, nodeId string, spaceNo uint32, parent []byte, folders []string) ([]string, []string) {
+	ret := _m.Called(interactive, nodeId, spaceNo, parent, folders)
 
 	var r0 []string
-	if rf, ok := ret.Get(0).(func(bool, string, []byte, []string) []string); ok {
-		r0 = rf(interactive, nodeId, parent, folders)
+	if rf, ok := ret.Get(0).(func(bool, string, uint32, []byte, []string) []string); ok {
+		r0 = rf(interactive, nodeId, spaceNo, parent, folders)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
@@ -195,8 +223,8 @@ func (_m *daoMock) FileOwnerMkFolders(interactive bool, nodeId string, parent []
 	}
 
 	var r1 []string
-	if rf, ok := ret.Get(1).(func(bool, string, []byte, []string) []string); ok {
-		r1 = rf(interactive, nodeId, parent, folders)
+	if rf, ok := ret.Get(1).(func(bool, string, uint32, []byte, []string) []string); ok {
+		r1 = rf(interactive, nodeId, spaceNo, parent, folders)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]string)
@@ -206,13 +234,18 @@ func (_m *daoMock) FileOwnerMkFolders(interactive bool, nodeId string, parent []
 	return r0, r1
 }
 
-// FileOwnerRemove provides a mock function with given fields: nodeId, pathId, recursive
-func (_m *daoMock) FileOwnerRemove(nodeId string, pathId []byte, recursive bool) bool {
-	ret := _m.Called(nodeId, pathId, recursive)
+// FileOwnerMove provides a mock function with given fields: nodeId, id, spaceNo, newId
+func (_m *daoMock) FileOwnerMove(nodeId string, id []byte, spaceNo uint32, newId []byte) {
+	_m.Called(nodeId, id, spaceNo, newId)
+}
+
+// FileOwnerRemove provides a mock function with given fields: nodeId, spaceNo, pathId, recursive
+func (_m *daoMock) FileOwnerRemove(nodeId string, spaceNo uint32, pathId []byte, recursive bool) bool {
+	ret := _m.Called(nodeId, spaceNo, pathId, recursive)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(string, []byte, bool) bool); ok {
-		r0 = rf(nodeId, pathId, recursive)
+	if rf, ok := ret.Get(0).(func(string, uint32, []byte, bool) bool); ok {
+		r0 = rf(nodeId, spaceNo, pathId, recursive)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -220,27 +253,32 @@ func (_m *daoMock) FileOwnerRemove(nodeId string, pathId []byte, recursive bool)
 	return r0
 }
 
-// FileRetrieve provides a mock function with given fields: hash
-func (_m *daoMock) FileRetrieve(hash string) (bool, bool, []byte, int, []string, uint64) {
-	ret := _m.Called(hash)
+// FileOwnerRename provides a mock function with given fields: nodeId, id, spaceNo, newName
+func (_m *daoMock) FileOwnerRename(nodeId string, id []byte, spaceNo uint32, newName string) {
+	_m.Called(nodeId, id, spaceNo, newName)
+}
+
+// FileRetrieve provides a mock function with given fields: nodeId, hash, spaceNo
+func (_m *daoMock) FileRetrieve(nodeId string, hash string, spaceNo uint32) (bool, bool, []byte, int, []string, uint64, string, []byte) {
+	ret := _m.Called(nodeId, hash, spaceNo)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(string) bool); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(string, string, uint32) bool); ok {
+		r0 = rf(nodeId, hash, spaceNo)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 bool
-	if rf, ok := ret.Get(1).(func(string) bool); ok {
-		r1 = rf(hash)
+	if rf, ok := ret.Get(1).(func(string, string, uint32) bool); ok {
+		r1 = rf(nodeId, hash, spaceNo)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
 
 	var r2 []byte
-	if rf, ok := ret.Get(2).(func(string) []byte); ok {
-		r2 = rf(hash)
+	if rf, ok := ret.Get(2).(func(string, string, uint32) []byte); ok {
+		r2 = rf(nodeId, hash, spaceNo)
 	} else {
 		if ret.Get(2) != nil {
 			r2 = ret.Get(2).([]byte)
@@ -248,15 +286,15 @@ func (_m *daoMock) FileRetrieve(hash string) (bool, bool, []byte, int, []string,
 	}
 
 	var r3 int
-	if rf, ok := ret.Get(3).(func(string) int); ok {
-		r3 = rf(hash)
+	if rf, ok := ret.Get(3).(func(string, string, uint32) int); ok {
+		r3 = rf(nodeId, hash, spaceNo)
 	} else {
 		r3 = ret.Get(3).(int)
 	}
 
 	var r4 []string
-	if rf, ok := ret.Get(4).(func(string) []string); ok {
-		r4 = rf(hash)
+	if rf, ok := ret.Get(4).(func(string, string, uint32) []string); ok {
+		r4 = rf(nodeId, hash, spaceNo)
 	} else {
 		if ret.Get(4) != nil {
 			r4 = ret.Get(4).([]string)
@@ -264,33 +302,58 @@ func (_m *daoMock) FileRetrieve(hash string) (bool, bool, []byte, int, []string,
 	}
 
 	var r5 uint64
-	if rf, ok := ret.Get(5).(func(string) uint64); ok {
-		r5 = rf(hash)
+	if rf, ok := ret.Get(5).(func(string, string, uint32) uint64); ok {
+		r5 = rf(nodeId, hash, spaceNo)
 	} else {
 		r5 = ret.Get(5).(uint64)
 	}
 
-	return r0, r1, r2, r3, r4, r5
+	var r6 string
+	if rf, ok := ret.Get(6).(func(string, string, uint32) string); ok {
+		r6 = rf(nodeId, hash, spaceNo)
+	} else {
+		r6 = ret.Get(6).(string)
+	}
+
+	var r7 []byte
+	if rf, ok := ret.Get(7).(func(string, string, uint32) []byte); ok {
+		r7 = rf(nodeId, hash, spaceNo)
+	} else {
+		if ret.Get(7) != nil {
+			r7 = ret.Get(7).([]byte)
+		}
+	}
+
+	return r0, r1, r2, r3, r4, r5, r6, r7
 }
 
-// FileReuse provides a mock function with given fields: existId, nodeId, hash, name, size, modTime, parentId
-func (_m *daoMock) FileReuse(existId []byte, nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte) {
-	_m.Called(existId, nodeId, hash, name, size, modTime, parentId)
+// FileReuse provides a mock function with given fields: existId, nodeId, id, hash, name, size, modTime, spaceNo, parentId, fileType
+func (_m *daoMock) FileReuse(existId []byte, nodeId string, id []byte, hash string, name string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, fileType string) {
+	_m.Called(existId, nodeId, id, hash, name, size, modTime, spaceNo, parentId, fileType)
 }
 
-// FileSaveDone provides a mock function with given fields: existId, nodeId, hash, name, size, modTime, parentId, partitionCount, blocks, storeVolume
-func (_m *daoMock) FileSaveDone(existId []byte, nodeId string, hash string, name string, size uint64, modTime uint64, parentId []byte, partitionCount int, blocks []string, storeVolume uint64) {
-	_m.Called(existId, nodeId, hash, name, size, modTime, parentId, partitionCount, blocks, storeVolume)
+// FileSaveDone provides a mock function with given fields: existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, partitions, storeVolume, encryptKey
+func (_m *daoMock) FileSaveDone(existId []byte, nodeId string, hash string, name string, fileType string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, partitionCount int, partitions []*metadata_pb.StorePartition, storeVolume uint64, encryptKey []byte) error {
+	ret := _m.Called(existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, partitions, storeVolume, encryptKey)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte, string, string, string, string, uint64, uint64, uint32, []byte, int, []*metadata_pb.StorePartition, uint64, []byte) error); ok {
+		r0 = rf(existId, nodeId, hash, name, fileType, size, modTime, spaceNo, parentId, partitionCount, partitions, storeVolume, encryptKey)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
-// FileSaveStep1 provides a mock function with given fields: nodeId, hash, size, storeVolume
-func (_m *daoMock) FileSaveStep1(nodeId string, hash string, size uint64, storeVolume uint64) {
-	_m.Called(nodeId, hash, size, storeVolume)
+// FileSaveStep1 provides a mock function with given fields: nodeId, hash, fileType, size, storeVolume, spaceNo
+func (_m *daoMock) FileSaveStep1(nodeId string, hash string, fileType string, size uint64, storeVolume uint64, spaceNo uint32) {
+	_m.Called(nodeId, hash, fileType, size, storeVolume, spaceNo)
 }
 
-// FileSaveTiny provides a mock function with given fields: existId, nodeId, hash, fileData, name, size, modTime, parentId
-func (_m *daoMock) FileSaveTiny(existId []byte, nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, parentId []byte) {
-	_m.Called(existId, nodeId, hash, fileData, name, size, modTime, parentId)
+// FileSaveTiny provides a mock function with given fields: existId, nodeId, hash, fileData, name, size, modTime, spaceNo, parentId, fileType, encryptKey
+func (_m *daoMock) FileSaveTiny(existId []byte, nodeId string, hash string, fileData []byte, name string, size uint64, modTime uint64, spaceNo uint32, parentId []byte, fileType string, encryptKey []byte) {
+	_m.Called(existId, nodeId, hash, fileData, name, size, modTime, spaceNo, parentId, fileType, encryptKey)
 }
 
 // ProviderFindOne provides a mock function with given fields: nodeId

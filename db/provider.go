@@ -313,6 +313,10 @@ func ProviderGetPubKeyBytes(nodeId []byte) []byte {
 	return getProviderPublicKeyBytes(base64.StdEncoding.EncodeToString(nodeId))
 }
 
+func ProviderGetPubKeyBytesByNodeId(nodeId string) []byte {
+	return getProviderPublicKeyBytes(nodeId)
+}
+
 func ProviderAllPubKeyBytes() (m map[string][]byte) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)

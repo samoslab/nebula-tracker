@@ -11,6 +11,8 @@ import (
 )
 
 const timestamp_expired = 900
+const timestamp_ahead = -150
+
 const method_store = "Store"
 const method_retrieve = "Retrieve"
 const method_get_fragment = "GetFragment"
@@ -35,7 +37,8 @@ func genAuth(publicKeyBytes []byte, method string, fileKey []byte, fileSize uint
 }
 
 func checkAuth(publicKeyBytes []byte, method string, fileKey []byte, fileSize uint64, blockKey []byte, blockSize uint64, timestamp uint64, ticket string, auth []byte) error {
-	if uint64(time.Now().Unix())-timestamp > timestamp_expired {
+	interval := time.Now().Unix() - int64(timestamp)
+	if interval > timestamp_expired || interval < timestamp_ahead {
 		return errors.New("auth expired")
 	}
 	if len(blockKey) == 0 {
@@ -90,4 +93,25 @@ func (self *RemoveReq) GenAuth(publicKeyBytes []byte) {
 }
 func (self *GetFragmentReq) GenAuth(publicKeyBytes []byte) {
 	self.Auth = genAuth(publicKeyBytes, method_get_fragment, nil, 0, self.Key, uint64(self.Size), self.Timestamp, "")
+}
+
+func (self *CheckAvailableReq) genAuth(publicKeyBytes []byte) []byte {
+	hash := hmac.New(sha256.New, publicKeyBytes)
+	hash.Write(util_bytes.FromUint64(self.Timestamp))
+	return hash.Sum(nil)
+}
+
+func (self *CheckAvailableReq) GenAuth(publicKeyBytes []byte) {
+	self.Auth = self.genAuth(publicKeyBytes)
+}
+
+func (self *CheckAvailableReq) CheckAuth(publicKeyBytes []byte) error {
+	interval := time.Now().Unix() - int64(self.Timestamp)
+	if interval > timestamp_expired || interval < timestamp_ahead {
+		return errors.New("auth expired")
+	}
+	if len(self.Auth) > 0 && bytes.Equal(self.Auth, self.genAuth(publicKeyBytes)) {
+		return nil
+	}
+	return errors.New("auth verify failed")
 }

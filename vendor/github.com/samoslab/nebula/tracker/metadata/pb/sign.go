@@ -22,6 +22,7 @@ func (self *MkFolderReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	for _, f := range self.Folder {
 		hasher.Write([]byte(f))
 	}
@@ -52,8 +53,12 @@ func (self *CheckFileExistReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	hasher.Write([]byte(self.FileType))
+	hasher.Write(self.EncryptKey)
+	hasher.Write(self.PublicKeyHash)
 	hasher.Write([]byte(self.FileName))
 	hasher.Write(util_bytes.FromUint64(self.FileModTime))
 	if len(self.FileData) > 0 {
@@ -115,8 +120,12 @@ func (self *UploadFileDoneReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	hasher.Write([]byte(self.FileType))
+	hasher.Write(self.EncryptKey)
+	hasher.Write(self.PublicKeyHash)
 	hasher.Write([]byte(self.FileName))
 	hasher.Write(util_bytes.FromUint64(self.FileModTime))
 	for _, p := range self.Partition {
@@ -166,6 +175,7 @@ func (self *ListFilesReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	hasher.Write(util_bytes.FromUint32(self.PageSize))
 	hasher.Write(util_bytes.FromUint32(self.PageNum))
 	hasher.Write([]byte(self.SortType.String()))
@@ -190,6 +200,7 @@ func (self *RetrieveFileReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(util_bytes.FromUint32(self.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
 	return hasher.Sum(nil)
@@ -214,6 +225,7 @@ func (self *RemoveReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Target.SpaceNo))
 	if self.Recursive {
 		hasher.Write(byte_slice_true)
 	} else {
@@ -241,6 +253,7 @@ func (self *MoveReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Source.SpaceNo))
 	hasher.Write([]byte(self.Dest))
 	return hasher.Sum(nil)
 }
@@ -251,5 +264,22 @@ func (self *MoveReq) SignReq(priKey *rsa.PrivateKey) (err error) {
 }
 
 func (self *MoveReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
+}
+
+func (self *SpaceSysFileReq) hash() []byte {
+	hasher := sha256.New()
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(util_bytes.FromUint32(self.SpaceNo))
+	return hasher.Sum(nil)
+}
+
+func (self *SpaceSysFileReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
+}
+
+func (self *SpaceSysFileReq) VerifySign(pubKey *rsa.PublicKey) error {
 	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }

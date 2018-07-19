@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"nebula-tracker/db"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 	"strconv"
 	"time"
@@ -23,7 +24,7 @@ import (
 var encryptKey []byte
 
 func main() {
-	fmt.Println(randAesKey(16))
+	// fmt.Println(randAesKey(16))
 	http.HandleFunc("/api/pub-key/client_all/", clientAll)
 	http.HandleFunc("/api/pub-key/provider_all/", providerAll)
 	http.HandleFunc("/api/pub-key/client/", client)
@@ -62,9 +63,13 @@ func client(w http.ResponseWriter, r *http.Request) {
 	if !pass {
 		return
 	}
-	en, err := util_aes.Encrypt(db.ClientGetPubKeyBytes(nodeId), encryptKey)
+	pubKey := db.ClientGetPubKeyBytesByNodeId(nodeId)
+	if len(pubKey) == 0 {
+		json.NewEncoder(w).Encode(&JsonObj{Code: 2, ErrMsg: "node id not exist: " + nodeId})
+	}
+	en, err := util_aes.Encrypt(pubKey, encryptKey)
 	if err != nil {
-		json.NewEncoder(w).Encode(&JsonObj{Code: 2, ErrMsg: "encrypt public key failed: " + err.Error()})
+		json.NewEncoder(w).Encode(&JsonObj{Code: 3, ErrMsg: "encrypt public key failed: " + err.Error()})
 	} else {
 		json.NewEncoder(w).Encode(&JsonObj{Data: base64.StdEncoding.EncodeToString(en)})
 	}
@@ -80,9 +85,13 @@ func provider(w http.ResponseWriter, r *http.Request) {
 	if !pass {
 		return
 	}
-	en, err := util_aes.Encrypt(db.ProviderGetPubKeyBytes(nodeId), encryptKey)
+	pubKey := db.ProviderGetPubKeyBytesByNodeId(nodeId)
+	if len(pubKey) == 0 {
+		json.NewEncoder(w).Encode(&JsonObj{Code: 2, ErrMsg: "node id not exist: " + nodeId})
+	}
+	en, err := util_aes.Encrypt(pubKey, encryptKey)
 	if err != nil {
-		json.NewEncoder(w).Encode(&JsonObj{Code: 2, ErrMsg: "encrypt public key failed: " + err.Error()})
+		json.NewEncoder(w).Encode(&JsonObj{Code: 3, ErrMsg: "encrypt public key failed: " + err.Error()})
 	} else {
 		json.NewEncoder(w).Encode(&JsonObj{Data: base64.StdEncoding.EncodeToString(en)})
 	}
@@ -119,17 +128,22 @@ func providerAll(w http.ResponseWriter, r *http.Request) {
 	processMap(w, db.ProviderAllPubKeyBytes())
 }
 
-func checkNodeId(w http.ResponseWriter, nodeIdStr string) (nodeId []byte, pass bool) {
+func checkNodeId(w http.ResponseWriter, nodeIdStr string) (nodeId string, pass bool) {
 	if len(nodeIdStr) == 0 {
 		json.NewEncoder(w).Encode(&JsonObj{Code: 11, ErrMsg: "node id is required."})
-		return nil, false
+		return "", false
 	}
 	var err error
-	nodeId, err = base64.StdEncoding.DecodeString(nodeIdStr)
+	nodeIdStr, err = url.QueryUnescape(nodeIdStr)
 	if err != nil {
-		json.NewEncoder(w).Encode(&JsonObj{Code: 12, ErrMsg: "node id is invalid."})
-		return nil, false
+		json.NewEncoder(w).Encode(&JsonObj{Code: 12, ErrMsg: fmt.Sprintf("unescape node id [%s] failed: %v", nodeIdStr, err)})
+		return "", false
 	}
+	// nodeId, err = base64.StdEncoding.DecodeString(nodeIdStr)
+	// if err != nil {
+	// 	json.NewEncoder(w).Encode(&JsonObj{Code: 13, ErrMsg: fmt.Sprintf("base64 decode node id [%s] failed: %v", nodeIdStr, err)})
+	// 	return nil, false
+	// }
 	return nodeId, true
 }
 

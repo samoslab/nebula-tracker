@@ -7,9 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	gosync "github.com/lrita/gosync"
 	"github.com/robfig/cron"
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var cronRunner *cron.Cron
@@ -70,7 +73,14 @@ func Get(nodeId string) *db.ProviderInfo {
 	}
 }
 
+var running gosync.Mutex = gosync.NewMutex()
+
 func update() {
+	if running.TryLock() {
+		defer running.UnLock()
+	} else {
+		return
+	}
 	all := db.ProviderFindAll()
 	providers, providerMap = filter(all)
 	initialized = true
@@ -78,16 +88,23 @@ func update() {
 }
 
 func filter(all []db.ProviderInfo) (*[]db.ProviderInfo, map[string]*db.ProviderInfo) {
+	slice := make([]db.ProviderInfo, 0, len(all))
 	m := make(map[string]*db.ProviderInfo, len(all))
 	for _, pi := range all {
-		if check(&pi) {
+		start := time.Now().UTC()
+		available := false
+		if check(&pi, &available) || check(&pi, &available) || check(&pi, &available) {
 			m[pi.NodeId] = &pi
+			slice = append(slice, pi)
+		}
+		if !available {
+			db.SaveNaRecord(pi.NodeId, start, time.Now().UTC())
 		}
 	}
-	return &all, m
+	return &slice, m
 }
 
-func check(pi *db.ProviderInfo) bool {
+func check(pi *db.ProviderInfo, available *bool) bool {
 	var hostStr string // prefer
 	if len(pi.Host) > 0 {
 		hostStr = pi.Host
@@ -101,12 +118,34 @@ func check(pi *db.ProviderInfo) bool {
 	}
 	defer conn.Close()
 	psc := provider_pb.NewProviderServiceClient(conn)
-	return pingProvider(psc) == nil
+	total, maxFileSize, err := checkAvailable(psc, pi.PublicKey)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if !ok || st.Code() != codes.DeadlineExceeded {
+			fmt.Printf("checkAvailable of provider [%s:%d] failed,  error: %v\n", hostStr, pi.Port, err)
+		}
+		return false
+	}
+	*available = true
+	if total > giga && maxFileSize > giga {
+		return true
+	} else {
+		fmt.Printf("checkAvailable of provider [%s:%d] reply total: %d, maxFileSize: %d\n", hostStr, pi.Port, total, maxFileSize)
+		return false
+	}
 }
 
-func pingProvider(client provider_pb.ProviderServiceClient) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+var giga uint64 = 1024 * 1024 * 1024
+
+func checkAvailable(client provider_pb.ProviderServiceClient, publicKeyBytes []byte) (total uint64, maxFileSize uint64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, err := client.Ping(ctx, &provider_pb.PingReq{})
-	return err
+	req := &provider_pb.CheckAvailableReq{Timestamp: uint64(time.Now().Unix())}
+	req.GenAuth(publicKeyBytes)
+	var resp *provider_pb.CheckAvailableResp
+	resp, err = client.CheckAvailable(ctx, req)
+	if err != nil {
+		return
+	}
+	return resp.Total, resp.MaxFileSize, nil
 }

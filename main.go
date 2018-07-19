@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"log"
 	"net"
@@ -25,15 +27,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
+	pk, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		log.Fatalf("GenerateKey failed:%s", err.Error())
+	}
 	dbo := db.OpenDb(&conf.Db)
 	defer dbo.Close()
 	chooser.StartAutoUpdate()
 	defer chooser.StopAutoUpdate()
 	grpcServer := grpc.NewServer()
-	pbrp.RegisterProviderRegisterServiceServer(grpcServer, register_pimpl.NewProviderRegisterService())
-	pbrc.RegisterClientRegisterServiceServer(grpcServer, register_cimpl.NewClientRegisterService())
-	pbrc.RegisterOrderServiceServer(grpcServer, register_cimpl.NewClientOrderService())
-	pbm.RegisterMatadataServiceServer(grpcServer, metadata_impl.NewMatadataService())
+	pbrp.RegisterProviderRegisterServiceServer(grpcServer, register_pimpl.NewProviderRegisterService(pk))
+	pbrc.RegisterClientRegisterServiceServer(grpcServer, register_cimpl.NewClientRegisterService(pk))
+	pbrc.RegisterOrderServiceServer(grpcServer, register_cimpl.NewClientOrderService(pk))
+	pbm.RegisterMatadataServiceServer(grpcServer, metadata_impl.NewMatadataService(pk))
 
 	grpcServer.Serve(lis)
 

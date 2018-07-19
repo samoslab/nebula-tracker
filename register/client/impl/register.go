@@ -2,7 +2,6 @@ package impl
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	util_hash "github.com/samoslab/nebula/util/hash"
@@ -28,22 +26,20 @@ type ClientRegisterService struct {
 	PubKey      *rsa.PublicKey
 	PriKey      *rsa.PrivateKey
 	PubKeyBytes []byte
+	PubKeyHash  []byte
 }
 
-func NewClientRegisterService() *ClientRegisterService {
+func NewClientRegisterService(pk *rsa.PrivateKey) *ClientRegisterService {
 	crs := &ClientRegisterService{}
-	pk, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		log.Fatalf("GenerateKey failed:%s", err.Error())
-	}
 	crs.PriKey = pk
 	crs.PubKey = &pk.PublicKey
 	crs.PubKeyBytes = x509.MarshalPKCS1PublicKey(crs.PubKey)
+	crs.PubKeyHash = util_hash.Sha1(crs.PubKeyBytes)
 	return crs
 }
 
 func (self *ClientRegisterService) GetPublicKey(ctx context.Context, req *pb.GetPublicKeyReq) (*pb.GetPublicKeyResp, error) {
-	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes}, nil
+	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes, PublicKeyHash: self.PubKeyHash}, nil
 }
 
 func (self *ClientRegisterService) decrypt(data []byte) ([]byte, error) {
@@ -60,6 +56,9 @@ func (self *ClientRegisterService) Register(ctx context.Context, req *pb.Registe
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	if db.ClientExistsNodeId(nodeIdStr) {
 		return &pb.RegisterResp{Code: 4, ErrMsg: "This NodeId is already registered"}, nil
+	}
+	if !bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+		return &pb.RegisterResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
 	}
 	if req.PublicKeyEnc == nil || len(req.PublicKeyEnc) == 0 {
 		return &pb.RegisterResp{Code: 5, ErrMsg: "PublicKeyEnc is required"}, nil
@@ -111,18 +110,19 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 	if len(req.NodeId) != 20 {
 		return &pb.VerifyContactEmailResp{Code: 3, ErrMsg: "NodeId length must be 20"}, nil
 	}
-	pubKey := db.ClientGetPubKey(req.NodeId)
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return &pb.VerifyContactEmailResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.VerifyContactEmailResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
 		return &pb.VerifyContactEmailResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
-	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	found, contactEmail, emailVerified, randomCode, sendTime := db.ClientGetRandomCode(nodeIdStr)
+	found, contactEmail, emailVerified, randomCode, sendTime := db.ClientGetRandomCode(nodeId)
 	if !found {
 		return &pb.VerifyContactEmailResp{Code: 6, ErrMsg: "this node id is not been registered"}, nil
 	}
@@ -130,37 +130,38 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 		return &pb.VerifyContactEmailResp{Code: 7, ErrMsg: "already verified contact email"}, nil
 	}
 	if req.VerifyCode != randomCode {
-		self.reGenerateVerifyCode(nodeIdStr, contactEmail)
+		self.reGenerateVerifyCode(nodeId, contactEmail)
 		return &pb.VerifyContactEmailResp{Code: 8, ErrMsg: "wrong verified code, will send verify email again"}, nil
 	}
 	if subM := time.Now().UTC().Sub(sendTime).Minutes(); subM > 120 {
-		self.reGenerateVerifyCode(nodeIdStr, contactEmail)
+		self.reGenerateVerifyCode(nodeId, contactEmail)
 		return &pb.VerifyContactEmailResp{Code: 9, ErrMsg: "verify code expired, will send verify email again"}, nil
 	}
-	db.ClientUpdateEmailVerified(nodeIdStr)
+	db.ClientUpdateEmailVerified(nodeId)
 	return &pb.VerifyContactEmailResp{Code: 0}, nil
 }
 
 func (self *ClientRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (*pb.ResendVerifyCodeResp, error) {
-	pubKey := db.ClientGetPubKey(req.NodeId)
+	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
+	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed: %s", err)
 	}
-	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	found, contactEmail, emailVerified, _, _ := db.ClientGetRandomCode(nodeIdStr)
+	found, contactEmail, emailVerified, _, _ := db.ClientGetRandomCode(nodeId)
 	if !found {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
 	if emailVerified {
 		return nil, status.Error(codes.AlreadyExists, "already verified！")
 	}
-	self.reGenerateVerifyCode(nodeIdStr, contactEmail)
+	self.reGenerateVerifyCode(nodeId, contactEmail)
 	return &pb.ResendVerifyCodeResp{Success: true}, nil
 }
 

@@ -29,7 +29,7 @@ var encryptKey []byte
 
 func init() {
 	var err error
-	encryptKey, err = hex.DecodeString(config.GetCollectorConfig().TrackerInterface.EncryptKeyHex)
+	encryptKey, err = hex.DecodeString(config.GetConsumerConfig().TrackerInterface.EncryptKeyHex)
 	if err != nil {
 		log.Fatalf("decode encrypt key Error： %s", err)
 	}
@@ -47,7 +47,7 @@ func setAuthHeaders(req *http.Request, ti *config.TrackerInterface) {
 }
 
 func httpGet(url string) ([]byte, error) {
-	ti := config.GetCollectorConfig().TrackerInterface
+	ti := config.GetConsumerConfig().TrackerInterface
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", ti.ContextPath+url, nil)
 	if err != nil {
@@ -81,9 +81,17 @@ func getSingle(nodeId string, subPath string) (pubKey []byte, err error) {
 		return nil, err
 	}
 	if jsonObj.Code != 0 {
+		if jsonObj.Code == 2 {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("%s code:%d", jsonObj.ErrMsg, jsonObj.Code)
 	}
-	en, err := base64.StdEncoding.DecodeString(string(jsonObj.Data))
+	var str string
+	err = json.Unmarshal(jsonObj.Data, &str)
+	if err != nil {
+		return nil, err
+	}
+	en, err := base64.StdEncoding.DecodeString(str)
 	if err != nil {
 		return nil, err
 	}

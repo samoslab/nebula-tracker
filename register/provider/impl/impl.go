@@ -2,7 +2,6 @@ package impl
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -15,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
@@ -34,17 +32,15 @@ type ProviderRegisterService struct {
 	PubKey      *rsa.PublicKey
 	PriKey      *rsa.PrivateKey
 	PubKeyBytes []byte
+	PubKeyHash  []byte
 }
 
-func NewProviderRegisterService() *ProviderRegisterService {
+func NewProviderRegisterService(pk *rsa.PrivateKey) *ProviderRegisterService {
 	prs := &ProviderRegisterService{}
-	pk, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		log.Fatalf("GenerateKey failed:%s", err.Error())
-	}
 	prs.PriKey = pk
 	prs.PubKey = &pk.PublicKey
 	prs.PubKeyBytes = x509.MarshalPKCS1PublicKey(prs.PubKey)
+	prs.PubKeyHash = util_hash.Sha1(prs.PubKeyBytes)
 	return prs
 }
 
@@ -69,10 +65,13 @@ func (self *ProviderRegisterService) GetPublicKey(ctx context.Context, req *pb.G
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes, Ip: ip}, nil
+	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes, PublicKeyHash: self.PubKeyHash, Ip: ip}, nil
 }
 
 func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (*pb.RegisterResp, error) {
+	if !bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+		return &pb.RegisterResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
+	}
 	if req.NodeIdEnc == nil || len(req.NodeIdEnc) == 0 {
 		return &pb.RegisterResp{Code: 2, ErrMsg: "NodeIdEnc is required"}, nil
 	}
@@ -98,7 +97,8 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if err != nil {
 		return &pb.RegisterResp{Code: 8, ErrMsg: "Public Key can not be parsed"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.RegisterResp{Code: 28, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err = req.VerifySign(pubKey); err != nil {
@@ -115,9 +115,9 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if !email_re.MatchString(string(billEmail)) {
 		return &pb.RegisterResp{Code: 12, ErrMsg: "Bill Email is invalid."}, nil
 	}
-	if db.ProviderExistsBillEmail(string(billEmail)) {
-		return &pb.RegisterResp{Code: 13, ErrMsg: "This Bill Email is already registered"}, nil
-	}
+	// if db.ProviderExistsBillEmail(string(billEmail)) {
+	// 	return &pb.RegisterResp{Code: 13, ErrMsg: "This Bill Email is already registered"}, nil
+	// }
 	if req.EncryptKeyEnc == nil || len(req.EncryptKeyEnc) == 0 {
 		return &pb.RegisterResp{Code: 14, ErrMsg: "EncryptKeyEnc is required"}, nil
 	}
@@ -192,7 +192,7 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 }
 
 func pingProvider(client provider_pb.ProviderServiceClient) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := client.Ping(ctx, &provider_pb.PingReq{})
 	return err
@@ -222,7 +222,8 @@ func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *p
 	if pubKey == nil {
 		return &pb.VerifyBillEmailResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return &pb.VerifyBillEmailResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -253,7 +254,8 @@ func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -276,7 +278,8 @@ func (self *ProviderRegisterService) AddExtraStorage(ctx context.Context, req *p
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
@@ -305,16 +308,34 @@ func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.Refr
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
 	}
-	if uint64(time.Now().Unix())-req.Timestamp > verify_sign_expired {
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
 		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
 	}
 	if err := req.VerifySign(pubKey); err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
 	ip, err := getClientIp(ctx)
-	if err == nil && len(ip) >= 7 {
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "get provider ip failed， error: %s", err)
+	}
+	if len(ip) >= 7 {
+		resp := &pb.RefreshIpResp{Ip: ip}
+		addr := fmt.Sprintf("%s:%d", ip, req.Port)
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			return resp, status.Errorf(codes.Unavailable, "can not connect to %s, error: %s", addr, err)
+		}
+		defer conn.Close()
+		psc := provider_pb.NewProviderServiceClient(conn)
+		err = pingProvider(psc)
+		if err != nil {
+			return resp, status.Errorf(codes.Unavailable, "ping %s failed, error: %s", addr, err)
+		}
 		nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 		db.UpdateProviderHost(nodeIdStr, ip)
+		return resp, nil
+	} else {
+		return &pb.RefreshIpResp{}, nil
 	}
-	return &pb.RefreshIpResp{Ip: ip}, nil
 }

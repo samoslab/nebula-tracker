@@ -31,7 +31,7 @@
 
 [[constraint]]
   name = "github.com/golang/protobuf"
-  version = "1.1.0"
+  version = "1.0.0"
 
 [[constraint]]
   branch = "master"
@@ -40,6 +40,14 @@
 [[constraint]]
   branch = "master"
   name = "github.com/lib/pq"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/lrita/gosync"
+
+[[constraint]]
+  name = "github.com/nsqio/go-nsq"
+  version = "1.0.7"
 
 [[constraint]]
   name = "github.com/patrickmn/go-cache"
@@ -54,7 +62,7 @@
   version = "1.1.0"
 
 [[constraint]]
-  branch = "master"
+  branch = "develop"
   name = "github.com/samoslab/nebula"
 
 [[constraint]]

@@ -30,6 +30,7 @@ func (self *RegisterReq) hash() []byte {
 	for _, val := range self.ExtraStorageVolume {
 		hasher.Write(util_bytes.FromUint64(val))
 	}
+	hasher.Write(self.PublicKeyHash)
 	return hasher.Sum(nil)
 }
 
@@ -127,6 +128,7 @@ func (self *RefreshIpReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(util_bytes.FromUint32(self.Port))
 	return hasher.Sum(nil)
 }
 

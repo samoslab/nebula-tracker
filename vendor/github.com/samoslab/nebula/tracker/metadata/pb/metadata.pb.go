@@ -8,16 +8,18 @@ It is generated from these files:
 	metadata.proto
 
 It has these top-level messages:
+	GetPublicKeyReq
+	GetPublicKeyResp
 	MkFolderReq
 	FilePath
 	MkFolderResp
 	CheckFileExistReq
 	CheckFileExistResp
-	ReplicaProvider
 	UploadFilePrepareReq
 	SplitPartition
 	PieceHashAndSize
 	UploadFilePrepareResp
+	ReplicaProvider
 	ErasureCodePartition
 	BlockProviderAuth
 	PieceHashAuth
@@ -37,6 +39,8 @@ It has these top-level messages:
 	RemoveResp
 	MoveReq
 	MoveResp
+	SpaceSysFileReq
+	SpaceSysFileResp
 */
 package metadata_pb
 
@@ -105,6 +109,46 @@ func (x SortType) String() string {
 }
 func (SortType) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
+type GetPublicKeyReq struct {
+	Version uint32 `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
+}
+
+func (m *GetPublicKeyReq) Reset()                    { *m = GetPublicKeyReq{} }
+func (m *GetPublicKeyReq) String() string            { return proto.CompactTextString(m) }
+func (*GetPublicKeyReq) ProtoMessage()               {}
+func (*GetPublicKeyReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+func (m *GetPublicKeyReq) GetVersion() uint32 {
+	if m != nil {
+		return m.Version
+	}
+	return 0
+}
+
+type GetPublicKeyResp struct {
+	PublicKey     []byte `protobuf:"bytes,1,opt,name=publicKey,proto3" json:"publicKey,omitempty"`
+	PublicKeyHash []byte `protobuf:"bytes,2,opt,name=publicKeyHash,proto3" json:"publicKeyHash,omitempty"`
+}
+
+func (m *GetPublicKeyResp) Reset()                    { *m = GetPublicKeyResp{} }
+func (m *GetPublicKeyResp) String() string            { return proto.CompactTextString(m) }
+func (*GetPublicKeyResp) ProtoMessage()               {}
+func (*GetPublicKeyResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+func (m *GetPublicKeyResp) GetPublicKey() []byte {
+	if m != nil {
+		return m.PublicKey
+	}
+	return nil
+}
+
+func (m *GetPublicKeyResp) GetPublicKeyHash() []byte {
+	if m != nil {
+		return m.PublicKeyHash
+	}
+	return nil
+}
+
 type MkFolderReq struct {
 	Version     uint32    `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
 	NodeId      []byte    `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
@@ -118,7 +162,7 @@ type MkFolderReq struct {
 func (m *MkFolderReq) Reset()                    { *m = MkFolderReq{} }
 func (m *MkFolderReq) String() string            { return proto.CompactTextString(m) }
 func (*MkFolderReq) ProtoMessage()               {}
-func (*MkFolderReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+func (*MkFolderReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
 
 func (m *MkFolderReq) GetVersion() uint32 {
 	if m != nil {
@@ -174,12 +218,13 @@ type FilePath struct {
 	//	*FilePath_Path
 	//	*FilePath_Id
 	OneOfPath isFilePath_OneOfPath `protobuf_oneof:"oneOfPath"`
+	SpaceNo   uint32               `protobuf:"varint,3,opt,name=spaceNo" json:"spaceNo,omitempty"`
 }
 
 func (m *FilePath) Reset()                    { *m = FilePath{} }
 func (m *FilePath) String() string            { return proto.CompactTextString(m) }
 func (*FilePath) ProtoMessage()               {}
-func (*FilePath) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+func (*FilePath) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
 
 type isFilePath_OneOfPath interface {
 	isFilePath_OneOfPath()
@@ -214,6 +259,13 @@ func (m *FilePath) GetId() []byte {
 		return x.Id
 	}
 	return nil
+}
+
+func (m *FilePath) GetSpaceNo() uint32 {
+	if m != nil {
+		return m.SpaceNo
+	}
+	return 0
 }
 
 // XXX_OneofFuncs is for the internal use of the proto package.
@@ -290,7 +342,7 @@ type MkFolderResp struct {
 func (m *MkFolderResp) Reset()                    { *m = MkFolderResp{} }
 func (m *MkFolderResp) String() string            { return proto.CompactTextString(m) }
 func (*MkFolderResp) ProtoMessage()               {}
-func (*MkFolderResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+func (*MkFolderResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
 
 func (m *MkFolderResp) GetCode() uint32 {
 	if m != nil {
@@ -307,24 +359,27 @@ func (m *MkFolderResp) GetErrMsg() string {
 }
 
 type CheckFileExistReq struct {
-	Version     uint32    `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
-	NodeId      []byte    `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
-	Timestamp   uint64    `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
-	Parent      *FilePath `protobuf:"bytes,4,opt,name=parent" json:"parent,omitempty"`
-	FileHash    []byte    `protobuf:"bytes,5,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
-	FileSize    uint64    `protobuf:"varint,6,opt,name=fileSize" json:"fileSize,omitempty"`
-	FileName    string    `protobuf:"bytes,7,opt,name=fileName" json:"fileName,omitempty"`
-	FileModTime uint64    `protobuf:"varint,8,opt,name=fileModTime" json:"fileModTime,omitempty"`
-	FileData    []byte    `protobuf:"bytes,9,opt,name=fileData,proto3" json:"fileData,omitempty"`
-	Interactive bool      `protobuf:"varint,10,opt,name=interactive" json:"interactive,omitempty"`
-	NewVersion  bool      `protobuf:"varint,11,opt,name=newVersion" json:"newVersion,omitempty"`
-	Sign        []byte    `protobuf:"bytes,12,opt,name=sign,proto3" json:"sign,omitempty"`
+	Version       uint32    `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
+	NodeId        []byte    `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Timestamp     uint64    `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
+	Parent        *FilePath `protobuf:"bytes,4,opt,name=parent" json:"parent,omitempty"`
+	FileHash      []byte    `protobuf:"bytes,5,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
+	FileSize      uint64    `protobuf:"varint,6,opt,name=fileSize" json:"fileSize,omitempty"`
+	FileType      string    `protobuf:"bytes,7,opt,name=fileType" json:"fileType,omitempty"`
+	EncryptKey    []byte    `protobuf:"bytes,8,opt,name=encryptKey,proto3" json:"encryptKey,omitempty"`
+	PublicKeyHash []byte    `protobuf:"bytes,9,opt,name=publicKeyHash,proto3" json:"publicKeyHash,omitempty"`
+	FileName      string    `protobuf:"bytes,10,opt,name=fileName" json:"fileName,omitempty"`
+	FileModTime   uint64    `protobuf:"varint,11,opt,name=fileModTime" json:"fileModTime,omitempty"`
+	FileData      []byte    `protobuf:"bytes,12,opt,name=fileData,proto3" json:"fileData,omitempty"`
+	Interactive   bool      `protobuf:"varint,13,opt,name=interactive" json:"interactive,omitempty"`
+	NewVersion    bool      `protobuf:"varint,14,opt,name=newVersion" json:"newVersion,omitempty"`
+	Sign          []byte    `protobuf:"bytes,15,opt,name=sign,proto3" json:"sign,omitempty"`
 }
 
 func (m *CheckFileExistReq) Reset()                    { *m = CheckFileExistReq{} }
 func (m *CheckFileExistReq) String() string            { return proto.CompactTextString(m) }
 func (*CheckFileExistReq) ProtoMessage()               {}
-func (*CheckFileExistReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+func (*CheckFileExistReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
 
 func (m *CheckFileExistReq) GetVersion() uint32 {
 	if m != nil {
@@ -366,6 +421,27 @@ func (m *CheckFileExistReq) GetFileSize() uint64 {
 		return m.FileSize
 	}
 	return 0
+}
+
+func (m *CheckFileExistReq) GetFileType() string {
+	if m != nil {
+		return m.FileType
+	}
+	return ""
+}
+
+func (m *CheckFileExistReq) GetEncryptKey() []byte {
+	if m != nil {
+		return m.EncryptKey
+	}
+	return nil
+}
+
+func (m *CheckFileExistReq) GetPublicKeyHash() []byte {
+	if m != nil {
+		return m.PublicKeyHash
+	}
+	return nil
 }
 
 func (m *CheckFileExistReq) GetFileName() string {
@@ -411,19 +487,18 @@ func (m *CheckFileExistReq) GetSign() []byte {
 }
 
 type CheckFileExistResp struct {
-	Code             uint32             `protobuf:"varint,1,opt,name=code" json:"code,omitempty"`
-	ErrMsg           string             `protobuf:"bytes,2,opt,name=errMsg" json:"errMsg,omitempty"`
-	StoreType        FileStoreType      `protobuf:"varint,3,opt,name=storeType,enum=metadata.pb.FileStoreType" json:"storeType,omitempty"`
-	DataPieceCount   uint32             `protobuf:"varint,4,opt,name=dataPieceCount" json:"dataPieceCount,omitempty"`
-	VerifyPieceCount uint32             `protobuf:"varint,5,opt,name=verifyPieceCount" json:"verifyPieceCount,omitempty"`
-	ReplicaCount     uint32             `protobuf:"varint,6,opt,name=replicaCount" json:"replicaCount,omitempty"`
-	Provider         []*ReplicaProvider `protobuf:"bytes,7,rep,name=provider" json:"provider,omitempty"`
+	Code             uint32        `protobuf:"varint,1,opt,name=code" json:"code,omitempty"`
+	ErrMsg           string        `protobuf:"bytes,2,opt,name=errMsg" json:"errMsg,omitempty"`
+	StoreType        FileStoreType `protobuf:"varint,3,opt,name=storeType,enum=metadata.pb.FileStoreType" json:"storeType,omitempty"`
+	DataPieceCount   uint32        `protobuf:"varint,4,opt,name=dataPieceCount" json:"dataPieceCount,omitempty"`
+	VerifyPieceCount uint32        `protobuf:"varint,5,opt,name=verifyPieceCount" json:"verifyPieceCount,omitempty"`
+	ReplicaCount     uint32        `protobuf:"varint,6,opt,name=replicaCount" json:"replicaCount,omitempty"`
 }
 
 func (m *CheckFileExistResp) Reset()                    { *m = CheckFileExistResp{} }
 func (m *CheckFileExistResp) String() string            { return proto.CompactTextString(m) }
 func (*CheckFileExistResp) ProtoMessage()               {}
-func (*CheckFileExistResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
+func (*CheckFileExistResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{6} }
 
 func (m *CheckFileExistResp) GetCode() uint32 {
 	if m != nil {
@@ -467,69 +542,6 @@ func (m *CheckFileExistResp) GetReplicaCount() uint32 {
 	return 0
 }
 
-func (m *CheckFileExistResp) GetProvider() []*ReplicaProvider {
-	if m != nil {
-		return m.Provider
-	}
-	return nil
-}
-
-type ReplicaProvider struct {
-	NodeId    []byte `protobuf:"bytes,1,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
-	Server    string `protobuf:"bytes,2,opt,name=server" json:"server,omitempty"`
-	Port      uint32 `protobuf:"varint,3,opt,name=port" json:"port,omitempty"`
-	Timestamp uint64 `protobuf:"varint,4,opt,name=timestamp" json:"timestamp,omitempty"`
-	Ticket    string `protobuf:"bytes,5,opt,name=ticket" json:"ticket,omitempty"`
-	Auth      []byte `protobuf:"bytes,6,opt,name=auth,proto3" json:"auth,omitempty"`
-}
-
-func (m *ReplicaProvider) Reset()                    { *m = ReplicaProvider{} }
-func (m *ReplicaProvider) String() string            { return proto.CompactTextString(m) }
-func (*ReplicaProvider) ProtoMessage()               {}
-func (*ReplicaProvider) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
-
-func (m *ReplicaProvider) GetNodeId() []byte {
-	if m != nil {
-		return m.NodeId
-	}
-	return nil
-}
-
-func (m *ReplicaProvider) GetServer() string {
-	if m != nil {
-		return m.Server
-	}
-	return ""
-}
-
-func (m *ReplicaProvider) GetPort() uint32 {
-	if m != nil {
-		return m.Port
-	}
-	return 0
-}
-
-func (m *ReplicaProvider) GetTimestamp() uint64 {
-	if m != nil {
-		return m.Timestamp
-	}
-	return 0
-}
-
-func (m *ReplicaProvider) GetTicket() string {
-	if m != nil {
-		return m.Ticket
-	}
-	return ""
-}
-
-func (m *ReplicaProvider) GetAuth() []byte {
-	if m != nil {
-		return m.Auth
-	}
-	return nil
-}
-
 type UploadFilePrepareReq struct {
 	Version   uint32            `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
 	NodeId    []byte            `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
@@ -543,7 +555,7 @@ type UploadFilePrepareReq struct {
 func (m *UploadFilePrepareReq) Reset()                    { *m = UploadFilePrepareReq{} }
 func (m *UploadFilePrepareReq) String() string            { return proto.CompactTextString(m) }
 func (*UploadFilePrepareReq) ProtoMessage()               {}
-func (*UploadFilePrepareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{6} }
+func (*UploadFilePrepareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{7} }
 
 func (m *UploadFilePrepareReq) GetVersion() uint32 {
 	if m != nil {
@@ -601,7 +613,7 @@ type SplitPartition struct {
 func (m *SplitPartition) Reset()                    { *m = SplitPartition{} }
 func (m *SplitPartition) String() string            { return proto.CompactTextString(m) }
 func (*SplitPartition) ProtoMessage()               {}
-func (*SplitPartition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{7} }
+func (*SplitPartition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{8} }
 
 func (m *SplitPartition) GetPiece() []*PieceHashAndSize {
 	if m != nil {
@@ -618,7 +630,7 @@ type PieceHashAndSize struct {
 func (m *PieceHashAndSize) Reset()                    { *m = PieceHashAndSize{} }
 func (m *PieceHashAndSize) String() string            { return proto.CompactTextString(m) }
 func (*PieceHashAndSize) ProtoMessage()               {}
-func (*PieceHashAndSize) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{8} }
+func (*PieceHashAndSize) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{9} }
 
 func (m *PieceHashAndSize) GetHash() []byte {
 	if m != nil {
@@ -635,17 +647,89 @@ func (m *PieceHashAndSize) GetSize() uint32 {
 }
 
 type UploadFilePrepareResp struct {
-	Partition []*ErasureCodePartition `protobuf:"bytes,1,rep,name=partition" json:"partition,omitempty"`
+	Partition    []*ErasureCodePartition `protobuf:"bytes,1,rep,name=partition" json:"partition,omitempty"`
+	Provider     []*ReplicaProvider      `protobuf:"bytes,2,rep,name=provider" json:"provider,omitempty"`
+	ReplicaCount uint32                  `protobuf:"varint,3,opt,name=replicaCount" json:"replicaCount,omitempty"`
 }
 
 func (m *UploadFilePrepareResp) Reset()                    { *m = UploadFilePrepareResp{} }
 func (m *UploadFilePrepareResp) String() string            { return proto.CompactTextString(m) }
 func (*UploadFilePrepareResp) ProtoMessage()               {}
-func (*UploadFilePrepareResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{9} }
+func (*UploadFilePrepareResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{10} }
 
 func (m *UploadFilePrepareResp) GetPartition() []*ErasureCodePartition {
 	if m != nil {
 		return m.Partition
+	}
+	return nil
+}
+
+func (m *UploadFilePrepareResp) GetProvider() []*ReplicaProvider {
+	if m != nil {
+		return m.Provider
+	}
+	return nil
+}
+
+func (m *UploadFilePrepareResp) GetReplicaCount() uint32 {
+	if m != nil {
+		return m.ReplicaCount
+	}
+	return 0
+}
+
+type ReplicaProvider struct {
+	NodeId    []byte `protobuf:"bytes,1,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Server    string `protobuf:"bytes,2,opt,name=server" json:"server,omitempty"`
+	Port      uint32 `protobuf:"varint,3,opt,name=port" json:"port,omitempty"`
+	Timestamp uint64 `protobuf:"varint,4,opt,name=timestamp" json:"timestamp,omitempty"`
+	Ticket    string `protobuf:"bytes,5,opt,name=ticket" json:"ticket,omitempty"`
+	Auth      []byte `protobuf:"bytes,6,opt,name=auth,proto3" json:"auth,omitempty"`
+}
+
+func (m *ReplicaProvider) Reset()                    { *m = ReplicaProvider{} }
+func (m *ReplicaProvider) String() string            { return proto.CompactTextString(m) }
+func (*ReplicaProvider) ProtoMessage()               {}
+func (*ReplicaProvider) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{11} }
+
+func (m *ReplicaProvider) GetNodeId() []byte {
+	if m != nil {
+		return m.NodeId
+	}
+	return nil
+}
+
+func (m *ReplicaProvider) GetServer() string {
+	if m != nil {
+		return m.Server
+	}
+	return ""
+}
+
+func (m *ReplicaProvider) GetPort() uint32 {
+	if m != nil {
+		return m.Port
+	}
+	return 0
+}
+
+func (m *ReplicaProvider) GetTimestamp() uint64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *ReplicaProvider) GetTicket() string {
+	if m != nil {
+		return m.Ticket
+	}
+	return ""
+}
+
+func (m *ReplicaProvider) GetAuth() []byte {
+	if m != nil {
+		return m.Auth
 	}
 	return nil
 }
@@ -658,7 +742,7 @@ type ErasureCodePartition struct {
 func (m *ErasureCodePartition) Reset()                    { *m = ErasureCodePartition{} }
 func (m *ErasureCodePartition) String() string            { return proto.CompactTextString(m) }
 func (*ErasureCodePartition) ProtoMessage()               {}
-func (*ErasureCodePartition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{10} }
+func (*ErasureCodePartition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{12} }
 
 func (m *ErasureCodePartition) GetProviderAuth() []*BlockProviderAuth {
 	if m != nil {
@@ -685,7 +769,7 @@ type BlockProviderAuth struct {
 func (m *BlockProviderAuth) Reset()                    { *m = BlockProviderAuth{} }
 func (m *BlockProviderAuth) String() string            { return proto.CompactTextString(m) }
 func (*BlockProviderAuth) ProtoMessage()               {}
-func (*BlockProviderAuth) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{11} }
+func (*BlockProviderAuth) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{13} }
 
 func (m *BlockProviderAuth) GetNodeId() []byte {
 	if m != nil {
@@ -732,7 +816,7 @@ type PieceHashAuth struct {
 func (m *PieceHashAuth) Reset()                    { *m = PieceHashAuth{} }
 func (m *PieceHashAuth) String() string            { return proto.CompactTextString(m) }
 func (*PieceHashAuth) ProtoMessage()               {}
-func (*PieceHashAuth) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{12} }
+func (*PieceHashAuth) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{14} }
 
 func (m *PieceHashAuth) GetHash() []byte {
 	if m != nil {
@@ -763,24 +847,27 @@ func (m *PieceHashAuth) GetAuth() []byte {
 }
 
 type UploadFileDoneReq struct {
-	Version     uint32            `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
-	NodeId      []byte            `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
-	Timestamp   uint64            `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
-	Parent      *FilePath         `protobuf:"bytes,4,opt,name=parent" json:"parent,omitempty"`
-	FileHash    []byte            `protobuf:"bytes,5,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
-	FileSize    uint64            `protobuf:"varint,6,opt,name=fileSize" json:"fileSize,omitempty"`
-	FileName    string            `protobuf:"bytes,7,opt,name=fileName" json:"fileName,omitempty"`
-	FileModTime uint64            `protobuf:"varint,8,opt,name=fileModTime" json:"fileModTime,omitempty"`
-	Partition   []*StorePartition `protobuf:"bytes,9,rep,name=partition" json:"partition,omitempty"`
-	Interactive bool              `protobuf:"varint,10,opt,name=interactive" json:"interactive,omitempty"`
-	NewVersion  bool              `protobuf:"varint,11,opt,name=newVersion" json:"newVersion,omitempty"`
-	Sign        []byte            `protobuf:"bytes,12,opt,name=sign,proto3" json:"sign,omitempty"`
+	Version       uint32            `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
+	NodeId        []byte            `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Timestamp     uint64            `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
+	Parent        *FilePath         `protobuf:"bytes,4,opt,name=parent" json:"parent,omitempty"`
+	FileHash      []byte            `protobuf:"bytes,5,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
+	FileSize      uint64            `protobuf:"varint,6,opt,name=fileSize" json:"fileSize,omitempty"`
+	FileType      string            `protobuf:"bytes,7,opt,name=fileType" json:"fileType,omitempty"`
+	EncryptKey    []byte            `protobuf:"bytes,8,opt,name=encryptKey,proto3" json:"encryptKey,omitempty"`
+	PublicKeyHash []byte            `protobuf:"bytes,9,opt,name=publicKeyHash,proto3" json:"publicKeyHash,omitempty"`
+	FileName      string            `protobuf:"bytes,10,opt,name=fileName" json:"fileName,omitempty"`
+	FileModTime   uint64            `protobuf:"varint,11,opt,name=fileModTime" json:"fileModTime,omitempty"`
+	Partition     []*StorePartition `protobuf:"bytes,12,rep,name=partition" json:"partition,omitempty"`
+	Interactive   bool              `protobuf:"varint,13,opt,name=interactive" json:"interactive,omitempty"`
+	NewVersion    bool              `protobuf:"varint,14,opt,name=newVersion" json:"newVersion,omitempty"`
+	Sign          []byte            `protobuf:"bytes,15,opt,name=sign,proto3" json:"sign,omitempty"`
 }
 
 func (m *UploadFileDoneReq) Reset()                    { *m = UploadFileDoneReq{} }
 func (m *UploadFileDoneReq) String() string            { return proto.CompactTextString(m) }
 func (*UploadFileDoneReq) ProtoMessage()               {}
-func (*UploadFileDoneReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{13} }
+func (*UploadFileDoneReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{15} }
 
 func (m *UploadFileDoneReq) GetVersion() uint32 {
 	if m != nil {
@@ -822,6 +909,27 @@ func (m *UploadFileDoneReq) GetFileSize() uint64 {
 		return m.FileSize
 	}
 	return 0
+}
+
+func (m *UploadFileDoneReq) GetFileType() string {
+	if m != nil {
+		return m.FileType
+	}
+	return ""
+}
+
+func (m *UploadFileDoneReq) GetEncryptKey() []byte {
+	if m != nil {
+		return m.EncryptKey
+	}
+	return nil
+}
+
+func (m *UploadFileDoneReq) GetPublicKeyHash() []byte {
+	if m != nil {
+		return m.PublicKeyHash
+	}
+	return nil
 }
 
 func (m *UploadFileDoneReq) GetFileName() string {
@@ -873,7 +981,7 @@ type StorePartition struct {
 func (m *StorePartition) Reset()                    { *m = StorePartition{} }
 func (m *StorePartition) String() string            { return proto.CompactTextString(m) }
 func (*StorePartition) ProtoMessage()               {}
-func (*StorePartition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{14} }
+func (*StorePartition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{16} }
 
 func (m *StorePartition) GetBlock() []*StoreBlock {
 	if m != nil {
@@ -893,7 +1001,7 @@ type StoreBlock struct {
 func (m *StoreBlock) Reset()                    { *m = StoreBlock{} }
 func (m *StoreBlock) String() string            { return proto.CompactTextString(m) }
 func (*StoreBlock) ProtoMessage()               {}
-func (*StoreBlock) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{15} }
+func (*StoreBlock) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{17} }
 
 func (m *StoreBlock) GetHash() []byte {
 	if m != nil {
@@ -938,7 +1046,7 @@ type UploadFileDoneResp struct {
 func (m *UploadFileDoneResp) Reset()                    { *m = UploadFileDoneResp{} }
 func (m *UploadFileDoneResp) String() string            { return proto.CompactTextString(m) }
 func (*UploadFileDoneResp) ProtoMessage()               {}
-func (*UploadFileDoneResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{16} }
+func (*UploadFileDoneResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{18} }
 
 func (m *UploadFileDoneResp) GetCode() uint32 {
 	if m != nil {
@@ -969,7 +1077,7 @@ type ListFilesReq struct {
 func (m *ListFilesReq) Reset()                    { *m = ListFilesReq{} }
 func (m *ListFilesReq) String() string            { return proto.CompactTextString(m) }
 func (*ListFilesReq) ProtoMessage()               {}
-func (*ListFilesReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{17} }
+func (*ListFilesReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{19} }
 
 func (m *ListFilesReq) GetVersion() uint32 {
 	if m != nil {
@@ -1044,7 +1152,7 @@ type ListFilesResp struct {
 func (m *ListFilesResp) Reset()                    { *m = ListFilesResp{} }
 func (m *ListFilesResp) String() string            { return proto.CompactTextString(m) }
 func (*ListFilesResp) ProtoMessage()               {}
-func (*ListFilesResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{18} }
+func (*ListFilesResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20} }
 
 func (m *ListFilesResp) GetCode() uint32 {
 	if m != nil {
@@ -1081,12 +1189,13 @@ type FileOrFolder struct {
 	ModTime  uint64 `protobuf:"varint,4,opt,name=modTime" json:"modTime,omitempty"`
 	FileHash []byte `protobuf:"bytes,5,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
 	FileSize uint64 `protobuf:"varint,6,opt,name=fileSize" json:"fileSize,omitempty"`
+	FileType string `protobuf:"bytes,7,opt,name=fileType" json:"fileType,omitempty"`
 }
 
 func (m *FileOrFolder) Reset()                    { *m = FileOrFolder{} }
 func (m *FileOrFolder) String() string            { return proto.CompactTextString(m) }
 func (*FileOrFolder) ProtoMessage()               {}
-func (*FileOrFolder) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{19} }
+func (*FileOrFolder) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{21} }
 
 func (m *FileOrFolder) GetId() []byte {
 	if m != nil {
@@ -1130,19 +1239,27 @@ func (m *FileOrFolder) GetFileSize() uint64 {
 	return 0
 }
 
+func (m *FileOrFolder) GetFileType() string {
+	if m != nil {
+		return m.FileType
+	}
+	return ""
+}
+
 type RetrieveFileReq struct {
 	Version   uint32 `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
 	NodeId    []byte `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
 	Timestamp uint64 `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
-	FileHash  []byte `protobuf:"bytes,4,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
-	FileSize  uint64 `protobuf:"varint,5,opt,name=fileSize" json:"fileSize,omitempty"`
-	Sign      []byte `protobuf:"bytes,6,opt,name=sign,proto3" json:"sign,omitempty"`
+	SpaceNo   uint32 `protobuf:"varint,4,opt,name=spaceNo" json:"spaceNo,omitempty"`
+	FileHash  []byte `protobuf:"bytes,5,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
+	FileSize  uint64 `protobuf:"varint,6,opt,name=fileSize" json:"fileSize,omitempty"`
+	Sign      []byte `protobuf:"bytes,7,opt,name=sign,proto3" json:"sign,omitempty"`
 }
 
 func (m *RetrieveFileReq) Reset()                    { *m = RetrieveFileReq{} }
 func (m *RetrieveFileReq) String() string            { return proto.CompactTextString(m) }
 func (*RetrieveFileReq) ProtoMessage()               {}
-func (*RetrieveFileReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20} }
+func (*RetrieveFileReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22} }
 
 func (m *RetrieveFileReq) GetVersion() uint32 {
 	if m != nil {
@@ -1161,6 +1278,13 @@ func (m *RetrieveFileReq) GetNodeId() []byte {
 func (m *RetrieveFileReq) GetTimestamp() uint64 {
 	if m != nil {
 		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *RetrieveFileReq) GetSpaceNo() uint32 {
+	if m != nil {
+		return m.SpaceNo
 	}
 	return 0
 }
@@ -1187,17 +1311,19 @@ func (m *RetrieveFileReq) GetSign() []byte {
 }
 
 type RetrieveFileResp struct {
-	Code      uint32               `protobuf:"varint,1,opt,name=code" json:"code,omitempty"`
-	ErrMsg    string               `protobuf:"bytes,2,opt,name=errMsg" json:"errMsg,omitempty"`
-	FileData  []byte               `protobuf:"bytes,3,opt,name=fileData,proto3" json:"fileData,omitempty"`
-	Partition []*RetrievePartition `protobuf:"bytes,4,rep,name=partition" json:"partition,omitempty"`
-	Timestamp uint64               `protobuf:"varint,5,opt,name=timestamp" json:"timestamp,omitempty"`
+	Code       uint32               `protobuf:"varint,1,opt,name=code" json:"code,omitempty"`
+	ErrMsg     string               `protobuf:"bytes,2,opt,name=errMsg" json:"errMsg,omitempty"`
+	FileData   []byte               `protobuf:"bytes,3,opt,name=fileData,proto3" json:"fileData,omitempty"`
+	FileType   string               `protobuf:"bytes,4,opt,name=fileType" json:"fileType,omitempty"`
+	EncryptKey []byte               `protobuf:"bytes,5,opt,name=encryptKey,proto3" json:"encryptKey,omitempty"`
+	Partition  []*RetrievePartition `protobuf:"bytes,6,rep,name=partition" json:"partition,omitempty"`
+	Timestamp  uint64               `protobuf:"varint,7,opt,name=timestamp" json:"timestamp,omitempty"`
 }
 
 func (m *RetrieveFileResp) Reset()                    { *m = RetrieveFileResp{} }
 func (m *RetrieveFileResp) String() string            { return proto.CompactTextString(m) }
 func (*RetrieveFileResp) ProtoMessage()               {}
-func (*RetrieveFileResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{21} }
+func (*RetrieveFileResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{23} }
 
 func (m *RetrieveFileResp) GetCode() uint32 {
 	if m != nil {
@@ -1216,6 +1342,20 @@ func (m *RetrieveFileResp) GetErrMsg() string {
 func (m *RetrieveFileResp) GetFileData() []byte {
 	if m != nil {
 		return m.FileData
+	}
+	return nil
+}
+
+func (m *RetrieveFileResp) GetFileType() string {
+	if m != nil {
+		return m.FileType
+	}
+	return ""
+}
+
+func (m *RetrieveFileResp) GetEncryptKey() []byte {
+	if m != nil {
+		return m.EncryptKey
 	}
 	return nil
 }
@@ -1241,7 +1381,7 @@ type RetrievePartition struct {
 func (m *RetrievePartition) Reset()                    { *m = RetrievePartition{} }
 func (m *RetrievePartition) String() string            { return proto.CompactTextString(m) }
 func (*RetrievePartition) ProtoMessage()               {}
-func (*RetrievePartition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22} }
+func (*RetrievePartition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{24} }
 
 func (m *RetrievePartition) GetBlock() []*RetrieveBlock {
 	if m != nil {
@@ -1261,7 +1401,7 @@ type RetrieveBlock struct {
 func (m *RetrieveBlock) Reset()                    { *m = RetrieveBlock{} }
 func (m *RetrieveBlock) String() string            { return proto.CompactTextString(m) }
 func (*RetrieveBlock) ProtoMessage()               {}
-func (*RetrieveBlock) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{23} }
+func (*RetrieveBlock) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{25} }
 
 func (m *RetrieveBlock) GetHash() []byte {
 	if m != nil {
@@ -1309,7 +1449,7 @@ type RetrieveNode struct {
 func (m *RetrieveNode) Reset()                    { *m = RetrieveNode{} }
 func (m *RetrieveNode) String() string            { return proto.CompactTextString(m) }
 func (*RetrieveNode) ProtoMessage()               {}
-func (*RetrieveNode) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{24} }
+func (*RetrieveNode) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{26} }
 
 func (m *RetrieveNode) GetNodeId() []byte {
 	if m != nil {
@@ -1358,7 +1498,7 @@ type RemoveReq struct {
 func (m *RemoveReq) Reset()                    { *m = RemoveReq{} }
 func (m *RemoveReq) String() string            { return proto.CompactTextString(m) }
 func (*RemoveReq) ProtoMessage()               {}
-func (*RemoveReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{25} }
+func (*RemoveReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{27} }
 
 func (m *RemoveReq) GetVersion() uint32 {
 	if m != nil {
@@ -1410,7 +1550,7 @@ type RemoveResp struct {
 func (m *RemoveResp) Reset()                    { *m = RemoveResp{} }
 func (m *RemoveResp) String() string            { return proto.CompactTextString(m) }
 func (*RemoveResp) ProtoMessage()               {}
-func (*RemoveResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{26} }
+func (*RemoveResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{28} }
 
 func (m *RemoveResp) GetCode() uint32 {
 	if m != nil {
@@ -1438,7 +1578,7 @@ type MoveReq struct {
 func (m *MoveReq) Reset()                    { *m = MoveReq{} }
 func (m *MoveReq) String() string            { return proto.CompactTextString(m) }
 func (*MoveReq) ProtoMessage()               {}
-func (*MoveReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{27} }
+func (*MoveReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{29} }
 
 func (m *MoveReq) GetVersion() uint32 {
 	if m != nil {
@@ -1490,7 +1630,7 @@ type MoveResp struct {
 func (m *MoveResp) Reset()                    { *m = MoveResp{} }
 func (m *MoveResp) String() string            { return proto.CompactTextString(m) }
 func (*MoveResp) ProtoMessage()               {}
-func (*MoveResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{28} }
+func (*MoveResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{30} }
 
 func (m *MoveResp) GetCode() uint32 {
 	if m != nil {
@@ -1506,17 +1646,83 @@ func (m *MoveResp) GetErrMsg() string {
 	return ""
 }
 
+type SpaceSysFileReq struct {
+	Version   uint32 `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
+	NodeId    []byte `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Timestamp uint64 `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
+	SpaceNo   uint32 `protobuf:"varint,4,opt,name=spaceNo" json:"spaceNo,omitempty"`
+	Sign      []byte `protobuf:"bytes,6,opt,name=sign,proto3" json:"sign,omitempty"`
+}
+
+func (m *SpaceSysFileReq) Reset()                    { *m = SpaceSysFileReq{} }
+func (m *SpaceSysFileReq) String() string            { return proto.CompactTextString(m) }
+func (*SpaceSysFileReq) ProtoMessage()               {}
+func (*SpaceSysFileReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{31} }
+
+func (m *SpaceSysFileReq) GetVersion() uint32 {
+	if m != nil {
+		return m.Version
+	}
+	return 0
+}
+
+func (m *SpaceSysFileReq) GetNodeId() []byte {
+	if m != nil {
+		return m.NodeId
+	}
+	return nil
+}
+
+func (m *SpaceSysFileReq) GetTimestamp() uint64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *SpaceSysFileReq) GetSpaceNo() uint32 {
+	if m != nil {
+		return m.SpaceNo
+	}
+	return 0
+}
+
+func (m *SpaceSysFileReq) GetSign() []byte {
+	if m != nil {
+		return m.Sign
+	}
+	return nil
+}
+
+type SpaceSysFileResp struct {
+	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+func (m *SpaceSysFileResp) Reset()                    { *m = SpaceSysFileResp{} }
+func (m *SpaceSysFileResp) String() string            { return proto.CompactTextString(m) }
+func (*SpaceSysFileResp) ProtoMessage()               {}
+func (*SpaceSysFileResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{32} }
+
+func (m *SpaceSysFileResp) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
 func init() {
+	proto.RegisterType((*GetPublicKeyReq)(nil), "metadata.pb.GetPublicKeyReq")
+	proto.RegisterType((*GetPublicKeyResp)(nil), "metadata.pb.GetPublicKeyResp")
 	proto.RegisterType((*MkFolderReq)(nil), "metadata.pb.MkFolderReq")
 	proto.RegisterType((*FilePath)(nil), "metadata.pb.FilePath")
 	proto.RegisterType((*MkFolderResp)(nil), "metadata.pb.MkFolderResp")
 	proto.RegisterType((*CheckFileExistReq)(nil), "metadata.pb.CheckFileExistReq")
 	proto.RegisterType((*CheckFileExistResp)(nil), "metadata.pb.CheckFileExistResp")
-	proto.RegisterType((*ReplicaProvider)(nil), "metadata.pb.ReplicaProvider")
 	proto.RegisterType((*UploadFilePrepareReq)(nil), "metadata.pb.UploadFilePrepareReq")
 	proto.RegisterType((*SplitPartition)(nil), "metadata.pb.SplitPartition")
 	proto.RegisterType((*PieceHashAndSize)(nil), "metadata.pb.PieceHashAndSize")
 	proto.RegisterType((*UploadFilePrepareResp)(nil), "metadata.pb.UploadFilePrepareResp")
+	proto.RegisterType((*ReplicaProvider)(nil), "metadata.pb.ReplicaProvider")
 	proto.RegisterType((*ErasureCodePartition)(nil), "metadata.pb.ErasureCodePartition")
 	proto.RegisterType((*BlockProviderAuth)(nil), "metadata.pb.BlockProviderAuth")
 	proto.RegisterType((*PieceHashAuth)(nil), "metadata.pb.PieceHashAuth")
@@ -1536,6 +1742,8 @@ func init() {
 	proto.RegisterType((*RemoveResp)(nil), "metadata.pb.RemoveResp")
 	proto.RegisterType((*MoveReq)(nil), "metadata.pb.MoveReq")
 	proto.RegisterType((*MoveResp)(nil), "metadata.pb.MoveResp")
+	proto.RegisterType((*SpaceSysFileReq)(nil), "metadata.pb.SpaceSysFileReq")
+	proto.RegisterType((*SpaceSysFileResp)(nil), "metadata.pb.SpaceSysFileResp")
 	proto.RegisterEnum("metadata.pb.FileStoreType", FileStoreType_name, FileStoreType_value)
 	proto.RegisterEnum("metadata.pb.SortType", SortType_name, SortType_value)
 }
@@ -1551,6 +1759,7 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for MatadataService service
 
 type MatadataServiceClient interface {
+	GetPublicKey(ctx context.Context, in *GetPublicKeyReq, opts ...grpc.CallOption) (*GetPublicKeyResp, error)
 	MkFolder(ctx context.Context, in *MkFolderReq, opts ...grpc.CallOption) (*MkFolderResp, error)
 	CheckFileExist(ctx context.Context, in *CheckFileExistReq, opts ...grpc.CallOption) (*CheckFileExistResp, error)
 	UploadFilePrepare(ctx context.Context, in *UploadFilePrepareReq, opts ...grpc.CallOption) (*UploadFilePrepareResp, error)
@@ -1559,6 +1768,7 @@ type MatadataServiceClient interface {
 	RetrieveFile(ctx context.Context, in *RetrieveFileReq, opts ...grpc.CallOption) (*RetrieveFileResp, error)
 	Remove(ctx context.Context, in *RemoveReq, opts ...grpc.CallOption) (*RemoveResp, error)
 	Move(ctx context.Context, in *MoveReq, opts ...grpc.CallOption) (*MoveResp, error)
+	SpaceSysFile(ctx context.Context, in *SpaceSysFileReq, opts ...grpc.CallOption) (*SpaceSysFileResp, error)
 }
 
 type matadataServiceClient struct {
@@ -1567,6 +1777,15 @@ type matadataServiceClient struct {
 
 func NewMatadataServiceClient(cc *grpc.ClientConn) MatadataServiceClient {
 	return &matadataServiceClient{cc}
+}
+
+func (c *matadataServiceClient) GetPublicKey(ctx context.Context, in *GetPublicKeyReq, opts ...grpc.CallOption) (*GetPublicKeyResp, error) {
+	out := new(GetPublicKeyResp)
+	err := grpc.Invoke(ctx, "/metadata.pb.MatadataService/GetPublicKey", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *matadataServiceClient) MkFolder(ctx context.Context, in *MkFolderReq, opts ...grpc.CallOption) (*MkFolderResp, error) {
@@ -1641,9 +1860,19 @@ func (c *matadataServiceClient) Move(ctx context.Context, in *MoveReq, opts ...g
 	return out, nil
 }
 
+func (c *matadataServiceClient) SpaceSysFile(ctx context.Context, in *SpaceSysFileReq, opts ...grpc.CallOption) (*SpaceSysFileResp, error) {
+	out := new(SpaceSysFileResp)
+	err := grpc.Invoke(ctx, "/metadata.pb.MatadataService/SpaceSysFile", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for MatadataService service
 
 type MatadataServiceServer interface {
+	GetPublicKey(context.Context, *GetPublicKeyReq) (*GetPublicKeyResp, error)
 	MkFolder(context.Context, *MkFolderReq) (*MkFolderResp, error)
 	CheckFileExist(context.Context, *CheckFileExistReq) (*CheckFileExistResp, error)
 	UploadFilePrepare(context.Context, *UploadFilePrepareReq) (*UploadFilePrepareResp, error)
@@ -1652,10 +1881,29 @@ type MatadataServiceServer interface {
 	RetrieveFile(context.Context, *RetrieveFileReq) (*RetrieveFileResp, error)
 	Remove(context.Context, *RemoveReq) (*RemoveResp, error)
 	Move(context.Context, *MoveReq) (*MoveResp, error)
+	SpaceSysFile(context.Context, *SpaceSysFileReq) (*SpaceSysFileResp, error)
 }
 
 func RegisterMatadataServiceServer(s *grpc.Server, srv MatadataServiceServer) {
 	s.RegisterService(&_MatadataService_serviceDesc, srv)
+}
+
+func _MatadataService_GetPublicKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPublicKeyReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MatadataServiceServer).GetPublicKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/metadata.pb.MatadataService/GetPublicKey",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MatadataServiceServer).GetPublicKey(ctx, req.(*GetPublicKeyReq))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _MatadataService_MkFolder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -1802,10 +2050,32 @@ func _MatadataService_Move_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MatadataService_SpaceSysFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SpaceSysFileReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MatadataServiceServer).SpaceSysFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/metadata.pb.MatadataService/SpaceSysFile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MatadataServiceServer).SpaceSysFile(ctx, req.(*SpaceSysFileReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _MatadataService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "metadata.pb.MatadataService",
 	HandlerType: (*MatadataServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetPublicKey",
+			Handler:    _MatadataService_GetPublicKey_Handler,
+		},
 		{
 			MethodName: "MkFolder",
 			Handler:    _MatadataService_MkFolder_Handler,
@@ -1838,6 +2108,10 @@ var _MatadataService_serviceDesc = grpc.ServiceDesc{
 			MethodName: "Move",
 			Handler:    _MatadataService_Move_Handler,
 		},
+		{
+			MethodName: "SpaceSysFile",
+			Handler:    _MatadataService_SpaceSysFile_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "metadata.proto",
@@ -1846,95 +2120,106 @@ var _MatadataService_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("metadata.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 1433 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe4, 0x58, 0xcd, 0x8f, 0xdb, 0x44,
-	0x14, 0x5f, 0x27, 0x4e, 0xd6, 0x7e, 0xf9, 0x68, 0x76, 0xb4, 0xdd, 0xba, 0xa1, 0x2d, 0xc1, 0x07,
-	0x14, 0xb5, 0x6a, 0x05, 0x5b, 0x51, 0x4a, 0x41, 0x2a, 0xfd, 0xd8, 0xaa, 0x48, 0xa4, 0x5d, 0x4d,
-	0x0a, 0xe2, 0xc0, 0xc5, 0xb5, 0x67, 0x37, 0xd6, 0x26, 0xb1, 0x3b, 0x9e, 0x84, 0xb6, 0x07, 0xfe,
-	0x00, 0x0e, 0xdc, 0x91, 0x90, 0x38, 0x81, 0x38, 0x80, 0xc4, 0x89, 0x13, 0x7f, 0x09, 0x77, 0x8e,
-	0xfc, 0x03, 0x9c, 0xd0, 0x8c, 0xc7, 0xf6, 0x8c, 0xe3, 0x76, 0xd9, 0xaa, 0x2b, 0xad, 0xc4, 0x6d,
-	0xde, 0x9b, 0x37, 0x33, 0xef, 0xe3, 0xf7, 0x3e, 0x6c, 0xe8, 0xce, 0x08, 0xf3, 0x02, 0x8f, 0x79,
-	0x57, 0x62, 0x1a, 0xb1, 0x08, 0xb5, 0x0a, 0xfa, 0xb1, 0xfb, 0xa7, 0x01, 0xad, 0xd1, 0xc1, 0xbd,
-	0x68, 0x1a, 0x10, 0x8a, 0xc9, 0x13, 0xe4, 0xc0, 0xfa, 0x92, 0xd0, 0x24, 0x8c, 0xe6, 0x8e, 0x31,
-	0x30, 0x86, 0x1d, 0x9c, 0x91, 0x68, 0x0b, 0x9a, 0xf3, 0x28, 0x20, 0x9f, 0x04, 0x4e, 0x6d, 0x60,
-	0x0c, 0xdb, 0x58, 0x52, 0xe8, 0x1c, 0xd8, 0x2c, 0x9c, 0x91, 0x84, 0x79, 0xb3, 0xd8, 0xa9, 0x0f,
-	0x8c, 0xa1, 0x89, 0x0b, 0x06, 0xba, 0x0c, 0xcd, 0xd8, 0xa3, 0x64, 0xce, 0x1c, 0x73, 0x60, 0x0c,
-	0x5b, 0xdb, 0xa7, 0xaf, 0x28, 0xaf, 0x5f, 0xb9, 0x17, 0x4e, 0xc9, 0xae, 0xc7, 0x26, 0x58, 0x0a,
-	0xf1, 0x47, 0xf6, 0x84, 0x2e, 0x4e, 0x63, 0x50, 0x1f, 0xda, 0x58, 0x52, 0x68, 0x00, 0xad, 0x70,
-	0xce, 0x08, 0xf5, 0x7c, 0x16, 0x2e, 0x89, 0xd3, 0x1c, 0x18, 0x43, 0x0b, 0xab, 0x2c, 0x84, 0xc0,
-	0x4c, 0xc2, 0xfd, 0xb9, 0xb3, 0x2e, 0x94, 0x13, 0x6b, 0xf7, 0x26, 0x58, 0xd9, 0x0b, 0x68, 0x13,
-	0xcc, 0xd8, 0x63, 0x13, 0x61, 0x95, 0x7d, 0x7f, 0x0d, 0x0b, 0x0a, 0xf5, 0xa0, 0x16, 0x4a, 0x83,
-	0xee, 0xaf, 0xe1, 0x5a, 0x18, 0xdc, 0x6e, 0x81, 0x1d, 0xcd, 0xc9, 0xc3, 0x3d, 0x7e, 0xc8, 0xbd,
-	0x01, 0xed, 0xc2, 0x39, 0x49, 0xcc, 0x1f, 0xf1, 0xa3, 0x80, 0x48, 0xd7, 0x88, 0x35, 0x57, 0x99,
-	0x50, 0x3a, 0x4a, 0xf6, 0xc5, 0x35, 0x36, 0x96, 0x94, 0xfb, 0x4f, 0x0d, 0x36, 0xee, 0x4c, 0x88,
-	0x7f, 0xc0, 0x55, 0xd8, 0x79, 0x1a, 0x26, 0xec, 0x04, 0xf8, 0xb7, 0x0f, 0xd6, 0x5e, 0x38, 0x25,
-	0xf7, 0xbd, 0x64, 0xe2, 0x34, 0xc4, 0x33, 0x39, 0x9d, 0xed, 0x8d, 0xc3, 0xe7, 0xa9, 0x83, 0x4d,
-	0x9c, 0xd3, 0xd9, 0xde, 0x03, 0x6f, 0x46, 0x84, 0x87, 0x6d, 0x9c, 0xd3, 0x3c, 0x36, 0x7c, 0x3d,
-	0x8a, 0x82, 0x47, 0xe1, 0x8c, 0x38, 0x96, 0x38, 0xaa, 0xb2, 0xb2, 0xd3, 0x77, 0x3d, 0xe6, 0x39,
-	0x76, 0xf1, 0x2a, 0xa7, 0xcb, 0x91, 0x85, 0xd5, 0xc8, 0x5e, 0x00, 0x98, 0x93, 0xaf, 0x3e, 0x97,
-	0x5e, 0x6b, 0x09, 0x01, 0x85, 0x93, 0x47, 0xbe, 0xad, 0x44, 0xfe, 0x97, 0x1a, 0xa0, 0xb2, 0xf3,
-	0x8f, 0x16, 0x3f, 0x74, 0x1d, 0xec, 0x84, 0x45, 0x94, 0x3c, 0x7a, 0x16, 0x13, 0xe1, 0xf7, 0xee,
-	0x76, 0x7f, 0xc5, 0xb9, 0xe3, 0x4c, 0x02, 0x17, 0xc2, 0xe8, 0x6d, 0xe8, 0x72, 0x99, 0xdd, 0x90,
-	0xf8, 0xe4, 0x4e, 0xb4, 0x90, 0xb1, 0xe9, 0xe0, 0x12, 0x17, 0x5d, 0x84, 0xde, 0x92, 0xd0, 0x70,
-	0xef, 0x99, 0x22, 0xd9, 0x10, 0x92, 0x2b, 0x7c, 0xe4, 0x42, 0x9b, 0x92, 0x78, 0x1a, 0xfa, 0x5e,
-	0x2a, 0xd7, 0x14, 0x72, 0x1a, 0x0f, 0x5d, 0x07, 0x2b, 0xa6, 0xd1, 0x32, 0xe4, 0xe9, 0xb3, 0x3e,
-	0xa8, 0x0f, 0x5b, 0xdb, 0xe7, 0x34, 0x85, 0x71, 0x2a, 0xbc, 0x2b, 0x65, 0x70, 0x2e, 0xed, 0xfe,
-	0x60, 0xc0, 0xa9, 0xd2, 0xae, 0x82, 0x47, 0x43, 0xc3, 0xe3, 0x16, 0x34, 0x13, 0x42, 0x97, 0x84,
-	0x66, 0xfe, 0x4a, 0x29, 0xee, 0xdb, 0x38, 0xa2, 0x4c, 0xb8, 0xaa, 0x83, 0xc5, 0x5a, 0xc7, 0xae,
-	0x59, 0xc6, 0xee, 0x16, 0x34, 0x59, 0xe8, 0x1f, 0x90, 0xd4, 0x6a, 0x1b, 0x4b, 0x8a, 0xdf, 0xe4,
-	0x2d, 0xd8, 0x44, 0xd8, 0xd8, 0xc6, 0x62, 0xed, 0xfe, 0x6d, 0xc0, 0xe6, 0x67, 0xf1, 0x34, 0xf2,
-	0x02, 0x81, 0x69, 0x4a, 0x38, 0xa0, 0x8f, 0x23, 0xa1, 0xd4, 0x0c, 0x31, 0x5f, 0x92, 0x21, 0x8d,
-	0x52, 0x86, 0x7c, 0x00, 0x76, 0xec, 0x51, 0x16, 0x32, 0xae, 0x49, 0x53, 0x78, 0xff, 0x0d, 0xcd,
-	0xfb, 0xe3, 0x78, 0x1a, 0xb2, 0xdd, 0x4c, 0x04, 0x17, 0xd2, 0x95, 0xa5, 0x6b, 0x07, 0xba, 0xfa,
-	0x01, 0x74, 0x15, 0x1a, 0x31, 0xc7, 0x83, 0x63, 0x88, 0xcb, 0xcf, 0x6b, 0x97, 0x0b, 0xa4, 0x70,
-	0x1d, 0x6f, 0xcd, 0x03, 0xae, 0x0e, 0x4e, 0x65, 0xdd, 0x1b, 0xd0, 0x2b, 0x6f, 0xf1, 0xe7, 0x26,
-	0xdc, 0xba, 0x34, 0xac, 0x62, 0x9d, 0xaa, 0xf0, 0x9c, 0x08, 0x4f, 0x75, 0xb0, 0x58, 0xbb, 0x5f,
-	0xc0, 0xe9, 0x0a, 0x8f, 0x27, 0x31, 0xba, 0xa9, 0x9a, 0x9a, 0x6a, 0xf3, 0x96, 0xa6, 0xcd, 0x0e,
-	0xf5, 0x92, 0x05, 0x25, 0x77, 0xa2, 0x80, 0x54, 0x19, 0xec, 0x3e, 0x85, 0xcd, 0x2a, 0x11, 0x74,
-	0x1b, 0xda, 0x19, 0x24, 0x6f, 0x2d, 0x44, 0xad, 0xe6, 0x77, 0x5f, 0xd0, 0xee, 0xbe, 0x3d, 0x8d,
-	0xfc, 0x83, 0x5d, 0x45, 0x0a, 0x6b, 0x67, 0xf4, 0xe8, 0xd6, 0x4a, 0xd1, 0x75, 0x7f, 0x34, 0x60,
-	0x63, 0xe5, 0x86, 0xd7, 0x02, 0xf5, 0x4d, 0x68, 0x24, 0xdc, 0x43, 0x02, 0x34, 0x16, 0x4e, 0x09,
-	0x74, 0x0d, 0x2c, 0xee, 0x5f, 0x61, 0x4d, 0x43, 0x58, 0xd3, 0x7f, 0x41, 0xdc, 0xb8, 0x25, 0xb9,
-	0xac, 0xeb, 0x43, 0x47, 0xdb, 0xfa, 0xaf, 0x41, 0x53, 0x72, 0xaa, 0x5e, 0x99, 0x53, 0xa6, 0x92,
-	0x53, 0xdf, 0xd5, 0x61, 0xa3, 0x88, 0xf0, 0xdd, 0x68, 0x4e, 0xfe, 0xb7, 0x1d, 0x4a, 0xcb, 0x5e,
-	0xbb, 0x2a, 0x7b, 0x79, 0x75, 0xaf, 0xcc, 0xde, 0xe3, 0x69, 0x60, 0x37, 0xa1, 0xab, 0x3f, 0x89,
-	0x2e, 0x43, 0xe3, 0x31, 0x47, 0xae, 0xcc, 0x8a, 0x33, 0xab, 0xea, 0x09, 0x60, 0xe3, 0x54, 0xca,
-	0xfd, 0xd6, 0x00, 0x28, 0xb8, 0x87, 0xe2, 0xc7, 0x94, 0xf8, 0xe9, 0x83, 0x25, 0xce, 0x8f, 0xc9,
-	0x13, 0x09, 0xef, 0x9c, 0xe6, 0x7b, 0x3e, 0xef, 0xa9, 0xc9, 0x62, 0x26, 0x51, 0x9e, 0xd3, 0xdc,
-	0x0b, 0xa2, 0x01, 0x3e, 0x48, 0x01, 0xc2, 0xb1, 0xde, 0xc6, 0x2a, 0xcb, 0xfd, 0x18, 0x50, 0x19,
-	0x6c, 0x47, 0x9c, 0xa8, 0x7e, 0xaa, 0x41, 0xfb, 0xd3, 0x30, 0x61, 0xfc, 0x82, 0xe4, 0x64, 0x40,
-	0x35, 0xf6, 0xf6, 0x8b, 0x76, 0xd0, 0xc1, 0x39, 0xcd, 0x55, 0xe3, 0xeb, 0x07, 0x8b, 0x99, 0x6c,
-	0xd5, 0x19, 0x89, 0xde, 0x05, 0x2b, 0x89, 0x28, 0x13, 0x63, 0xc5, 0xba, 0x18, 0x2b, 0xf4, 0x67,
-	0xc6, 0x72, 0x13, 0xe7, 0x62, 0xfc, 0x21, 0x2f, 0xf1, 0x1f, 0x52, 0xde, 0xd8, 0xad, 0xd4, 0xf1,
-	0x19, 0x9d, 0x83, 0xc7, 0x56, 0xc0, 0xf3, 0x8d, 0x01, 0x1d, 0xc5, 0x51, 0x47, 0x1c, 0x7c, 0x06,
-	0xd0, 0x62, 0x11, 0xf3, 0xa6, 0x98, 0xf8, 0x11, 0x0d, 0x24, 0x0a, 0x54, 0x16, 0xba, 0x04, 0xf5,
-	0xbd, 0x68, 0xcf, 0x31, 0x05, 0x10, 0xcf, 0xae, 0x38, 0xe9, 0x21, 0x95, 0x23, 0x33, 0x97, 0x72,
-	0xbf, 0x37, 0xa0, 0xad, 0x72, 0x51, 0x57, 0xcc, 0xdc, 0x29, 0x10, 0x6b, 0x61, 0xa0, 0xcc, 0xfc,
-	0x35, 0x61, 0x5b, 0x36, 0xf3, 0x23, 0x30, 0xe7, 0x3c, 0x9b, 0xd3, 0x42, 0x26, 0xd6, 0xdc, 0xad,
-	0x33, 0x99, 0xc5, 0xe9, 0x38, 0x91, 0x91, 0xaf, 0x5a, 0x37, 0xdc, 0x5f, 0xc5, 0xe8, 0xc3, 0x68,
-	0x48, 0x96, 0x84, 0xab, 0x79, 0x92, 0x66, 0x8a, 0x2c, 0xb6, 0x4d, 0x25, 0xb6, 0xbf, 0x1b, 0xd0,
-	0xd3, 0xf5, 0x3d, 0x62, 0x78, 0xd5, 0x61, 0xbc, 0x5e, 0x1a, 0xc6, 0x3f, 0x52, 0xcb, 0xa0, 0x59,
-	0xd1, 0x7d, 0xb3, 0x97, 0x2b, 0x2b, 0xa1, 0xe6, 0x84, 0x46, 0xb9, 0xf5, 0xee, 0xc0, 0xc6, 0xca,
-	0x69, 0xf4, 0x8e, 0x5e, 0xd4, 0xfa, 0x95, 0x8f, 0x69, 0x75, 0xed, 0x67, 0x03, 0x3a, 0xda, 0xc6,
-	0xb1, 0x97, 0xb6, 0xf7, 0xe5, 0x87, 0x00, 0xaf, 0x63, 0xb2, 0x89, 0x9f, 0xad, 0xd4, 0x93, 0x0b,
-	0xe0, 0x42, 0xd6, 0xfd, 0x1a, 0xda, 0xea, 0xd6, 0x6b, 0x19, 0x33, 0x8a, 0xfe, 0x6e, 0x56, 0xf6,
-	0xf7, 0x86, 0xd2, 0xdf, 0xff, 0x30, 0xc0, 0xc6, 0x64, 0x16, 0x2d, 0x8f, 0xab, 0xaf, 0x33, 0x8f,
-	0xee, 0x93, 0xc3, 0x8a, 0x65, 0x2a, 0xc4, 0x2f, 0xa3, 0xc4, 0x5f, 0xd0, 0x84, 0x37, 0xc9, 0x86,
-	0x70, 0x71, 0xc1, 0xa8, 0x44, 0xfa, 0x75, 0x80, 0x4c, 0xfb, 0x23, 0x36, 0x8a, 0xdf, 0x0c, 0x58,
-	0x1f, 0x1d, 0x9f, 0xd9, 0x49, 0xb4, 0xa0, 0x3e, 0x39, 0xc4, 0xec, 0x54, 0x88, 0xab, 0x1d, 0x90,
-	0x24, 0xfb, 0xc2, 0x11, 0xeb, 0xca, 0x92, 0x7d, 0x0d, 0xac, 0xd1, 0x2b, 0x98, 0x7a, 0x71, 0x1b,
-	0x3a, 0xda, 0x77, 0x28, 0x3a, 0x05, 0x2d, 0x65, 0xb6, 0xee, 0xad, 0xa1, 0x1e, 0xb4, 0x47, 0x8b,
-	0x29, 0x0b, 0xe5, 0xf7, 0x5d, 0xcf, 0xb8, 0x78, 0x09, 0xac, 0xac, 0xc9, 0x20, 0x0b, 0x4c, 0x3e,
-	0x22, 0xf5, 0xd6, 0x50, 0x8b, 0xfb, 0x4c, 0xd4, 0xd2, 0x9e, 0xc1, 0xd9, 0xbc, 0x02, 0xf5, 0x6a,
-	0xdb, 0x7f, 0x99, 0x70, 0x6a, 0xe4, 0xa5, 0x16, 0x8e, 0x09, 0x5d, 0x86, 0x3e, 0x41, 0xb7, 0xc0,
-	0xca, 0x7e, 0x8b, 0x20, 0x47, 0xb3, 0x5f, 0xf9, 0x95, 0xd4, 0x3f, 0xfb, 0x82, 0x9d, 0x24, 0x76,
-	0xd7, 0xd0, 0x18, 0xba, 0xfa, 0xf7, 0x39, 0xd2, 0x0b, 0xcd, 0xca, 0x9f, 0x93, 0xfe, 0x9b, 0x2f,
-	0xdd, 0x17, 0x97, 0x7e, 0xa9, 0xce, 0xb3, 0xf2, 0x8b, 0x05, 0xe9, 0x9f, 0x26, 0x55, 0xdf, 0x90,
-	0x7d, 0xf7, 0x30, 0x91, 0x4c, 0x65, 0x7d, 0x80, 0x29, 0xa9, 0xbc, 0x32, 0x4a, 0x97, 0x54, 0x5e,
-	0x9d, 0x7e, 0xdc, 0x35, 0x74, 0x17, 0xec, 0xbc, 0x53, 0x23, 0xdd, 0x63, 0xea, 0xa8, 0xd3, 0xef,
-	0xbf, 0x68, 0x4b, 0xdc, 0x32, 0x2a, 0x2a, 0x0d, 0x67, 0xa3, 0x73, 0x95, 0xf5, 0x49, 0xb6, 0xb7,
-	0xfe, 0xf9, 0x97, 0xec, 0x8a, 0xeb, 0x3e, 0x84, 0x66, 0x9a, 0x79, 0x68, 0xab, 0x24, 0x2a, 0x8b,
-	0x49, 0xff, 0x4c, 0x25, 0x5f, 0x1c, 0x7e, 0x0f, 0x4c, 0x8e, 0x64, 0xb4, 0xa9, 0x87, 0x5f, 0x1e,
-	0x3c, 0x5d, 0xc1, 0xe5, 0xc7, 0x1e, 0x37, 0xc5, 0xcf, 0xc9, 0xab, 0xff, 0x06, 0x00, 0x00, 0xff,
-	0xff, 0x2d, 0xbe, 0xbb, 0xc1, 0xae, 0x14, 0x00, 0x00,
+	// 1604 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x58, 0x4f, 0x6f, 0x1c, 0xc5,
+	0x12, 0xdf, 0xd9, 0x9d, 0x5d, 0xef, 0xd6, 0xfe, 0xf1, 0xba, 0xe5, 0x38, 0x93, 0x7d, 0x89, 0xdf,
+	0xbe, 0xd1, 0x53, 0x64, 0x25, 0x4a, 0x04, 0x8e, 0x08, 0x21, 0x20, 0x85, 0xfc, 0x71, 0x08, 0x82,
+	0x75, 0xac, 0xde, 0x10, 0x09, 0x89, 0xcb, 0x78, 0xb6, 0x6d, 0x8f, 0xbc, 0xbb, 0x33, 0xe9, 0x99,
+	0x5d, 0xe2, 0x1c, 0xb8, 0x70, 0xe3, 0x00, 0x1f, 0x81, 0x13, 0x88, 0x23, 0x27, 0xc4, 0x81, 0x3b,
+	0xdf, 0x01, 0xf1, 0x15, 0xb8, 0xe4, 0xca, 0x05, 0x55, 0xcf, 0xbf, 0xee, 0x99, 0x89, 0x8d, 0xa3,
+	0x2c, 0xca, 0x81, 0x5b, 0x57, 0x75, 0x75, 0x77, 0x55, 0xf5, 0xaf, 0xaa, 0xab, 0x1a, 0x3a, 0x13,
+	0x16, 0x58, 0x23, 0x2b, 0xb0, 0xae, 0x7a, 0xdc, 0x0d, 0x5c, 0xd2, 0x4c, 0xe9, 0x5d, 0xf3, 0x32,
+	0x2c, 0x7f, 0xc0, 0x82, 0x9d, 0xd9, 0xee, 0xd8, 0xb1, 0x3f, 0x62, 0x47, 0x94, 0x3d, 0x21, 0x06,
+	0x2c, 0xcd, 0x19, 0xf7, 0x1d, 0x77, 0x6a, 0x68, 0x7d, 0x6d, 0xa3, 0x4d, 0x63, 0xd2, 0x7c, 0x0c,
+	0x5d, 0x55, 0xd8, 0xf7, 0xc8, 0x79, 0x68, 0x78, 0x31, 0x43, 0xc8, 0xb7, 0x68, 0xca, 0x20, 0xff,
+	0x87, 0x76, 0x42, 0x3c, 0xb0, 0xfc, 0x03, 0xa3, 0x2c, 0x24, 0x54, 0xa6, 0xf9, 0x9b, 0x06, 0xcd,
+	0xc1, 0xe1, 0x7d, 0x77, 0x3c, 0x62, 0xfc, 0x58, 0x0d, 0xc8, 0x1a, 0xd4, 0xa6, 0xee, 0x88, 0x7d,
+	0x38, 0x8a, 0x36, 0x8a, 0x28, 0xd4, 0x22, 0x70, 0x26, 0xcc, 0x0f, 0xac, 0x89, 0x67, 0x54, 0xfa,
+	0xda, 0x86, 0x4e, 0x53, 0x06, 0xb9, 0x02, 0x35, 0xcf, 0xe2, 0x6c, 0x1a, 0x18, 0x7a, 0x5f, 0xdb,
+	0x68, 0x6e, 0x9e, 0xb9, 0x2a, 0xb9, 0xe0, 0xea, 0x7d, 0x67, 0xcc, 0x76, 0xac, 0xe0, 0x80, 0x46,
+	0x42, 0x78, 0xc8, 0x9e, 0xd0, 0xc5, 0xa8, 0xf6, 0x2b, 0x1b, 0x0d, 0x1a, 0x51, 0xa4, 0x0f, 0x4d,
+	0x67, 0x1a, 0x30, 0x6e, 0xd9, 0x81, 0x33, 0x67, 0x46, 0xad, 0xaf, 0x6d, 0xd4, 0xa9, 0xcc, 0x22,
+	0x04, 0x74, 0xdf, 0xd9, 0x9f, 0x1a, 0x4b, 0x42, 0x39, 0x31, 0x36, 0x3f, 0x85, 0x7a, 0x7c, 0x02,
+	0x59, 0x05, 0xdd, 0xb3, 0x82, 0x03, 0x61, 0x55, 0xe3, 0x41, 0x89, 0x0a, 0x8a, 0x74, 0xa1, 0xec,
+	0x44, 0x06, 0x3d, 0x28, 0xd1, 0xb2, 0x33, 0x42, 0x07, 0xf8, 0x9e, 0x65, 0xb3, 0x6d, 0x57, 0x18,
+	0xd3, 0xa6, 0x31, 0x79, 0xa7, 0x09, 0x0d, 0x77, 0xca, 0x1e, 0xee, 0xe1, 0x76, 0xe6, 0x4d, 0x68,
+	0xa5, 0x6e, 0xf3, 0x3d, 0x3c, 0xde, 0x76, 0x47, 0x2c, 0x72, 0x9a, 0x18, 0xa3, 0x31, 0x8c, 0xf3,
+	0x81, 0xbf, 0x2f, 0x0e, 0x68, 0xd0, 0x88, 0x32, 0x7f, 0xaf, 0xc0, 0xca, 0xdd, 0x03, 0x66, 0x1f,
+	0xa2, 0x72, 0x5b, 0x4f, 0x1d, 0x3f, 0x78, 0x0d, 0x3c, 0xdf, 0x83, 0xfa, 0x9e, 0x33, 0x66, 0x02,
+	0x29, 0x55, 0x71, 0x4c, 0x42, 0xc7, 0x73, 0x43, 0xe7, 0x59, 0xe8, 0x7a, 0x9d, 0x26, 0x74, 0x3c,
+	0xf7, 0xe8, 0xc8, 0x63, 0xc2, 0xf7, 0x0d, 0x9a, 0xd0, 0x64, 0x1d, 0x80, 0x4d, 0x6d, 0x7e, 0xe4,
+	0x05, 0x88, 0xd0, 0xba, 0xd8, 0x55, 0xe2, 0xe4, 0x21, 0xda, 0x28, 0x80, 0x68, 0x7c, 0xc2, 0xb6,
+	0x35, 0x61, 0x06, 0xa4, 0x27, 0x20, 0x8d, 0xb8, 0xc0, 0xf1, 0xc0, 0x1d, 0x3d, 0x72, 0x26, 0xcc,
+	0x68, 0x0a, 0xe5, 0x64, 0x56, 0xbc, 0xfa, 0x9e, 0x15, 0x58, 0x46, 0x2b, 0xb5, 0x0b, 0xe9, 0x2c,
+	0xaa, 0xda, 0x79, 0x54, 0xad, 0x03, 0x4c, 0xd9, 0xe7, 0x8f, 0xa3, 0x7b, 0xe9, 0x08, 0x01, 0x89,
+	0x93, 0xa0, 0x6e, 0x59, 0x42, 0xdd, 0x73, 0x0d, 0x48, 0xf6, 0x7a, 0x4f, 0x87, 0x10, 0x72, 0x03,
+	0x1a, 0x7e, 0xe0, 0xf2, 0xd0, 0xab, 0x78, 0xb3, 0x9d, 0xcd, 0x5e, 0xee, 0xfa, 0x86, 0xb1, 0x04,
+	0x4d, 0x85, 0xc9, 0x45, 0xe8, 0xa0, 0xcc, 0x8e, 0xc3, 0x6c, 0x76, 0xd7, 0x9d, 0x45, 0xb7, 0xdf,
+	0xa6, 0x19, 0x2e, 0xb9, 0x04, 0xdd, 0x39, 0xe3, 0xce, 0xde, 0x91, 0x24, 0x59, 0x15, 0x92, 0x39,
+	0x3e, 0x31, 0xa1, 0xc5, 0x99, 0x37, 0x76, 0x6c, 0x2b, 0x94, 0xab, 0x09, 0x39, 0x85, 0x67, 0xfe,
+	0xa1, 0xc1, 0xea, 0x27, 0xde, 0xd8, 0xb5, 0x46, 0x02, 0x59, 0x9c, 0x21, 0xac, 0x16, 0x01, 0x6b,
+	0x19, 0xa7, 0xfa, 0x31, 0x38, 0xad, 0x66, 0x70, 0xfa, 0x0e, 0x34, 0x3c, 0x8b, 0x07, 0x4e, 0x80,
+	0x9a, 0xd4, 0xfa, 0x95, 0x8d, 0xe6, 0xe6, 0x7f, 0x14, 0x97, 0x0e, 0xbd, 0xb1, 0x13, 0xec, 0xc4,
+	0x22, 0x34, 0x95, 0x2e, 0x4c, 0x2d, 0x5b, 0xd0, 0x51, 0x17, 0x90, 0x6b, 0x50, 0xf5, 0xd0, 0x67,
+	0x86, 0x26, 0x36, 0xbf, 0xa0, 0x6c, 0x2e, 0xbc, 0x89, 0x3a, 0xde, 0x9e, 0x8e, 0x50, 0x1d, 0x1a,
+	0xca, 0x9a, 0x37, 0xa1, 0x9b, 0x9d, 0xc2, 0xe3, 0x0e, 0xd0, 0xba, 0x30, 0xa3, 0x8b, 0x71, 0xa8,
+	0xc2, 0x33, 0x26, 0x3c, 0xd5, 0xa6, 0x62, 0x6c, 0xfe, 0xa4, 0xc1, 0x99, 0x02, 0x97, 0xfb, 0x1e,
+	0xb9, 0x25, 0xdb, 0x1a, 0xaa, 0xf3, 0x3f, 0x45, 0x9d, 0x2d, 0x6e, 0xf9, 0x33, 0xce, 0xee, 0xba,
+	0x23, 0x56, 0x68, 0xf1, 0x0d, 0xa8, 0x7b, 0xdc, 0x9d, 0x3b, 0x98, 0x88, 0xcb, 0x62, 0xfd, 0x79,
+	0x65, 0x3d, 0x0d, 0xaf, 0x7e, 0x27, 0x92, 0xa1, 0x89, 0x74, 0x0e, 0x2b, 0x95, 0x02, 0xac, 0x7c,
+	0xab, 0xc1, 0x72, 0x66, 0x07, 0x09, 0x0c, 0x9a, 0x02, 0x86, 0x35, 0xa8, 0xf9, 0x8c, 0xcf, 0x85,
+	0x1e, 0x22, 0x42, 0x42, 0x0a, 0x1d, 0xe2, 0xb9, 0x3c, 0xde, 0x5f, 0x8c, 0x55, 0xe0, 0xe8, 0x59,
+	0xe0, 0xac, 0x41, 0x2d, 0x70, 0xec, 0x43, 0x16, 0xe2, 0xbc, 0x41, 0x23, 0x0a, 0x77, 0xb2, 0x66,
+	0xc1, 0x81, 0x40, 0x75, 0x8b, 0x8a, 0xb1, 0xf9, 0x14, 0x56, 0x8b, 0x5c, 0x44, 0xee, 0x40, 0x2b,
+	0xb6, 0xf4, 0xf6, 0x4c, 0x3c, 0x26, 0xe8, 0x9b, 0x75, 0xc5, 0x37, 0x77, 0xc6, 0xae, 0x7d, 0xb8,
+	0x23, 0x49, 0x51, 0x65, 0x8d, 0xaa, 0x65, 0x39, 0xa3, 0xa5, 0xf9, 0x9d, 0x06, 0x2b, 0xb9, 0x1d,
+	0x5e, 0x89, 0x77, 0x56, 0xa1, 0xea, 0x23, 0x42, 0x84, 0x67, 0xea, 0x34, 0x24, 0xc8, 0x75, 0xa8,
+	0x23, 0xc0, 0x84, 0x35, 0x55, 0x61, 0x4d, 0xef, 0x05, 0xc0, 0x45, 0x4b, 0x12, 0x59, 0xd3, 0x86,
+	0xb6, 0x32, 0xf5, 0x77, 0x51, 0x2b, 0x5d, 0x43, 0xa5, 0xf0, 0x1a, 0x74, 0xe9, 0x1a, 0xfe, 0xac,
+	0xc0, 0x4a, 0x8a, 0xf0, 0x7b, 0xee, 0x94, 0xfd, 0xfb, 0x50, 0x2e, 0xec, 0xa1, 0x54, 0x12, 0x64,
+	0xab, 0x28, 0x41, 0xe2, 0x23, 0x53, 0x98, 0x2e, 0x16, 0xf3, 0x8e, 0xde, 0x82, 0x8e, 0x7a, 0x24,
+	0xb9, 0x02, 0xd5, 0x5d, 0x8c, 0x8d, 0x28, 0xee, 0xce, 0xe6, 0xd5, 0x13, 0xa1, 0x43, 0x43, 0x29,
+	0xf3, 0x6b, 0x0d, 0x20, 0xe5, 0x9e, 0x88, 0x50, 0x3d, 0x42, 0x68, 0x0f, 0xea, 0x62, 0xfd, 0x90,
+	0x3d, 0x89, 0x02, 0x28, 0xa1, 0x71, 0xce, 0xc6, 0xa7, 0xdd, 0x9f, 0x4d, 0xa2, 0x38, 0x4a, 0x68,
+	0xf4, 0x82, 0x78, 0x87, 0xb7, 0x43, 0x08, 0x62, 0x34, 0xb5, 0xa8, 0xcc, 0x32, 0xdf, 0x07, 0x92,
+	0x85, 0xf3, 0x29, 0x4b, 0xc7, 0xef, 0xcb, 0xd0, 0xfa, 0xd8, 0xf1, 0x03, 0xdc, 0xc0, 0x7f, 0x3d,
+	0x82, 0xc1, 0xb3, 0xf6, 0xd3, 0x17, 0xb7, 0x4d, 0x13, 0x1a, 0x55, 0xc3, 0xf1, 0xf6, 0x6c, 0x12,
+	0x55, 0x0c, 0x31, 0x49, 0xde, 0x84, 0xba, 0xef, 0xf2, 0x20, 0x09, 0x85, 0x4e, 0xe6, 0x98, 0x61,
+	0x34, 0x49, 0x13, 0x31, 0x3c, 0xc8, 0xf2, 0xed, 0x87, 0x1c, 0x5f, 0xa4, 0x7a, 0xe8, 0xf8, 0x98,
+	0x4e, 0xc0, 0xd3, 0x90, 0xc0, 0xf3, 0x95, 0x06, 0x6d, 0xc9, 0x51, 0xa7, 0xac, 0xbf, 0xfa, 0xd0,
+	0x0c, 0xdc, 0xc0, 0x1a, 0x53, 0x66, 0xbb, 0x7c, 0x14, 0xa1, 0x40, 0x66, 0x91, 0xcb, 0x50, 0xd9,
+	0x73, 0xf7, 0x0c, 0x5d, 0x00, 0xf1, 0x5c, 0xce, 0x49, 0x0f, 0x79, 0xd4, 0x1b, 0xa0, 0x94, 0xf9,
+	0xb3, 0x06, 0x2d, 0x99, 0x4b, 0x3a, 0xa2, 0xed, 0x08, 0x81, 0x88, 0x4d, 0x47, 0xda, 0xf6, 0x94,
+	0x85, 0x6d, 0x71, 0xdb, 0x43, 0x40, 0x9f, 0x62, 0x34, 0x87, 0xa9, 0x52, 0x8c, 0xd1, 0xad, 0x93,
+	0x28, 0x8a, 0xc3, 0x37, 0x2e, 0x26, 0x17, 0x91, 0x99, 0xcc, 0x5f, 0xc5, 0x5b, 0x1d, 0x70, 0x87,
+	0xcd, 0x19, 0x9a, 0xb0, 0x08, 0xcc, 0x49, 0x2d, 0x97, 0xae, 0xb4, 0x5c, 0x2f, 0x6d, 0x51, 0x51,
+	0xc5, 0xf6, 0x5c, 0x83, 0xae, 0x6a, 0xc9, 0x29, 0x41, 0x21, 0x77, 0x12, 0x95, 0x4c, 0x27, 0x21,
+	0xbb, 0x50, 0x3f, 0x36, 0xb9, 0x57, 0x73, 0xc9, 0xfd, 0xbd, 0x7c, 0x65, 0xba, 0x9e, 0xa9, 0xb6,
+	0x42, 0xad, 0x0b, 0x73, 0xaf, 0xe2, 0xda, 0xa5, 0x6c, 0x39, 0xb1, 0x05, 0x2b, 0xb9, 0xd5, 0xe4,
+	0x0d, 0x35, 0x8d, 0xf6, 0x0a, 0x0f, 0x53, 0x32, 0xe9, 0x0f, 0x1a, 0xb4, 0x95, 0x89, 0x85, 0x27,
+	0xd3, 0xb7, 0xa3, 0x0e, 0x08, 0x33, 0x67, 0x54, 0x98, 0x9c, 0x2b, 0xd4, 0x13, 0x05, 0x68, 0x2a,
+	0x6b, 0x7e, 0x01, 0x2d, 0x79, 0xea, 0x95, 0x94, 0x4e, 0x69, 0xcd, 0xa2, 0x17, 0xd6, 0x2c, 0x55,
+	0xa9, 0x66, 0xf9, 0x45, 0x83, 0x06, 0x65, 0x13, 0x77, 0xbe, 0xa8, 0x5a, 0x25, 0xb0, 0xf8, 0x3e,
+	0x3b, 0x29, 0x3d, 0x87, 0x42, 0xb8, 0x19, 0x67, 0xf6, 0x8c, 0xfb, 0xf8, 0x2c, 0x57, 0x85, 0x8b,
+	0x53, 0x46, 0x12, 0x25, 0x35, 0x29, 0x4a, 0x6e, 0x00, 0xc4, 0xda, 0x9f, 0xf2, 0x69, 0xfa, 0x51,
+	0x83, 0xa5, 0xc1, 0xe2, 0xcc, 0xf6, 0xdd, 0x19, 0xb7, 0xd9, 0x09, 0x66, 0x87, 0x42, 0xa8, 0xf6,
+	0x88, 0xf9, 0x71, 0xa1, 0x2f, 0xc6, 0x85, 0x8f, 0xc4, 0x75, 0xa8, 0x0f, 0x5e, 0xc6, 0xd4, 0x6f,
+	0x34, 0x58, 0x1e, 0x62, 0x8a, 0x1a, 0x1e, 0xf9, 0xff, 0x7c, 0x52, 0x2c, 0xba, 0xb6, 0x8b, 0xd0,
+	0x55, 0x15, 0x0a, 0x2d, 0x42, 0x0f, 0xc5, 0x21, 0x8a, 0xe3, 0x4b, 0x9b, 0xd0, 0x56, 0xbe, 0x0e,
+	0xc8, 0x32, 0x34, 0xa5, 0x4e, 0xa7, 0x5b, 0x22, 0x5d, 0x68, 0x0d, 0x66, 0xe3, 0xc0, 0x89, 0x1a,
+	0xb4, 0xae, 0x76, 0xe9, 0x32, 0xd4, 0xe3, 0x07, 0x99, 0xd4, 0x41, 0xc7, 0x72, 0xb2, 0x5b, 0x22,
+	0x4d, 0xbc, 0x6d, 0xf1, 0xee, 0x74, 0x35, 0x64, 0x63, 0xde, 0xed, 0x96, 0x37, 0xbf, 0xac, 0xc1,
+	0xf2, 0xc0, 0x0a, 0xef, 0x66, 0xc8, 0xf8, 0xdc, 0xb1, 0x19, 0x19, 0x40, 0x4b, 0xfe, 0xbb, 0x24,
+	0x6a, 0x2f, 0x99, 0xf9, 0x03, 0xed, 0x5d, 0x38, 0x66, 0xd6, 0xf7, 0xcc, 0x12, 0xb9, 0x0d, 0xf5,
+	0xf8, 0xeb, 0x8d, 0x18, 0x8a, 0xb0, 0xf4, 0x91, 0xd9, 0x3b, 0xf7, 0x82, 0x19, 0xb1, 0xc5, 0x10,
+	0x3a, 0xea, 0x0f, 0x0d, 0x51, 0x33, 0x6e, 0xee, 0x77, 0xae, 0xf7, 0xdf, 0x63, 0xe7, 0xc5, 0xa6,
+	0x9f, 0xc9, 0xcd, 0x4a, 0xd4, 0x8e, 0x13, 0xb5, 0xef, 0x2e, 0xfa, 0x21, 0xe9, 0x99, 0x27, 0x89,
+	0xc4, 0x2a, 0xab, 0xb5, 0x63, 0x46, 0xe5, 0x5c, 0x9f, 0x94, 0x51, 0x39, 0x5f, 0x78, 0x9a, 0x25,
+	0x72, 0x0f, 0x1a, 0x49, 0x91, 0x44, 0x54, 0x8f, 0xc9, 0x55, 0x66, 0xaf, 0xf7, 0xa2, 0x29, 0xb1,
+	0xcb, 0x20, 0x4d, 0xb9, 0xc8, 0x26, 0xe7, 0x0b, 0x13, 0x75, 0x14, 0x28, 0x99, 0xfb, 0xcd, 0xbe,
+	0xc8, 0x66, 0x89, 0xbc, 0x0b, 0xb5, 0x30, 0x05, 0x91, 0xb5, 0x8c, 0x68, 0x94, 0x55, 0x7b, 0x67,
+	0x0b, 0xf9, 0x62, 0xf1, 0x5b, 0xa0, 0x63, 0x48, 0x93, 0x55, 0xf5, 0xfa, 0xa3, 0x85, 0x67, 0x0a,
+	0xb8, 0xb1, 0x09, 0x72, 0xfc, 0x64, 0x4c, 0xc8, 0xc4, 0x7a, 0xc6, 0x84, 0x6c, 0xe0, 0x99, 0xa5,
+	0xdd, 0x9a, 0xf8, 0xee, 0xbf, 0xf6, 0x57, 0x00, 0x00, 0x00, 0xff, 0xff, 0xb4, 0x2a, 0x2c, 0xfd,
+	0x00, 0x18, 0x00, 0x00,
 }

@@ -12,9 +12,18 @@ var initCollectorConfig = false
 var collectorConfig *CollectorConfig
 
 type CollectorConfig struct {
+	Server   Server
+	NsqAddrs []string
+	TestMode bool `default:"false"`
+}
+
+var initConsumerConfig = false
+var consumerConfig *ConsumerConfig
+
+type ConsumerConfig struct {
 	Db               Db
-	Server           Server
 	TrackerInterface TrackerInterface
+	NsqLookupd       string
 	TestMode         bool `default:"false"`
 }
 
@@ -59,4 +68,20 @@ func GetCollectorConfig() *CollectorConfig {
 	//	fmt.Printf("%+v\n", config)
 	initCollectorConfig = true
 	return collectorConfig
+}
+
+func GetConsumerConfig() *ConsumerConfig {
+	if initConsumerConfig {
+		return consumerConfig
+	}
+	m := multiconfig.NewWithPath(config_filename) // supports TOML, JSON and YAML
+	consumerConfig = new(ConsumerConfig)
+	err := m.Load(consumerConfig) // Check for error
+	if err != nil {
+		fmt.Printf("GetConsumerConfig Error: %s\n", err)
+	}
+	m.MustLoad(consumerConfig) // Panic's if there is any error
+	//	fmt.Printf("%+v\n", config)
+	initConsumerConfig = true
+	return consumerConfig
 }
