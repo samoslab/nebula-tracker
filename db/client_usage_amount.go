@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"time"
 )
 
 func updateClientUsageAmount(tx *sql.Tx, nodeId string, fileVolume uint64) {
@@ -9,4 +10,16 @@ func updateClientUsageAmount(tx *sql.Tx, nodeId string, fileVolume uint64) {
 	defer stmt.Close()
 	checkErr(err)
 	_, err = stmt.Exec(nodeId, fileVolume)
+}
+
+func getClientUsageAmount(tx *sql.Tx, nodeId string) (volume uint32, netflow uint32, upNetflow uint32, downNetflow uint32, lastUpdated time.Time) {
+	rows, err := tx.Query("select (VOLUME/1048576)::INT,(NETFLOW/1048576)::INT,(UP_NETFLOW/1048576)::INT,(DOWN_NETFLOW/1048576)::INT,LAST_MODIFIED from CLIENT_USAGE_AMOUNT where NODE_ID=$1", nodeId)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&volume, &netflow, &upNetflow, &downNetflow, &lastUpdated)
+		checkErr(err)
+		return
+	}
+	return
 }

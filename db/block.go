@@ -15,7 +15,7 @@ func saveBlocks(tx *sql.Tx, fileId []byte, creation time.Time, partitions []*pb.
 	for _, sp := range partitions {
 		for _, block := range sp.Block {
 			for _, pid := range block.StoreNodeId {
-				_, err = stmt.Exec(base64.StdEncoding.EncodeToString(block.Hash), block.Size, fileId, creation, pid)
+				_, err = stmt.Exec(base64.StdEncoding.EncodeToString(block.Hash), block.Size, fileId, creation, base64.StdEncoding.EncodeToString(pid))
 				checkErr(err)
 			}
 		}

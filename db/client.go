@@ -381,7 +381,8 @@ func UsageAmount(nodeId string) (inService bool, emailVerified bool, packageId i
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	inService, emailVerified, packageId, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeId)
-	// TODO usageXxx
+	volume, netflow, upNetflow, downNetflow = volume*1024, netflow*1024, upNetflow*1024, downNetflow*1024
+	usageVolume, usageNetflow, usageUpNetflow, usageDownNetflow, _ = getClientUsageAmount(tx, nodeId)
 	checkErr(tx.Commit())
 	commit = true
 	return
