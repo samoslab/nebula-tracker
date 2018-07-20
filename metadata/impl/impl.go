@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"nebula-tracker/config"
@@ -390,7 +391,7 @@ func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.Uplo
 		for _, piece := range part.Piece {
 			hashStr := base64.StdEncoding.EncodeToString(piece.Hash)
 			if _, ok := hashMap[hashStr]; ok {
-				return nil, status.Error(codes.InvalidArgument, "mutilple piece have same hash")
+				return nil, status.Error(codes.InvalidArgument, "multiple piece have same hash")
 			} else {
 				hashMap[hashStr] = true
 			}
@@ -551,10 +552,25 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 		for _, b := range p.Block {
 			hashStr := base64.StdEncoding.EncodeToString(b.Hash)
 			if _, ok := hashMap[hashStr]; ok {
-				return &pb.UploadFileDoneResp{Code: 28, ErrMsg: "mutilple block have same hash"}, nil
+				return &pb.UploadFileDoneResp{Code: 28, ErrMsg: "multiple block have same hash"}, nil
 			} else {
 				hashMap[hashStr] = true
 			}
+			if len(b.StoreNodeId) == 0 {
+				return &pb.UploadFileDoneResp{Code: 29, ErrMsg: "StoreNodeId can not be empty"}, nil
+			}
+			if len(b.StoreNodeId) > 1 {
+				nodeIdMap := make(map[string]bool, len(b.StoreNodeId))
+				for _, nodeByte := range b.StoreNodeId {
+					proNodeId := base64.StdEncoding.EncodeToString(nodeByte)
+					if _, ok := nodeIdMap[proNodeId]; ok {
+						return &pb.UploadFileDoneResp{Code: 30, ErrMsg: "the block have multiple same StoreNodeId, block hash: " + hex.EncodeToString(b.Hash)}, nil
+					} else {
+						nodeIdMap[proNodeId] = true
+					}
+				}
+			}
+
 			// check size cheating, verify by auth
 			storeVolume += uint64(b.Size) * uint64(len(b.StoreNodeId))
 		}
