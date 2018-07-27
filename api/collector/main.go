@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"nebula-tracker/db"
 	"net/http"
-	"net/url"
 	"runtime/debug"
 	"strconv"
 	"time"
@@ -58,11 +57,16 @@ func client(w http.ResponseWriter, r *http.Request) {
 	if !chechAuthHeader(w, r) {
 		return
 	}
-	nodeIdstr := r.RequestURI[len("/api/pub-key/client/"):]
-	nodeId, pass := checkNodeId(w, nodeIdstr)
-	if !pass {
-		return
+	r.ParseForm()
+	nodeId := r.FormValue("nodeId")
+	if len(nodeId) == 0 {
+		json.NewEncoder(w).Encode(&JsonObj{Code: 11, ErrMsg: "node id is required."})
 	}
+	// nodeIdstr := r.RequestURI[len("/api/pub-key/client/"):]
+	// nodeId, pass := checkNodeId(w, nodeIdstr)
+	// if !pass {
+	// 	return
+	// }
 	pubKey := db.ClientGetPubKeyBytesByNodeId(nodeId)
 	if len(pubKey) == 0 {
 		json.NewEncoder(w).Encode(&JsonObj{Code: 2, ErrMsg: "node id not exist: " + nodeId})
@@ -80,11 +84,16 @@ func provider(w http.ResponseWriter, r *http.Request) {
 	if !chechAuthHeader(w, r) {
 		return
 	}
-	nodeIdstr := r.RequestURI[len("/api/pub-key/provider/"):]
-	nodeId, pass := checkNodeId(w, nodeIdstr)
-	if !pass {
-		return
+	r.ParseForm()
+	nodeId := r.FormValue("nodeId")
+	if len(nodeId) == 0 {
+		json.NewEncoder(w).Encode(&JsonObj{Code: 11, ErrMsg: "node id is required."})
 	}
+	// nodeIdstr := r.RequestURI[len("/api/pub-key/provider/"):]
+	// nodeId, pass := checkNodeId(w, nodeIdstr)
+	// if !pass {
+	// 	return
+	// }
 	pubKey := db.ProviderGetPubKeyBytesByNodeId(nodeId)
 	if len(pubKey) == 0 {
 		json.NewEncoder(w).Encode(&JsonObj{Code: 2, ErrMsg: "node id not exist: " + nodeId})
@@ -128,24 +137,24 @@ func providerAll(w http.ResponseWriter, r *http.Request) {
 	processMap(w, db.ProviderAllPubKeyBytes())
 }
 
-func checkNodeId(w http.ResponseWriter, nodeIdStr string) (nodeId string, pass bool) {
-	if len(nodeIdStr) == 0 {
-		json.NewEncoder(w).Encode(&JsonObj{Code: 11, ErrMsg: "node id is required."})
-		return "", false
-	}
-	var err error
-	nodeIdStr, err = url.QueryUnescape(nodeIdStr)
-	if err != nil {
-		json.NewEncoder(w).Encode(&JsonObj{Code: 12, ErrMsg: fmt.Sprintf("unescape node id [%s] failed: %v", nodeIdStr, err)})
-		return "", false
-	}
-	// nodeId, err = base64.StdEncoding.DecodeString(nodeIdStr)
-	// if err != nil {
-	// 	json.NewEncoder(w).Encode(&JsonObj{Code: 13, ErrMsg: fmt.Sprintf("base64 decode node id [%s] failed: %v", nodeIdStr, err)})
-	// 	return nil, false
-	// }
-	return nodeId, true
-}
+// func checkNodeId(w http.ResponseWriter, nodeIdStr string) (nodeId string, pass bool) {
+// 	if len(nodeIdStr) == 0 {
+// 		json.NewEncoder(w).Encode(&JsonObj{Code: 11, ErrMsg: "node id is required."})
+// 		return "", false
+// 	}
+// 	var err error
+// 	nodeIdStr, err = url.QueryUnescape(nodeIdStr)
+// 	if err != nil {
+// 		json.NewEncoder(w).Encode(&JsonObj{Code: 12, ErrMsg: fmt.Sprintf("unescape node id [%s] failed: %v", nodeIdStr, err)})
+// 		return "", false
+// 	}
+// 	// nodeId, err = base64.StdEncoding.DecodeString(nodeIdStr)
+// 	// if err != nil {
+// 	// 	json.NewEncoder(w).Encode(&JsonObj{Code: 13, ErrMsg: fmt.Sprintf("base64 decode node id [%s] failed: %v", nodeIdStr, err)})
+// 	// 	return nil, false
+// 	// }
+// 	return nodeId, true
+// }
 
 func chechAuthHeader(w http.ResponseWriter, r *http.Request) bool {
 	//	if true {

@@ -13,6 +13,7 @@ collector:
 fee and bill
 storage proof and available test
 anti-cheating
+data length check and truncate, and cheating check
 
 
 provider:
@@ -21,3 +22,13 @@ unit test
 collector sender optimize
 add speed test module
 open leveldb readonly when disk is full
+
+
+client:
+websocket
+multiple file or folder upload
+
+
+order:
+collector log analysis
+collector sender optimize

@@ -27,6 +27,9 @@ func saveFromProvider(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcp_pb
 			notPassAls = append(notPassAls, al)
 			continue
 		}
+		if len(al.Info) > 250 {
+			al.Info = al.Info[:250]
+		}
 		_, err = stmt.Exec(al.Ticket, cltId, nodeId, al.Type, time.Unix(0, int64(timestamp)), al.Success,
 			base64.StdEncoding.EncodeToString(al.FileHash), al.FileSize, base64.StdEncoding.EncodeToString(al.BlockHash), al.BlockSize, time.Unix(0, int64(al.BeginTime)), time.Unix(0, int64(al.EndTime)),
 			al.TransportSize, al.Info)
@@ -53,6 +56,9 @@ func saveFromClient(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcc_pb.A
 		if !pass {
 			notPassAls = append(notPassAls, al)
 			continue
+		}
+		if len(al.Info) > 250 {
+			al.Info = al.Info[:250]
 		}
 		_, err = stmt.Exec(al.Ticket, cltId, nodeId, al.Type, time.Unix(0, int64(timestamp)), al.Success,
 			base64.StdEncoding.EncodeToString(al.FileHash), al.FileSize, base64.StdEncoding.EncodeToString(al.BlockHash), al.BlockSize, time.Unix(0, int64(al.BeginTime)), time.Unix(0, int64(al.EndTime)),

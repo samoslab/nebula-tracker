@@ -71,7 +71,7 @@ func httpGet(url string) ([]byte, error) {
 }
 
 func getSingle(nodeId string, subPath string) (pubKey []byte, err error) {
-	resp, err := httpGet(subPath + url.QueryEscape(nodeId))
+	resp, err := httpGet(subPath + "?nodeId=" + url.QueryEscape(nodeId))
 	if err != nil {
 		return nil, err
 	}
