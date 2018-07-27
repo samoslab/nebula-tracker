@@ -1,0 +1,56 @@
+syntax = "proto3";
+package check.pb;
+
+service CheckavAilabilityService {
+
+	rpc FindProvider(FindProviderReq)returns(FindProviderResp){}
+	
+	rpc UpdateStatus(UpdateStatusReq)returns(UpdateStatusResp){}
+
+}
+
+message FindProviderReq{
+	uint64 timestamp=1;
+	string auth=2;
+	string locality=3;
+}
+
+message FindProviderResp{
+	bytes data=2;
+}
+
+message UpdateStatusReq{
+	uint64 timestamp=1;
+	string auth=2;
+	string locality=3;
+	bytes data=4;
+}
+
+message UpdateStatusResp{
+}
+
+message Provider {
+	string nodeId=1;
+	bytes publicKey=2;
+	uint32 port=3;
+	string host=4;
+	string dynamicDomain=5;
+	uint64 lastConnect=6;
+}
+
+message BatchProvider{
+	repeated Provider p=1;
+}
+
+message ProviderStatus{
+	string nodeId=1;
+	uint64 checkTime=2;
+	uint64 latencyNs=3;
+	uint64 totalFreeVolume=4;
+	uint64 availFileSize=5;
+}
+
+message BatchProviderStatus{
+	repeated ProviderStatus ps=1;
+}
+

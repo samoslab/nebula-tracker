@@ -73,6 +73,7 @@ type InterfaceConfig struct {
 	AuthToken     string `default:"test"`
 	EncryptKeyHex string `default:"4fcf16120e28dec237da6ecdcb7ec3be"`
 	TestMode      bool   `default:"false"`
+	Locality      string `default:"cn-beijing-corp"`
 }
 
 func GetInterfaceConfig() *InterfaceConfig {

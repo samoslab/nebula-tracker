@@ -8,6 +8,8 @@ import (
 	"errors"
 	"time"
 
+	check_pb "nebula-tracker/api/check-availability/pb"
+
 	cache "github.com/patrickmn/go-cache"
 )
 
@@ -216,6 +218,8 @@ type ProviderInfo struct {
 	Host              string
 	DynamicDomain     string
 	StorageVolume     []uint64
+	LastConnect       uint64
+	LastAvail         uint64
 }
 
 func (self ProviderInfo) Server() string {
@@ -236,7 +240,7 @@ func ProviderFindOne(nodeId string) (p *ProviderInfo) {
 }
 
 func providerFindOne(tx *sql.Tx, nodeId string) *ProviderInfo {
-	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME from PROVIDER where NODE_ID=$1", nodeId)
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME,LAST_CONNECT,LAST_AVAIL from PROVIDER where NODE_ID=$1", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
@@ -249,8 +253,9 @@ func scanProviderInfo(rows *sql.Rows) *ProviderInfo {
 	var pi ProviderInfo
 	var host, dynamicDomain sql.NullString
 	var storageVolume NullUint64Slice
+	var lastAvail, lastConnect NullTime
 	err := rows.Scan(&pi.NodeId, &pi.PublicKey, &pi.BillEmail, &pi.EncryptKey, &pi.WalletAddress, &pi.UpBandwidth, &pi.DownBandwidth, &pi.TestUpBandwidth, &pi.TestDownBandwidth,
-		&pi.Availability, &pi.Port, &host, &dynamicDomain, &storageVolume)
+		&pi.Availability, &pi.Port, &host, &dynamicDomain, &storageVolume, &lastAvail, &lastConnect)
 	checkErr(err)
 	if host.Valid {
 		pi.Host = host.String
@@ -260,6 +265,12 @@ func scanProviderInfo(rows *sql.Rows) *ProviderInfo {
 	}
 	if storageVolume.Valid {
 		pi.StorageVolume = storageVolume.Uint64Slice
+	}
+	if lastAvail.Valid {
+		pi.LastAvail = uint64(lastAvail.Time.Unix())
+	}
+	if lastConnect.Valid {
+		pi.LastConnect = uint64(lastConnect.Time.Unix())
 	}
 	pi.NodeIdBytes, err = base64.StdEncoding.DecodeString(pi.NodeId)
 	if err != nil {
@@ -278,10 +289,33 @@ func ProviderFindAll() (slice []ProviderInfo) {
 }
 
 func providerFindAll(tx *sql.Tx) []ProviderInfo {
-	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME,LAST_CONNECT,LAST_AVAIL from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
 	checkErr(err)
 	defer rows.Close()
-	res := make([]ProviderInfo, 0, 16)
+	res := make([]ProviderInfo, 0, 32)
+	for rows.Next() {
+		res = append(res, *scanProviderInfo(rows))
+	}
+	return res
+}
+
+func ProviderFindAllAvail() (slice []ProviderInfo) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	slice = providerFindAllAvail(tx)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func providerFindAllAvail(tx *sql.Tx) []ProviderInfo {
+	now := time.Now()
+	m, _ := time.ParseDuration("-5m")
+	m1 := now.Add(m)
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME,LAST_CONNECT,LAST_AVAIL from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true and LAST_AVAIL>$1", m1)
+	checkErr(err)
+	defer rows.Close()
+	res := make([]ProviderInfo, 0, 32)
 	for rows.Next() {
 		res = append(res, *scanProviderInfo(rows))
 	}
@@ -330,7 +364,7 @@ func providerAllPubKeyBytes(tx *sql.Tx) map[string][]byte {
 	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY FROM PROVIDER where REMOVED=false")
 	checkErr(err)
 	defer rows.Close()
-	m := make(map[string][]byte, 16)
+	m := make(map[string][]byte, 32)
 	for rows.Next() {
 		var nodeId string
 		var pubKey []byte
@@ -358,4 +392,55 @@ func UpdateProviderHost(nodeId string, ip string) {
 	checkErr(tx.Commit())
 	commit = true
 	return
+}
+
+func FindProviderForCheck(locality string) []ProviderInfo {
+	return ProviderFindAll()
+}
+
+var giga uint64 = 1024 * 1024 * 1024
+
+func ProviderUpdateStatus(locality string, ps ...*check_pb.ProviderStatus) {
+	availMap := make(map[string]time.Time, len(ps))
+	connMap := make(map[string]time.Time, len(ps))
+	for _, s := range ps {
+		if s.LatencyNs < 2000000000 {
+			t := time.Unix(0, int64(s.CheckTime))
+			connMap[s.NodeId] = t
+			if s.AvailFileSize > giga && s.TotalFreeVolume > giga {
+				availMap[s.NodeId] = t
+			}
+		}
+	}
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	saveCheckAvailRecord(tx, locality, ps...)
+	if len(connMap) > 0 {
+		providerUpdateLastConn(tx, connMap)
+		if len(availMap) > 0 {
+			providerUpdateLastAvail(tx, availMap)
+		}
+	}
+	checkErr(tx.Commit())
+	commit = true
+}
+
+func providerUpdateLastAvail(tx *sql.Tx, m map[string]time.Time) {
+	stmt, err := tx.Prepare("update PROVIDER set LAST_MODIFIED=now(),LAST_CONNECT=$2,LAST_AVAIL=$3 where NODE_ID=$1 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
+	defer stmt.Close()
+	checkErr(err)
+	for k, v := range m {
+		_, err := stmt.Exec(k, v, v)
+		checkErr(err)
+	}
+}
+
+func providerUpdateLastConn(tx *sql.Tx, m map[string]time.Time) {
+	stmt, err := tx.Prepare("update PROVIDER set LAST_MODIFIED=now(),LAST_CONNECT=$2 where NODE_ID=$1 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
+	defer stmt.Close()
+	checkErr(err)
+	for k, v := range m {
+		_, err := stmt.Exec(k, v)
+		checkErr(err)
+	}
 }

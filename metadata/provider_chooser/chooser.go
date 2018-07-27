@@ -1,7 +1,6 @@
 package provider_chooser
 
 import (
-	"context"
 	"fmt"
 	"nebula-tracker/db"
 	"sync/atomic"
@@ -9,10 +8,6 @@ import (
 
 	gosync "github.com/lrita/gosync"
 	"github.com/robfig/cron"
-	provider_pb "github.com/samoslab/nebula/provider/pb"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 var cronRunner *cron.Cron
@@ -81,71 +76,72 @@ func update() {
 	} else {
 		return
 	}
-	all := db.ProviderFindAll()
+	all := db.ProviderFindAllAvail()
 	providers, providerMap = filter(all)
 	initialized = true
 	fmt.Printf("%s found %d available provider.\n", time.Now().UTC().Format("2006-01-02 15:04 UTC"), len(*providers))
 }
 
 func filter(all []db.ProviderInfo) (*[]db.ProviderInfo, map[string]*db.ProviderInfo) {
-	slice := make([]db.ProviderInfo, 0, len(all))
+	// slice := make([]db.ProviderInfo, 0, len(all))
 	m := make(map[string]*db.ProviderInfo, len(all))
 	for _, pi := range all {
-		start := time.Now().UTC()
-		available := false
-		if check(&pi, &available) || check(&pi, &available) || check(&pi, &available) {
-			m[pi.NodeId] = &pi
-			slice = append(slice, pi)
-		}
-		if !available {
-			db.SaveNaRecord(pi.NodeId, start, time.Now().UTC())
-		}
+		// start := time.Now().UTC()
+		// available := false
+		// if check(&pi, &available) || check(&pi, &available) || check(&pi, &available) {
+		// 	m[pi.NodeId] = &pi
+		// 	slice = append(slice, pi)
+		// }
+		// if !available {
+		// 	db.SaveNaRecord(pi.NodeId, start, time.Now().UTC())
+		// }
+		m[pi.NodeId] = &pi
 	}
-	return &slice, m
+	return &all, m
 }
 
-func check(pi *db.ProviderInfo, available *bool) bool {
-	var hostStr string // prefer
-	if len(pi.Host) > 0 {
-		hostStr = pi.Host
-	} else if len(pi.DynamicDomain) > 0 {
-		hostStr = pi.DynamicDomain
-	}
-	providerAddr := fmt.Sprintf("%s:%d", hostStr, pi.Port)
-	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
-	if err != nil {
-		return false
-	}
-	defer conn.Close()
-	psc := provider_pb.NewProviderServiceClient(conn)
-	total, maxFileSize, err := checkAvailable(psc, pi.PublicKey)
-	if err != nil {
-		st, ok := status.FromError(err)
-		if !ok || st.Code() != codes.DeadlineExceeded {
-			fmt.Printf("checkAvailable of provider [%s:%d] failed,  error: %v\n", hostStr, pi.Port, err)
-		}
-		return false
-	}
-	*available = true
-	if total > giga && maxFileSize > giga {
-		return true
-	} else {
-		fmt.Printf("checkAvailable of provider [%s:%d] reply total: %d, maxFileSize: %d\n", hostStr, pi.Port, total, maxFileSize)
-		return false
-	}
-}
+// func check(pi *db.ProviderInfo, available *bool) bool {
+// 	var hostStr string // prefer
+// 	if len(pi.Host) > 0 {
+// 		hostStr = pi.Host
+// 	} else if len(pi.DynamicDomain) > 0 {
+// 		hostStr = pi.DynamicDomain
+// 	}
+// 	providerAddr := fmt.Sprintf("%s:%d", hostStr, pi.Port)
+// 	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+// 	if err != nil {
+// 		return false
+// 	}
+// 	defer conn.Close()
+// 	psc := provider_pb.NewProviderServiceClient(conn)
+// 	total, maxFileSize, err := checkAvailable(psc, pi.PublicKey)
+// 	if err != nil {
+// 		st, ok := status.FromError(err)
+// 		if !ok || (st.Code() != codes.DeadlineExceeded && st.Code() != codes.Unavailable) {
+// 			fmt.Printf("checkAvailable of provider [%s:%d] failed,  error: %v\n", hostStr, pi.Port, err)
+// 		}
+// 		return false
+// 	}
+// 	*available = true
+// 	if total > giga && maxFileSize > giga {
+// 		return true
+// 	} else {
+// 		fmt.Printf("checkAvailable of provider [%s:%d] reply total: %d, maxFileSize: %d\n", hostStr, pi.Port, total, maxFileSize)
+// 		return false
+// 	}
+// }
 
-var giga uint64 = 1024 * 1024 * 1024
+// var giga uint64 = 1024 * 1024 * 1024
 
-func checkAvailable(client provider_pb.ProviderServiceClient, publicKeyBytes []byte) (total uint64, maxFileSize uint64, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	req := &provider_pb.CheckAvailableReq{Timestamp: uint64(time.Now().Unix())}
-	req.GenAuth(publicKeyBytes)
-	var resp *provider_pb.CheckAvailableResp
-	resp, err = client.CheckAvailable(ctx, req)
-	if err != nil {
-		return
-	}
-	return resp.Total, resp.MaxFileSize, nil
-}
+// func checkAvailable(client provider_pb.ProviderServiceClient, publicKeyBytes []byte) (total uint64, maxFileSize uint64, err error) {
+// 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+// 	defer cancel()
+// 	req := &provider_pb.CheckAvailableReq{Timestamp: uint64(time.Now().Unix())}
+// 	req.GenAuth(publicKeyBytes)
+// 	var resp *provider_pb.CheckAvailableResp
+// 	resp, err = client.CheckAvailable(ctx, req)
+// 	if err != nil {
+// 		return
+// 	}
+// 	return resp.Total, resp.MaxFileSize, nil
+// }
