@@ -15,6 +15,7 @@ import (
 	"github.com/robfig/cron"
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	util_aes "github.com/samoslab/nebula/util/aes"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -46,10 +47,12 @@ var conf *Config
 func check() {
 	var ps []*pb.Provider
 	var err error
-	for i := 0; i < 5; i++ {
-		ps, err = getProvider()
+	for i := 0; i < 6; i++ {
+		ps, err = getProvider(i)
 		if err != nil {
-			fmt.Printf("getProvider error: %v\n", err)
+			log.Warnf("getProvider(%d) error: %v", i, err)
+		} else {
+			break
 		}
 	}
 	if ps == nil || len(ps) == 0 {
@@ -72,17 +75,18 @@ func check() {
 				TotalFreeVolume: total,
 				AvailFileSize:   maxFileSize})
 		} else {
+			ts := time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
 			st, ok := status.FromError(err)
 			if ok {
 				if st.Code() == codes.Unavailable {
-					fmt.Printf("NodeId: %s, %s:%d unavailable\n", pi.NodeId, hostStr, pi.Port)
+					log.Warnf("%s, NodeId: %s, %s:%d unavailable", ts, pi.NodeId, hostStr, pi.Port)
 				} else if st.Code() == codes.DeadlineExceeded {
-					fmt.Printf("NodeId: %s, %s:%d DeadlineExceeded\n", pi.NodeId, hostStr, pi.Port)
+					log.Warnf("%s, NodeId: %s, %s:%d DeadlineExceeded", ts, pi.NodeId, hostStr, pi.Port)
 				} else {
-					fmt.Printf("NodeId: %s, %s:%d Code: %d, Message: %s\n", pi.NodeId, hostStr, pi.Port, st.Code(), st.Message())
+					log.Warnf("%s, NodeId: %s, %s:%d Code: %d, Message: %s", ts, pi.NodeId, hostStr, pi.Port, st.Code(), st.Message())
 				}
 			} else {
-				fmt.Printf("NodeId: %s, %s:%d Error: %s\n", pi.NodeId, hostStr, pi.Port, err)
+				log.Warnf("%s, NodeId: %s, %s:%d Error: %s", ts, pi.NodeId, hostStr, pi.Port, err)
 			}
 		}
 	}
@@ -91,17 +95,24 @@ func check() {
 	}
 	data, err := proto.Marshal(&pb.BatchProviderStatus{Ps: pss})
 	if err != nil {
-		panic(err)
+		log.Warnf("Marshal protobuf error: %v", err)
+		return
 	}
 	en, err := util_aes.Encrypt(data, encryptKey)
 	if err != nil {
-		panic(err)
+		log.Warnf("Encrypt error: %v", err)
+		return
 	}
-	updateStatus(en)
+	for i := 0; i < 6; i++ {
+		if updateStatus(i, en) {
+			return
+		}
+	}
 }
 
-func getProvider() ([]*pb.Provider, error) {
-	conn, err := grpc.Dial(conf.ApiHostAndPort, grpc.WithInsecure())
+func getProvider(tries int) ([]*pb.Provider, error) {
+	hostAndPort := conf.ApiHostAndPort[tries%len(conf.ApiHostAndPort)]
+	conn, err := grpc.Dial(hostAndPort, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
@@ -110,30 +121,32 @@ func getProvider() ([]*pb.Provider, error) {
 	return FindProvider(client)
 }
 
-func updateStatus(data []byte) {
-	conn, err := grpc.Dial(conf.ApiHostAndPort, grpc.WithInsecure())
+func updateStatus(tries int, data []byte) bool {
+	hostAndPort := conf.ApiHostAndPort[tries%len(conf.ApiHostAndPort)]
+	conn, err := grpc.Dial(hostAndPort, grpc.WithInsecure())
 	if err != nil {
-		panic(err)
+		log.Warnf("updateStatus Dial error: %v", err)
+		return false
 	}
 	defer conn.Close()
 	client := pb.NewCheckavAilabilityServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	for i := 0; i < 5; i++ {
-		req := &pb.UpdateStatusReq{Timestamp: uint64(time.Now().Unix()),
-			Locality: conf.Locality,
-			Data:     data}
-		req.GenAuth(authToken)
-		_, err = client.UpdateStatus(ctx, req)
-		if err != nil {
-			st, ok := status.FromError(err)
-			if ok && st.Code() == codes.DeadlineExceeded {
-				continue
-			} else {
-				panic(err)
-			}
+	req := &pb.UpdateStatusReq{Timestamp: uint64(time.Now().Unix()),
+		Locality: conf.Locality,
+		Data:     data}
+	req.GenAuth(authToken)
+	_, err = client.UpdateStatus(ctx, req)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.DeadlineExceeded {
+			return false
+		} else {
+			log.Warnf("updateStatus error: %v", err)
+			return false
 		}
 	}
+	return true
 }
 
 func FindProvider(client pb.CheckavAilabilityServiceClient) (ps []*pb.Provider, err error) {
@@ -182,7 +195,7 @@ type Config struct {
 	AuthToken      string `default:"test"`
 	EncryptKeyHex  string `default:"4fcf16120e28dec237da6ecdcb7ec3be"`
 	Locality       string `default:"cn-beijing-corp"`
-	ApiHostAndPort string `default:"localhost:6633"`
+	ApiHostAndPort []string
 }
 
 func GetConfig() *Config {
@@ -190,7 +203,7 @@ func GetConfig() *Config {
 	config := new(Config)
 	err := m.Load(config) // Check for error
 	if err != nil {
-		fmt.Printf("GetConfig Error: %s\n", err)
+		panic(err)
 	}
 	m.MustLoad(config) // Panic's if there is any error
 	//	fmt.Printf("%+v\n", config)
