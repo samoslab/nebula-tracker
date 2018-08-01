@@ -59,6 +59,12 @@ func newCheckavAilabilityService() *CheckavAilabilityService {
 }
 
 func (self *CheckavAilabilityService) FindProvider(ctx context.Context, req *pb.FindProviderReq) (resp *pb.FindProviderResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	conf := config.GetInterfaceConfig()
 	if err = req.CheckAuth([]byte(conf.AuthToken), int64(conf.AuthValidSec)); err != nil {
 		return
@@ -85,6 +91,12 @@ func (self *CheckavAilabilityService) FindProvider(ctx context.Context, req *pb.
 }
 
 func (self *CheckavAilabilityService) UpdateStatus(ctx context.Context, req *pb.UpdateStatusReq) (resp *pb.UpdateStatusResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	conf := config.GetInterfaceConfig()
 	if err = req.CheckAuth([]byte(conf.AuthToken), int64(conf.AuthValidSec)); err != nil {
 		return
