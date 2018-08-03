@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+    <title>Samos Storage Provider Status</title>
+    <link href="/s/favicon.ico" rel="shortcut icon" type="images/x-icon"/>
+    <link href="/s/css/style.css" rel="stylesheet" type="text/css"/>
+    <script src="/s/jquery.js"></script>
+</head>
+<body>
+    <div id="login-container" >
+        <div class="ibg-bg index-banner-0"></div>
+        <div id="login-header">
+            <div class="logo">
+               
+            </div>
+        </div>
+        {{if .Login}}
+        <div class="login-main">
+            <div class="login-sdk-v4">
+                <div class="header-login">
+                    <div id="login-middle" class="tang-pass-login">
+                        <form id="form" class="pass-form pass-form-normal" method="POST" action="/login/">
+                            <p class="pass-form-logo">Login</p>
+                            <input id="pass-form-inpt" class="pass-form-inpt" type="text" name="billEmail" placeholder="Bill Email"/>
+                            <input id="pass-form-inpt1" class="pass-form-inpt" type="text" name="nodeId" placeholder="Node Id"/>
+                            <input id="submit-btn" class="submit-btn" type="button"  value="Login"/>
+                        </form>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{if not .Login}}
+    <div id="contentWrap" style="display: none;">
+        <div class="container">
+            <h1>Offline Record</h1>
+            <h2>Current Status:<span class="status">{{if .Online}}online{{else}}offline{{end}}</span>{{if .Found}}<span class="endTime">last online check：<span>{{.Last.Format "2006-01-02 15:04:05 UTC"}}</span></span>{{end}}</h2>
+            <h1>history</h1>
+
+            {{range .DayStatus}}
+            <table class="table table-bordered table-hover">
+                <thead>
+                <tr class="active">
+                    <th  class="col-4">{{.Date}}</th>
+                    <th  class="col-6">Offline minutes: {{.TotalNaMins}}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {{range .DayStatus}}
+                <tr>
+                    <td  class="col-4">{{ index .NaSection 0 }}</td>
+                    <td  class="col-6">{{ index .NaSection 1 }}</td>
+                </tr>
+                {{end}}
+                </tbody>
+            </table>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+</body>
+</html>

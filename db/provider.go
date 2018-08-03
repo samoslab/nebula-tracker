@@ -444,3 +444,22 @@ func providerUpdateLastConn(tx *sql.Tx, m map[string]time.Time) {
 		checkErr(err)
 	}
 }
+
+func FindProviderByEmailAndNodeId(email string, nodeId string) (found bool) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	found = findProviderByEmailAndNodeId(tx, email, nodeId)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func findProviderByEmailAndNodeId(tx *sql.Tx, email string, nodeId string) bool {
+	rows, err := tx.Query("SELECT 1 from PROVIDER where NODE_ID=$1 and BILL_EMAIL=$2 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true", nodeId, email)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		return true
+	}
+	return false
+}
