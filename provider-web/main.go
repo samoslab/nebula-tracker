@@ -29,6 +29,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var conf *Config
+
 func main() {
 	// defer func() {
 	// 	if err := recover(); err != nil {
@@ -41,7 +43,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	conf := GetConfig(path + string(os.PathSeparator) + "config.toml")
+	conf = GetConfig(path + string(os.PathSeparator) + "config.toml")
 	dbo := db.OpenDb(&conf.Db)
 	defer dbo.Close()
 
@@ -49,14 +51,12 @@ func main() {
 	cronRunner.AddFunc("0 15,45 * * * *", clearExpiredSession)
 	defer cronRunner.Stop()
 	http.HandleFunc("/", indexHandler)
+	http.HandleFunc("/status/", statusHandler)
 
 	http.HandleFunc("/login/", loginHandler)
 	http.HandleFunc("/logout/", logoutHandler)
 
-	http.HandleFunc("/kyc/", indexHandler)
-
 	http.Handle("/s/", cache(http.StripPrefix("/s/", http.FileServer(http.Dir("s")))))
-	http.Handle("/i18n/", cache(http.StripPrefix("/i18n/", http.FileServer(http.Dir("i18n")))))
 
 	http.HandleFunc("/favicon.ico", serveFileHandler)
 	http.HandleFunc("/robots.txt", serveFileHandler)
@@ -292,7 +292,7 @@ type Config struct {
 	Db          config.Db
 	ListenIp    string `default:"127.0.0.1"`
 	ListenPort  int    `default:"7000"`
-	NaThreshold int    `default:"300"`
+	NaThreshold int    `default:"480"`
 	Offset      int    `default:"60"`
 }
 
@@ -307,7 +307,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	t := time.Now().UTC()
 	tm := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 	for i := 0; i < 6; i++ {
-		tm := tm.AddDate(0, 0, -1)
+		tm = tm.AddDate(0, 0, -1)
 		day := tm.Format("2006-01-02")
 		naSection := db.GetDailyNaByProviderAndDay(providerId, day)
 		slice = append(slice, DayStatus{Date: day, NaSection: naSection, TotalNaMins: sumNaMins(naSection)})
@@ -315,7 +315,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	found, last := db.GetLastCheckAvailRecord(providerId)
 	online := false
 	if found {
-		if time.Now().Unix()-last.Unix() < 480 {
+		if time.Now().Unix()-last.Unix() < int64(conf.NaThreshold) {
 			online = true
 		}
 	}
@@ -341,7 +341,7 @@ func sumNaMins(naSection [][2]time.Time) (sum int64) {
 	return sum / 60
 }
 
-func status(w http.ResponseWriter, r *http.Request) {
+func statusHandler(w http.ResponseWriter, r *http.Request) {
 	client := getClient(w, r)
 	if client.Account == "" {
 		json.NewEncoder(w).Encode(&JsonObj{Code: 1, ErrMsg: "not login"})
@@ -350,12 +350,15 @@ func status(w http.ResponseWriter, r *http.Request) {
 	providerId := client.Account
 	found, last := db.GetLastCheckAvailRecord(providerId)
 	if !found {
-		json.NewEncoder(w).Encode(&JsonObj{Data: struct{ Found bool }{Found: true}})
+		json.NewEncoder(w).Encode(&JsonObj{Data: struct {
+			Found bool `json:"found"`
+		}{Found: false}})
 	} else {
 		json.NewEncoder(w).Encode(&JsonObj{Data: struct {
-			Found bool
-			Last  int64
-		}{Found: true, Last: last.Unix()}})
+			Found  bool   `json:"found"`
+			Online bool   `json:"online"`
+			Last   string `json:"last"`
+		}{Found: true, Online: time.Now().Unix()-last.Unix() < int64(conf.NaThreshold), Last: last.UTC().Format("2006-01-02 15:04:05 UTC")}})
 	}
 
 }

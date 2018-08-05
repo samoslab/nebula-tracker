@@ -24,7 +24,7 @@
                             <p class="pass-form-logo">Login</p>
                             <input id="pass-form-inpt" class="pass-form-inpt" type="text" name="billEmail" placeholder="Bill Email"/>
                             <input id="pass-form-inpt1" class="pass-form-inpt" type="text" name="nodeId" placeholder="Node Id"/>
-                            <input id="submit-btn" class="submit-btn" type="button"  value="Login"/>
+                            <input id="submit-btn" class="submit-btn" type="submit"  value="Login"/>
                         </form>
 
                     </div>
@@ -34,28 +34,54 @@
         {{end}}
     </div>
     {{if not .Login}}
-    <div id="contentWrap" style="display: none;">
+    <div id="contentWrap">
         <div class="container">
-            <h1>Offline Record</h1>
-            <h2>Current Status:<span class="status">{{if .Online}}online{{else}}offline{{end}}</span>{{if .Found}}<span class="endTime">last online check：<span>{{.Last.Format "2006-01-02 15:04:05 UTC"}}</span></span>{{end}}</h2>
-            <h1>history</h1>
+            <h1>Current Status:<span id="status" {{if .Online}}class="onlineStatus"{{else}}class="offlineStatus"{{end}}>{{if .Online}}online{{else}}offline{{end}}</span>{{if .Found}}<span class="endTime">last online check：<span id="last">{{.Last.Format "2006-01-02 15:04:05 UTC"}}</span></span>{{end}}</h1>
+            <script>
+            window.setInterval(function(){
+                $.ajax({ url: '/status/', method: 'POST', dataType: 'json', success: function(obj){
+                    if(obj){
+                        if(obj.code===0&&obj.data&&obj.data.found){ 
+                            $('#last').text(obj.data.last)
+                            if(obj.data.online){
+                                $('#status').text('online');
+                                $("#status").attr('class', 'onlineStatus');
+                            }else{
+                                $('#status').text('offline');
+                                $("#status").attr('class', 'offlineStatus');
+                            }
+                        }else if(obj.code===1){
+                            self.location.href='/login/';
+                        }else{
+                            alert(obj.errmsg);
+                        }
+                    }else{
+                        alert('unknown error');
+                    }
+    }});
+
+            },60000)
+            </script>
+            <h2>Offline history</h2>
 
             {{range .DayStatus}}
             <table class="table table-bordered table-hover">
                 <thead>
                 <tr class="active">
-                    <th  class="col-4">{{.Date}}</th>
+                    <th  class="col-4">{{.Date}} UTC</th>
                     <th  class="col-6">Offline minutes: {{.TotalNaMins}}</th>
                 </tr>
                 </thead>
+                {{if .NaSection}}
                 <tbody>
-                {{range .DayStatus}}
+                {{range .NaSection}}
                 <tr>
-                    <td  class="col-4">{{ index .NaSection 0 }}</td>
-                    <td  class="col-6">{{ index .NaSection 1 }}</td>
+                    <td  class="col-4">{{ (index . 0).Format "2006-01-02 15:04:05 UTC" }}</td>
+                    <td  class="col-6">{{ (index . 1).Format "2006-01-02 15:04:05 UTC" }}</td>
                 </tr>
                 {{end}}
                 </tbody>
+                {{end}}
             </table>
             {{end}}
         </div>

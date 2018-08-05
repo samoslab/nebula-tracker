@@ -76,7 +76,7 @@ body {
     display: table;
     margin: 0 auto;
     clear: both;
-    width: 1102px;
+    width: 500px;
     height: 90%;
     position: relative;
     overflow: hidden;
@@ -139,7 +139,7 @@ body {
     box-shadow: rgba(0,0,0,0.3) 0 0 50px;
 }
 #login-container #login-middle {
-    width: 352px;
+    width: 480px;
     height: 100%;
     display: table-cell;
     vertical-align: middle;
@@ -165,7 +165,7 @@ body {
     padding: 7px 10px;
     margin-bottom:30px;
     height: 26px;
-    width: 284px;
+    width: 480px;
     border: 1px solid #dedede;
     font-size: 14px;
     color: #666;
@@ -229,20 +229,26 @@ body {
     margin:0 auto;
     padding:30px;
 }
-#contentWrap .container>h1{
+#contentWrap .container>h2{
     text-align: center;
     margin:50px 0;
 }
-#contentWrap .container>h2{
+#contentWrap .container>h1{
     font-size:30px;
     height: 70px;
     border-bottom: 1px dashed #cccccc;
 }
-#contentWrap .container>h2>span.status{
+#contentWrap .container>h1>span.onlineStatus{
+    color:green;
+    margin-left:30px;
+}
+
+#contentWrap .container>h1>span.offlineStatus{
     color:red;
     margin-left:30px;
 }
-#contentWrap .container>h2>span.endTime{
+
+#contentWrap .container>h1>span.endTime{
     float:right;
 }
 
