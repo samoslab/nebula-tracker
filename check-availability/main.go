@@ -11,12 +11,12 @@ import (
 
 	pb "nebula-tracker/api/check-availability/pb"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/koding/multiconfig"
 	"github.com/robfig/cron"
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	util_aes "github.com/samoslab/nebula/util/aes"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"runtime/debug"
 
+	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/protobuf/proto"
 	"google.golang.org/grpc"
 
 	"nebula-tracker/config"
