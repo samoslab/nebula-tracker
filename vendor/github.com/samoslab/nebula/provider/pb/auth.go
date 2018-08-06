@@ -10,8 +10,8 @@ import (
 	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
-const timestamp_expired = 900
-const timestamp_ahead = -150
+const timestamp_expired = 1800
+const timestamp_ahead = -300
 
 const method_store = "Store"
 const method_retrieve = "Retrieve"

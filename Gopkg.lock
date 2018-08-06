@@ -120,7 +120,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "b39a84b56179c4e587d399d9d0af9df6abf353f8"
+  revision = "c1e42875e3696dd4733db48725e2d573587b4b58"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -137,8 +137,8 @@
 [[projects]]
   name = "github.com/sirupsen/logrus"
   packages = ["."]
-  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
-  version = "v1.0.5"
+  revision = "3e01752db0189b9157070a0e1668a620f9a85da2"
+  version = "v1.0.6"
 
 [[projects]]
   name = "github.com/stretchr/objx"
@@ -178,7 +178,7 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "a49355c7e3f8fe157a85be2f77e6e269a0f89602"
+  revision = "56440b844dfe139a8ac053f4ecac0b20b79058f4"
 
 [[projects]]
   branch = "master"
@@ -192,7 +192,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "292b43bbf7cb8d35ddf40f8d5100ef3837cced3f"
+  revision = "f4c29de78a2a91c00474a2e689954305c350adf9"
 
 [[projects]]
   branch = "master"
@@ -201,7 +201,7 @@
     "unix",
     "windows"
   ]
-  revision = "1b2967e3c290b7c545b3db0deeda16e9be4f98a2"
+  revision = "34b17bdb430002e9db9ae7ddc8480b9fa05edc22"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -228,7 +228,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "e92b116572682a5b432ddd840aeaba2a559eeff1"
+  revision = "daca94659cb50e9f37c1b834680f2e46358f10b0"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -246,7 +246,9 @@
     "internal",
     "internal/backoff",
     "internal/channelz",
+    "internal/envconfig",
     "internal/grpcrand",
+    "internal/transport",
     "keepalive",
     "metadata",
     "naming",
@@ -256,11 +258,10 @@
     "resolver/passthrough",
     "stats",
     "status",
-    "tap",
-    "transport"
+    "tap"
   ]
-  revision = "168a6198bcb0ef175f7dacec0b8691fc141dc9b8"
-  version = "v1.13.0"
+  revision = "32fb0ac620c32ba40a4626ddf94d90d12cce3455"
+  version = "v1.14.0"
 
 [[projects]]
   name = "gopkg.in/yaml.v2"
