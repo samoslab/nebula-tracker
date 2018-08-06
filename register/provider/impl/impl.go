@@ -171,7 +171,7 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	}
 	defer conn.Close()
 	psc := provider_pb.NewProviderServiceClient(conn)
-	err = pingProvider(psc)
+	err = pingProvider(psc, util_hash.Sha1(nodeId))
 	if err != nil {
 		return &pb.RegisterResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
 	}
@@ -191,10 +191,18 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	return &pb.RegisterResp{Code: 0}, nil
 }
 
-func pingProvider(client provider_pb.ProviderServiceClient) error {
+func pingProvider(client provider_pb.ProviderServiceClient, nodeIdHash []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := client.Ping(ctx, &provider_pb.PingReq{})
+	resp, err := client.Ping(ctx, &provider_pb.PingReq{})
+	if err != nil {
+		return err
+	}
+	if resp != nil && len(resp.NodeIdHash) > 0 {
+		if bytes.Equal(resp.NodeIdHash, nodeIdHash) {
+			return fmt.Errorf("nodeId not same")
+		}
+	}
 	return err
 }
 
@@ -328,7 +336,7 @@ func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.Refr
 		}
 		defer conn.Close()
 		psc := provider_pb.NewProviderServiceClient(conn)
-		err = pingProvider(psc)
+		err = pingProvider(psc, util_hash.Sha1(req.NodeId))
 		if err != nil {
 			return resp, status.Errorf(codes.Unavailable, "ping %s failed, error: %s", addr, err)
 		}
