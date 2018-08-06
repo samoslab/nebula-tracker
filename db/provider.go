@@ -310,7 +310,7 @@ func ProviderFindAllAvail() (slice []ProviderInfo) {
 
 func providerFindAllAvail(tx *sql.Tx) []ProviderInfo {
 	now := time.Now()
-	m, _ := time.ParseDuration("-5m")
+	m, _ := time.ParseDuration("-3m")
 	m1 := now.Add(m)
 	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME,LAST_CONNECT,LAST_AVAIL from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true and LAST_AVAIL>$1", m1)
 	checkErr(err)
