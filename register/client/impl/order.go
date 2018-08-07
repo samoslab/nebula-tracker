@@ -4,16 +4,21 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"nebula-tracker/db"
+	"runtime/debug"
 	"strconv"
 	"time"
 
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
 	"github.com/shopspring/decimal"
+	"github.com/yanzay/log"
 )
 
 type ClientOrderService struct {
@@ -23,7 +28,13 @@ func NewClientOrderService(pk *rsa.PrivateKey) *ClientOrderService {
 	return &ClientOrderService{}
 }
 
-func (self *ClientOrderService) AllPackage(ctx context.Context, req *pb.AllPackageReq) (*pb.AllPackageResp, error) {
+func (self *ClientOrderService) AllPackage(ctx context.Context, req *pb.AllPackageReq) (resp *pb.AllPackageResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	ap := db.AllPackageInfo()
 	res := make([]*pb.Package, 0, len(ap))
 	for _, p := range ap {
@@ -65,7 +76,13 @@ func convertOrderInfo(o *db.OrderInfo) *pb.Order {
 		Remark:      o.Remark}
 }
 
-func (self *ClientOrderService) PackageInfo(ctx context.Context, req *pb.PackageInfoReq) (*pb.PackageInfoResp, error) {
+func (self *ClientOrderService) PackageInfo(ctx context.Context, req *pb.PackageInfoReq) (resp *pb.PackageInfoResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	pi := db.GetPackageInfo(req.PackageId)
 	if pi == nil {
 		return nil, nil
@@ -73,7 +90,13 @@ func (self *ClientOrderService) PackageInfo(ctx context.Context, req *pb.Package
 	return &pb.PackageInfoResp{Package: convertPackageInfo(pi)}, nil
 }
 
-func (self *ClientOrderService) PackageDiscount(ctx context.Context, req *pb.PackageDiscountReq) (*pb.PackageDiscountResp, error) {
+func (self *ClientOrderService) PackageDiscount(ctx context.Context, req *pb.PackageDiscountReq) (resp *pb.PackageDiscountResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	m := db.GetPackageDiscount(req.PackageId)
 	res := make(map[uint32]string, len(m))
 	for k, v := range m {
@@ -82,7 +105,13 @@ func (self *ClientOrderService) PackageDiscount(ctx context.Context, req *pb.Pac
 	return &pb.PackageDiscountResp{Discount: res}, nil
 }
 
-func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPackageReq) (*pb.BuyPackageResp, error) {
+func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPackageReq) (resp *pb.BuyPackageResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.BuyPackageResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.BuyPackageResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -125,7 +154,13 @@ func (self *ClientOrderService) BuyPackage(ctx context.Context, req *pb.BuyPacka
 	return &pb.BuyPackageResp{Order: convertOrderInfo(oi)}, nil
 }
 
-func (self *ClientOrderService) MyAllOrder(ctx context.Context, req *pb.MyAllOrderReq) (*pb.MyAllOrderResp, error) {
+func (self *ClientOrderService) MyAllOrder(ctx context.Context, req *pb.MyAllOrderReq) (resp *pb.MyAllOrderResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.MyAllOrderResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.MyAllOrderResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -156,7 +191,13 @@ func (self *ClientOrderService) MyAllOrder(ctx context.Context, req *pb.MyAllOrd
 	return &pb.MyAllOrderResp{MyAllOrder: res}, nil
 }
 
-func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfoReq) (*pb.OrderInfoResp, error) {
+func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfoReq) (resp *pb.OrderInfoResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.OrderInfoResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.OrderInfoResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -190,7 +231,13 @@ func (self *ClientOrderService) OrderInfo(ctx context.Context, req *pb.OrderInfo
 	return &pb.OrderInfoResp{Order: convertOrderInfo(oi)}, nil
 }
 
-func (self *ClientOrderService) RemoveOrder(ctx context.Context, req *pb.RemoveOrderReq) (*pb.RemoveOrderResp, error) {
+func (self *ClientOrderService) RemoveOrder(ctx context.Context, req *pb.RemoveOrderReq) (resp *pb.RemoveOrderResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.RemoveOrderResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.RemoveOrderResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -228,7 +275,13 @@ func (self *ClientOrderService) RemoveOrder(ctx context.Context, req *pb.RemoveO
 	return &pb.RemoveOrderResp{}, nil
 }
 
-func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.RechargeAddressReq) (*pb.RechargeAddressResp, error) {
+func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.RechargeAddressReq) (resp *pb.RechargeAddressResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.RechargeAddressResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.RechargeAddressResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -259,7 +312,13 @@ func (self *ClientOrderService) RechargeAddress(ctx context.Context, req *pb.Rec
 	return &pb.RechargeAddressResp{RechargeAddressEnc: rechargeAddressEnc, Balance: db.GetBalance(nodeId)}, nil
 }
 
-func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderReq) (*pb.PayOrderResp, error) {
+func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderReq) (resp *pb.PayOrderResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.PayOrderResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.PayOrderResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -300,7 +359,13 @@ func (self *ClientOrderService) PayOrder(ctx context.Context, req *pb.PayOrderRe
 	return &pb.PayOrderResp{}, nil
 }
 
-func (self *ClientOrderService) UsageAmount(ctx context.Context, req *pb.UsageAmountReq) (*pb.UsageAmountResp, error) {
+func (self *ClientOrderService) UsageAmount(ctx context.Context, req *pb.UsageAmountReq) (resp *pb.UsageAmountResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.UsageAmountResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.UsageAmountResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}

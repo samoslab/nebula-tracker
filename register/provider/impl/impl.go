@@ -11,6 +11,7 @@ import (
 	"nebula-tracker/register/sendmail"
 	"net"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
+	"github.com/yanzay/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -68,7 +70,13 @@ func (self *ProviderRegisterService) GetPublicKey(ctx context.Context, req *pb.G
 	return &pb.GetPublicKeyResp{PublicKey: self.PubKeyBytes, PublicKeyHash: self.PubKeyHash, Ip: ip}, nil
 }
 
-func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (*pb.RegisterResp, error) {
+func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (resp *pb.RegisterResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.RegisterResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if !bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
 		return &pb.RegisterResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
 	}
@@ -219,7 +227,13 @@ func (self *ProviderRegisterService) reGenerateVerifyCode(nodeId string, email s
 
 const verify_sign_expired = 15
 
-func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *pb.VerifyBillEmailReq) (*pb.VerifyBillEmailResp, error) {
+func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *pb.VerifyBillEmailReq) (resp *pb.VerifyBillEmailResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.VerifyBillEmailResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.VerifyBillEmailResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -257,7 +271,13 @@ func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *p
 	return &pb.VerifyBillEmailResp{Code: 0}, nil
 }
 
-func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (*pb.ResendVerifyCodeResp, error) {
+func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (resp *pb.ResendVerifyCodeResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	pubKey := db.ProviderGetPubKey(req.NodeId)
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
@@ -281,7 +301,13 @@ func (self *ProviderRegisterService) ResendVerifyCode(ctx context.Context, req *
 	return &pb.ResendVerifyCodeResp{Success: true}, nil
 }
 
-func (self *ProviderRegisterService) AddExtraStorage(ctx context.Context, req *pb.AddExtraStorageReq) (*pb.AddExtraStorageResp, error) {
+func (self *ProviderRegisterService) AddExtraStorage(ctx context.Context, req *pb.AddExtraStorageReq) (resp *pb.AddExtraStorageResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	pubKey := db.ProviderGetPubKey(req.NodeId)
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
@@ -301,17 +327,35 @@ func (self *ProviderRegisterService) AddExtraStorage(ctx context.Context, req *p
 	return &pb.AddExtraStorageResp{Success: true}, nil
 }
 
-func (self *ProviderRegisterService) GetTrackerServer(ctx context.Context, req *pb.GetTrackerServerReq) (*pb.GetTrackerServerResp, error) {
+func (self *ProviderRegisterService) GetTrackerServer(ctx context.Context, req *pb.GetTrackerServerReq) (resp *pb.GetTrackerServerResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	// TODO
 	return nil, nil
 }
 
-func (self *ProviderRegisterService) GetCollectorServer(ctx context.Context, req *pb.GetCollectorServerReq) (*pb.GetCollectorServerResp, error) {
+func (self *ProviderRegisterService) GetCollectorServer(ctx context.Context, req *pb.GetCollectorServerReq) (resp *pb.GetCollectorServerResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	// TODO
 	return nil, nil
 }
 
-func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.RefreshIpReq) (*pb.RefreshIpResp, error) {
+func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.RefreshIpReq) (resp *pb.RefreshIpResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	pubKey := db.ProviderGetPubKey(req.NodeId)
 	if pubKey == nil {
 		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")

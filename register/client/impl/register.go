@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"nebula-tracker/db"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
+	"github.com/yanzay/log"
 	"golang.org/x/net/context"
 
 	util_hash "github.com/samoslab/nebula/util/hash"
@@ -46,7 +48,13 @@ func (self *ClientRegisterService) decrypt(data []byte) ([]byte, error) {
 	return util_rsa.DecryptLong(self.PriKey, data, node.RSA_KEY_BYTES)
 }
 
-func (self *ClientRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (*pb.RegisterResp, error) {
+func (self *ClientRegisterService) Register(ctx context.Context, req *pb.RegisterReq) (resp *pb.RegisterResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.RegisterResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil || len(req.NodeId) == 0 {
 		return &pb.RegisterResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -103,7 +111,13 @@ func (self *ClientRegisterService) reGenerateVerifyCode(nodeId string, email str
 
 const verify_sign_expired = 15
 
-func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *pb.VerifyContactEmailReq) (*pb.VerifyContactEmailResp, error) {
+func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *pb.VerifyContactEmailReq) (resp *pb.VerifyContactEmailResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.VerifyContactEmailResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
 	if req.NodeId == nil {
 		return &pb.VerifyContactEmailResp{Code: 2, ErrMsg: "NodeId is required"}, nil
 	}
@@ -141,7 +155,13 @@ func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *
 	return &pb.VerifyContactEmailResp{Code: 0}, nil
 }
 
-func (self *ClientRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (*pb.ResendVerifyCodeResp, error) {
+func (self *ClientRegisterService) ResendVerifyCode(ctx context.Context, req *pb.ResendVerifyCodeReq) (resp *pb.ResendVerifyCodeResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	nodeId := base64.StdEncoding.EncodeToString(req.NodeId)
 	pubKey := db.ClientGetPubKey(nodeId)
 	if pubKey == nil {
@@ -165,7 +185,13 @@ func (self *ClientRegisterService) ResendVerifyCode(ctx context.Context, req *pb
 	return &pb.ResendVerifyCodeResp{Success: true}, nil
 }
 
-func (self *ClientRegisterService) GetTrackerServer(ctx context.Context, req *pb.GetTrackerServerReq) (*pb.GetTrackerServerResp, error) {
+func (self *ClientRegisterService) GetTrackerServer(ctx context.Context, req *pb.GetTrackerServerReq) (resp *pb.GetTrackerServerResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
 	// TODO
 	return nil, nil
 }
