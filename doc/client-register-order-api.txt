@@ -1,0 +1,127 @@
+GetPublicKey
+non
+
+Register
+300, ErrMsg: "System error: %s"
+500, ErrMsg: "tracker public key expired"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "This NodeId is already registered"
+5, ErrMsg: "PublicKeyEnc is required"
+6, ErrMsg: "decrypt PublicKeyEnc error: "
+7, ErrMsg: "Public Key is not match NodeId"
+8, ErrMsg: "Public Key can not be parsed"
+9, ErrMsg: "ContactEmailEnc is required"
+10, ErrMsg: "decrypt ContactEmailEnc error: " 
+11, ErrMsg: "This Contact Email is already registered"
+
+VerifyContactEmail
+300, ErrMsg: "System error: %s"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "This NodeId is already registered"
+5, ErrMsg: "Verify Sign failed: "
+6, ErrMsg: "this node id is not been registered"
+7, ErrMsg: "already verified contact email"
+8, ErrMsg: "wrong verified code, will send verify email again"
+9, ErrMsg: "verify code expired, will send verify email again"
+10, ErrMsg: "auth info expired， please check your system time " 
+
+ResendVerifyCode
+codes.Internal, "System error: "
+codes.InvalidArgument "this node id is not been registered"
+codes.Unauthenticated, "auth info expired， please check your system time"
+codes.Unauthenticated, "verify sign failed: %s"
+codes.InvalidArgument, "this node id is not been registered"
+codes.AlreadyExists, "already verified！"
+
+GetTrackerServer
+codes.Internal, "System error: "
+
+
+
+
+AllPackage
+codes.Internal, "System error: "
+
+PackageInfo
+codes.Internal, "System error: "
+
+PackageDiscount
+codes.Internal, "System error: "
+
+BuyPackage
+300, ErrMsg: "System error: %s"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "this node id is not been registered"
+10, ErrMsg: "auth info expired， please check your system time"
+5, ErrMsg: "Verify Sign failed: "
+9, ErrMsg: "email not verified"
+21, ErrMsg: "package not found, id: " 
+22, ErrMsg: "can not buy a package which volume is less than current"
+
+MyAllOrder
+300, ErrMsg: "System error: %s"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "this node id is not been registered"
+10, ErrMsg: "auth info expired， please check your system time"
+5, ErrMsg: "Verify Sign failed: "
+9, ErrMsg: "email not verified"
+
+OrderInfo
+300, ErrMsg: "System error: %s"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "this node id is not been registered"
+10, ErrMsg: "auth info expired， please check your system time"
+5, ErrMsg: "Verify Sign failed: "
+9, ErrMsg: "email not verified"
+15, ErrMsg: "orderId is required"
+16, ErrMsg: "order not found, id: "
+
+RemoveOrder
+300, ErrMsg: "System error: %s"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "this node id is not been registered"
+10, ErrMsg: "auth info expired， please check your system time"
+5, ErrMsg: "Verify Sign failed: "
+9, ErrMsg: "email not verified"
+15, ErrMsg: "orderId is required"
+16, ErrMsg: "order not found, id: "
+17, ErrMsg: "can not remove order paid, id: "
+
+RechargeAddress
+300, ErrMsg: "System error: %s"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "this node id is not been registered"
+10, ErrMsg: "auth info expired， please check your system time"
+5, ErrMsg: "Verify Sign failed: "
+9, ErrMsg: "email not verified"
+20, ErrMsg: "encrypt rechargeAddress failed: "
+
+PayOrder
+300, ErrMsg: "System error: %s"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "this node id is not been registered"
+10, ErrMsg: "auth info expired， please check your system time"
+5, ErrMsg: "Verify Sign failed: "
+9, ErrMsg: "email not verified"
+15, ErrMsg: "orderId is required"
+16, ErrMsg: "order is paid"
+17, ErrMsg: "order not found, id: "
+20, ErrMsg: "balance is not enough, margin: "
+
+UsageAmount
+300, ErrMsg: "System error: %s"
+2, ErrMsg: "NodeId is required"
+3, ErrMsg: "NodeId length must be 20"
+4, ErrMsg: "this node id is not been registered"
+10, ErrMsg: "auth info expired， please check your system time"
+5, ErrMsg: "Verify Sign failed: "
+400, ErrMsg: "email not verified"
+401, ErrMsg: "not buy any package order"

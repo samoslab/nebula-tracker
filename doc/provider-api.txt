@@ -1,0 +1,10 @@
+总结一下就这9类错误：
+codes.Unknown 网络或者其它错误
+codes.InvalidArgument 客户端参数错误
+codes.Unauthenticated 授权信息验证失败
+codes.AlreadyExists 文件已存在
+codes.ResourceExhausted 已无空间
+codes.Internal 内部错误，磁盘坏道或者其它问题导致读写文件错误
+codes.NotFound 文件不存在
+codes.FailedPrecondition 调用接口错误
+codes.DataLoss 数据已丢失

@@ -607,11 +607,11 @@ func (self *MatadataService) ListFiles(ctx context.Context, req *pb.ListFilesReq
 		return &pb.ListFilesResp{Code: 4, ErrMsg: "auth info expired， please check your system time"}, nil
 	}
 	if req.PageSize > 2000 {
-		return &pb.ListFilesResp{Code: 5, ErrMsg: "page size can not more than 2000"}, nil
+		return &pb.ListFilesResp{Code: 6, ErrMsg: "page size can not more than 2000"}, nil
 	}
 
 	if err := req.VerifySign(pubKey); err != nil {
-		return &pb.ListFilesResp{Code: 6, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
+		return &pb.ListFilesResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
 	inService, emailVerified, _, _, netflow, _,
@@ -1001,6 +1001,14 @@ func (self *MatadataService) SpaceSysFile(ctx context.Context, req *pb.SpaceSysF
 	// 	return nil, status.Error(codes.OutOfRange, "download netflow exceed")
 	// }
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	inService, emailVerified, _, _, _, _,
+		_, _, _, _, _, _ := self.d.UsageAmount(nodeIdStr)
+	if !emailVerified {
+		return nil, status.Error(codes.PermissionDenied, "email not verified")
+	}
+	if !inService {
+		return nil, status.Error(codes.PermissionDenied, "not buy any package order")
+	}
 	id, isFolder, hash := self.d.FileOwnerFileExists(nodeIdStr, req.SpaceNo, nil, db.SpaceSysFilename)
 	if len(id) > 0 && !isFolder {
 		exist, _, fileData, _, _, _, _, _ := self.d.FileRetrieve(nodeIdStr, hash, req.SpaceNo)
