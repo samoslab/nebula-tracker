@@ -45,7 +45,7 @@ func main() {
 	defer dbo.Close()
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterCheckavAilabilityServiceServer(grpcServer, newCheckavAilabilityService())
+	pb.RegisterCheckAvailabilityServiceServer(grpcServer, newCheckavAilabilityService())
 
 	grpcServer.Serve(lis)
 

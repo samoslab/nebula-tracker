@@ -1,27 +1,27 @@
 package check_pb
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/hex"
-	"strconv"
 	"time"
 
+	util_bytes "github.com/samoslab/nebula/util/bytes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func genAuth(timestamp uint64, locality string, data []byte, authToken []byte) string {
+func genAuth(timestamp uint64, locality string, data []byte, authToken []byte) []byte {
 	hash := hmac.New(sha256.New, authToken)
+	hash.Write(util_bytes.FromUint64(timestamp))
 	hash.Write([]byte(locality))
-	hash.Write([]byte(strconv.FormatInt(int64(timestamp), 10)))
 	if len(data) > 0 {
 		hash.Write(data)
 	}
-	return hex.EncodeToString(hash.Sum(nil))
+	return hash.Sum(nil)
 }
 
-func checkAuth(timestamp uint64, locality string, data []byte, auth string, authToken []byte, authValidSec int64) error {
+func checkAuth(timestamp uint64, locality string, data []byte, auth []byte, authToken []byte, authValidSec int64) error {
 	current := time.Now().Unix()
 	ts := int64(timestamp)
 	if ts-current > 3 {
@@ -30,13 +30,8 @@ func checkAuth(timestamp uint64, locality string, data []byte, auth string, auth
 	if current-ts > authValidSec {
 		return status.Error(codes.InvalidArgument, "timestamp expired")
 	}
-	hash := hmac.New(sha256.New, []byte(authToken))
-	hash.Write([]byte(locality))
-	hash.Write([]byte(strconv.FormatInt(int64(timestamp), 10)))
-	if len(data) > 0 {
-		hash.Write(data)
-	}
-	if hex.EncodeToString(hash.Sum(nil)) != auth {
+
+	if bytes.Equal(genAuth(timestamp, locality, data, authToken), auth) {
 		return status.Error(codes.Unauthenticated, "auth verify error")
 	}
 	return nil

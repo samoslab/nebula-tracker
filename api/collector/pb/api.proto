@@ -1,0 +1,42 @@
+syntax = "proto3";
+package forcollector.pb;
+
+service ForCollectorService {
+
+	rpc ClientPubKey(ClientPubKeyReq)returns(ClientPubKeyResp){}
+	
+    rpc ProviderPubKey(ProviderPubKeyReq)returns(ProviderPubKeyResp){}
+    
+    rpc HourlyUpdate(HourlyUpdateReq)returns(HourlyUpdateResp){}
+
+}
+
+message ClientPubKeyReq{
+    uint64 timestamp=1;
+	bytes auth=2;
+    string nodeId=3;
+}
+
+message ClientPubKeyResp{
+    bytes pubKeyEnc=1;
+}
+
+message ProviderPubKeyReq{
+    uint64 timestamp=1;
+	bytes auth=2;
+    string nodeId=3;
+}
+
+message ProviderPubKeyResp{
+    bytes pubKeyEnc=1;
+}
+
+message HourlyUpdateReq{
+	uint64 timestamp=1;
+    bytes auth=2;
+    bytes data=3;
+}
+
+message HourlyUpdateResp{
+    
+}

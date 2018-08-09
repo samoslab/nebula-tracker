@@ -1,7 +1,7 @@
 syntax = "proto3";
 package check.pb;
 
-service CheckavAilabilityService {
+service CheckAvailabilityService {
 
 	rpc FindProvider(FindProviderReq)returns(FindProviderResp){}
 	
@@ -11,7 +11,7 @@ service CheckavAilabilityService {
 
 message FindProviderReq{
 	uint64 timestamp=1;
-	string auth=2;
+	bytes auth=2;
 	string locality=3;
 }
 
@@ -21,7 +21,7 @@ message FindProviderResp{
 
 message UpdateStatusReq{
 	uint64 timestamp=1;
-	string auth=2;
+	bytes auth=2;
 	string locality=3;
 	bytes data=4;
 }

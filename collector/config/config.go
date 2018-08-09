@@ -48,10 +48,10 @@ type Server struct {
 }
 
 type TrackerInterface struct {
-	ContextPath   string `default:"http://localhost:6655/api"`
-	ApiToken      string `default:"test"`
-	EncryptKeyHex string `default:"4fcf16120e28dec237da6ecdcb7ec3be"`
-	Debug         bool   `default:"false"`
+	ApiHostAndPort []string
+	ApiToken       string `default:"test"`
+	EncryptKeyHex  string `default:"4fcf16120e28dec237da6ecdcb7ec3be"`
+	Debug          bool   `default:"false"`
 }
 
 func GetCollectorConfig() *CollectorConfig {
