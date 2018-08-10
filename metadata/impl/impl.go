@@ -285,17 +285,19 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 }
 
 const done_expired = 1800
+const ticket_sep = "-"
 
 func uuidStr() string {
 	u := uuid.NewV4()
-	return "-" + base64.StdEncoding.EncodeToString(u[:])
+	return base64.StdEncoding.EncodeToString(u[:])
 }
+
 func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, fileHash []byte, fileSize uint64, blockHash []byte, blockSize uint64) []*pb.ReplicaProvider {
 	pis := self.c.Choose(num)
 	res := make([]*pb.ReplicaProvider, 0, len(pis))
 	ts := uint64(time.Now().Unix())
 	for _, pi := range pis {
-		ticket := nodeId + uuidStr()
+		ticket := nodeId + ticket_sep + pi.NodeId + ticket_sep + uuidStr()
 		res = append(res, &pb.ReplicaProvider{NodeId: pi.NodeIdBytes,
 			Port:      pi.Port,
 			Server:    pi.Server(),
@@ -418,7 +420,7 @@ func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash 
 		proAuth := make([]*pb.BlockProviderAuth, 0, len(pis))
 		for i, piece := range part.Piece {
 			pi := pis[i]
-			ticket := nodeId + uuidStr()
+			ticket := nodeId + ticket_sep + pi.NodeId + ticket_sep + uuidStr()
 			proAuth = append(proAuth, &pb.BlockProviderAuth{NodeId: pi.NodeIdBytes,
 				Server: pi.Server(),
 				Port:   pi.Port,
@@ -453,7 +455,7 @@ func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash 
 			pi := pis[pieceCnt+i/each]
 			bpa := proAuth[pieceCnt+i/each]
 			piece := part.Piece[i%pieceCnt]
-			ticket := nodeId + uuidStr()
+			ticket := nodeId + ticket_sep + pi.NodeId + ticket_sep + uuidStr()
 			bpa.HashAuth = append(bpa.HashAuth, &pb.PieceHashAuth{Hash: piece.Hash,
 				Size:   piece.Size,
 				Ticket: ticket,
@@ -791,7 +793,7 @@ func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte,
 				}
 				providerMap[n] = pro
 			}
-			ticket := nodeId + uuidStr()
+			ticket := nodeId + ticket_sep + n + ticket_sep + uuidStr()
 			store = append(store, &pb.RetrieveNode{NodeId: bytes,
 				Server: pro.Server(),
 				Port:   pro.Port,
