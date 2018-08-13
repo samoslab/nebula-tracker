@@ -31,7 +31,7 @@ func checkAuth(timestamp uint64, locality string, data []byte, auth []byte, auth
 		return status.Error(codes.InvalidArgument, "timestamp expired")
 	}
 
-	if bytes.Equal(genAuth(timestamp, locality, data, authToken), auth) {
+	if !bytes.Equal(genAuth(timestamp, locality, data, authToken), auth) {
 		return status.Error(codes.Unauthenticated, "auth verify error")
 	}
 	return nil

@@ -104,7 +104,7 @@ func (self *ForCollectorService) ProviderPubKey(ctx context.Context, req *pb.Pro
 		return nil, status.Error(codes.InvalidArgument, "node id is required.")
 	}
 
-	pubKey := db.ClientGetPubKeyBytesByNodeId(req.NodeId)
+	pubKey := db.ProviderGetPubKeyBytesByNodeId(req.NodeId)
 	if len(pubKey) == 0 {
 		return nil, status.Error(codes.NotFound, "node id not exist: "+req.NodeId)
 	}
