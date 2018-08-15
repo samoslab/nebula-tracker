@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"time"
 
@@ -81,18 +82,30 @@ func parseAndCheck(ticket string) (pass bool, clientId string, providerId string
 	}
 }
 
-func SaveFromProvider(nodeId string, timestamp uint64, als []*tcp_pb.ActionLog) {
+func SaveFromProvider(nodeId string, timestamp uint64, als []*tcp_pb.ActionLog) (err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			err = fmt.Errorf("db error: %s", er)
+		}
+	}()
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	saveFromProvider(tx, nodeId, timestamp, als)
 	checkErr(tx.Commit())
 	commit = true
+	return
 }
 
-func SaveFromClient(nodeId string, timestamp uint64, als []*tcc_pb.ActionLog) {
+func SaveFromClient(nodeId string, timestamp uint64, als []*tcc_pb.ActionLog) (err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			err = fmt.Errorf("db error: %s", er)
+		}
+	}()
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	saveFromClient(tx, nodeId, timestamp, als)
 	checkErr(tx.Commit())
 	commit = true
+	return
 }

@@ -82,8 +82,14 @@ func (*LogConsumer) HandleMessage(msg *nsq.Message) error {
 		log.Warnf("Verify Sign failed, nodeId: %s, err: %s", nodeId, err)
 		return nil
 	}
-	db.SaveFromProvider(nodeId, batch.Timestamp, batch.ActionLog)
-	return nil
+	err = nil
+	for i := 0; i < 5; i++ {
+		if err = db.SaveFromProvider(nodeId, batch.Timestamp, batch.ActionLog); err == nil {
+			break
+		}
+		log.Warnf("save to db failed, times: %d, err: %s", i, err)
+	}
+	return err
 }
 
 var pubKeyCache = cache.New(20*time.Minute, 10*time.Minute)
