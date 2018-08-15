@@ -52,17 +52,18 @@ func ClientPubKey(nodeId string) ([]byte, error) {
 	req := &pb.ClientPubKeyReq{Timestamp: uint64(time.Now().Unix()),
 		NodeId: nodeId}
 	req.GenAuth(apiToken)
-	resp, er := client.ClientPubKey(ctx, req)
-	if er != nil {
+	resp, err := client.ClientPubKey(ctx, req)
+	if err != nil {
 		st, ok := status.FromError(err)
 		if ok {
 			if st.Code() == codes.NotFound {
+				log.Warnf("Not found %s, error: %v", nodeId, err)
 				return nil, nil
 			} else if st.Code() == codes.InvalidArgument || st.Code() == codes.Unauthenticated {
 				panic(err)
 			}
 		}
-		return nil, er
+		return nil, err
 	}
 	bs, er := util_aes.Decrypt(resp.PubKeyEnc, encryptKey)
 	if er != nil {

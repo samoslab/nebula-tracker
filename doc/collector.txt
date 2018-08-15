@@ -1,0 +1,4 @@
+old data stats:
+
+select CLT_TYPE,TICKET_CLIENT_ID,sum(COALESCE(CLT_TRANSPORT_SIZE, PVD_TRANSPORT_SIZE)) from bak_action_log group by CLT_TYPE,TICKET_CLIENT_ID;
+select PVD_TYPE,PVD_NODE_ID,sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE)) from bak_action_log where PVD_NODE_ID is not null and PVD_NODE_ID<>'' group by PVD_TYPE,PVD_NODE_ID;
