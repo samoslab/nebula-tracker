@@ -9,6 +9,7 @@ import (
 	"net"
 	"runtime/debug"
 
+	"github.com/gogo/protobuf/proto"
 	util_aes "github.com/samoslab/nebula/util/aes"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -116,6 +117,23 @@ func (self *ForCollectorService) ProviderPubKey(ctx context.Context, req *pb.Pro
 	}
 }
 
+const KEY_LAST_START string = "collector-last-summarize"
+
+func (self *ForCollectorService) GetLastSummary(ctx context.Context, req *pb.GetLastSummaryReq) (resp *pb.GetLastSummaryResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
+	conf := config.GetInterfaceConfig()
+	if err = req.CheckAuth([]byte(conf.AuthToken), int64(conf.AuthValidSec)); err != nil {
+		return
+	}
+	intVal, _, _ := db.GetKvStore(KEY_LAST_START)
+	return &pb.GetLastSummaryResp{LastSummary: intVal}, nil
+}
+
 func (self *ForCollectorService) HourlyUpdate(ctx context.Context, req *pb.HourlyUpdateReq) (resp *pb.HourlyUpdateResp, err error) {
 	defer func() {
 		if er := recover(); er != nil {
@@ -123,6 +141,19 @@ func (self *ForCollectorService) HourlyUpdate(ctx context.Context, req *pb.Hourl
 			err = status.Errorf(codes.Internal, "System error: %s", er)
 		}
 	}()
-
-	return nil, nil
+	conf := config.GetInterfaceConfig()
+	if err = req.CheckAuth([]byte(conf.AuthToken), int64(conf.AuthValidSec)); err != nil {
+		return
+	}
+	data, err := util_aes.Decrypt(req.Data, encryptKey)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	hs := &pb.HourlySummary{}
+	err = proto.Unmarshal(data, hs)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	db.SaveHourlySummary(KEY_LAST_START, hs)
+	return &pb.HourlyUpdateResp{}, nil
 }

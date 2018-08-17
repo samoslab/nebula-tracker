@@ -383,6 +383,10 @@ func UsageAmount(nodeId string) (inService bool, emailVerified bool, packageId i
 	inService, emailVerified, packageId, volume, netflow, upNetflow, downNetflow, endTime = getCurrentPackage(tx, nodeId)
 	volume, netflow, upNetflow, downNetflow = volume*1024, netflow*1024, upNetflow*1024, downNetflow*1024
 	usageVolume, usageNetflow, usageUpNetflow, usageDownNetflow, _ = getClientUsageAmount(tx, nodeId)
+	serviceSeq := getServiceSeq(tx, nodeId, time.Now())
+	ud, uu := getClientNetflow(tx, nodeId, serviceSeq)
+	usageUpNetflow, usageDownNetflow = uint32(uu/1048576), uint32(ud/1048576)
+	usageNetflow = usageUpNetflow + usageDownNetflow
 	checkErr(tx.Commit())
 	commit = true
 	return

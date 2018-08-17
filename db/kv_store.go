@@ -59,3 +59,18 @@ func SaveKvStore(name string, intVal int64, strVal string) {
 	checkErr(tx.Commit())
 	commit = true
 }
+
+func saveKvStoreCheckOldValue(tx *sql.Tx, name string, intVal int64, oldIntVal int64, strVal string, oldStrVal string) bool {
+	stmt, err := tx.Prepare("update KV_STORE set INT_VAL=$2, STR_VAL=$3 where NAME=$1 and INT_VAL=$4 and STR_VAL=$5")
+	checkErr(err)
+	defer stmt.Close()
+	res, err := stmt.Exec(name, intVal, strVal, oldIntVal, oldStrVal)
+	checkErr(err)
+	rowCnt, err := res.RowsAffected()
+	checkErr(err)
+	if rowCnt == 1 {
+		return true
+	} else {
+		return false
+	}
+}

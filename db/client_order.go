@@ -156,11 +156,11 @@ func cancelUnpaidOrder(tx *sql.Tx, nodeId string) {
 	checkErr(err)
 }
 
-func updatePayTime(tx *sql.Tx, nodeId string, id []byte, startTime time.Time, endTime time.Time, payTime time.Time) {
-	stmt, err := tx.Prepare("update CLIENT_ORDER set START_TIME=$3,END_TIME=$4,PAY_TIME=$5,LAST_MODIFIED=$6 where NODE_ID=$1 and ID=$2 and PAY_TIME is null")
+func updatePayTime(tx *sql.Tx, nodeId string, id []byte, startTime time.Time, endTime time.Time, payTime time.Time, serviceSeq uint32) {
+	stmt, err := tx.Prepare("update CLIENT_ORDER set START_TIME=$3,END_TIME=$4,PAY_TIME=$5,LAST_MODIFIED=$6,SERVICE_SEQ=$7 where NODE_ID=$1 and ID=$2 and PAY_TIME is null")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(nodeId, id, startTime, endTime, payTime, payTime)
+	rs, err := stmt.Exec(nodeId, id, startTime, endTime, payTime, payTime, serviceSeq)
 	checkErr(err)
 	rowsAffected, err := rs.RowsAffected()
 	checkErr(err)
@@ -193,12 +193,15 @@ func PayOrder(nodeId string, orderId []byte, amount uint64, validDays uint32, pa
 	defer rollback(tx, &commit)
 	reduceBalanceToPayOrder(tx, nodeId, amount)
 	inService, _, _, _, _, _, _, endServiceTime := getCurrentPackage(tx, nodeId)
+	serviceSeq := getMaxServiceSeq(tx, nodeId)
 	if inService {
 		startTime = endServiceTime
+	} else {
+		serviceSeq += 1
 	}
 	dd, _ := time.ParseDuration(strconv.Itoa(24*int(validDays)) + "h")
 	endTime := startTime.Add(dd)
-	updatePayTime(tx, nodeId, orderId, startTime, endTime, payTime)
+	updatePayTime(tx, nodeId, orderId, startTime, endTime, payTime, serviceSeq)
 	updateCurrentPackage(tx, nodeId, packageId, volume, netflow, upNetflow, downNetflow, endTime, inService)
 	if !inService {
 		resetClientUsageAmountNetflow(tx, nodeId)
@@ -206,5 +209,49 @@ func PayOrder(nodeId string, orderId []byte, amount uint64, validDays uint32, pa
 	// TODO remove other upgrade order
 	checkErr(tx.Commit())
 	commit = true
+	return
+}
+
+func getMaxServiceSeq(tx *sql.Tx, nodeId string) (seq uint32) {
+	rows, err := tx.Query("select max(SERVICE_SEQ) from CLIENT_ORDER where NODE_ID=$1 and PAY_TIME is not null", nodeId)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&seq)
+		checkErr(err)
+		return
+	}
+	return
+}
+
+func getCurrentServiceSeq(tx *sql.Tx, nodeId string, timestamp time.Time) (seq uint32) {
+	rows, err := tx.Query("select SERVICE_SEQ from CLIENT_ORDER where NODE_ID=$1 and PAY_TIME is not null and $2 BETWEEN START_TIME and END_TIME limit 1", nodeId, timestamp)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&seq)
+		checkErr(err)
+		return
+	}
+	return
+}
+
+func getLastServiceSeq(tx *sql.Tx, nodeId string, timestamp time.Time) (seq uint32) {
+	rows, err := tx.Query("select SERVICE_SEQ from CLIENT_ORDER where NODE_ID=$1 and PAY_TIME is not null and END_TIME<=$2 order by END_TIME desc limit 1", nodeId, timestamp)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&seq)
+		checkErr(err)
+		return
+	}
+	return
+}
+
+func getServiceSeq(tx *sql.Tx, nodeId string, timestamp time.Time) (seq uint32) {
+	seq = getCurrentServiceSeq(tx, nodeId, timestamp)
+	if seq == 0 {
+		seq = getLastServiceSeq(tx, nodeId, timestamp)
+	}
 	return
 }

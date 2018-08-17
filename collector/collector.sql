@@ -72,10 +72,3 @@ create table IF NOT EXISTS PROVIDER_CHEATING_RECORD(
 
 CREATE INDEX CLIENT_PROVIDER_CHEATING_NODE_ID ON PROVIDER_CHEATING_RECORD (NODE_ID);
 
-
-create table KV_STORE(
-    NAME varchar(64) not null,
-    INT_VAL bigint default null,
-    STR_VAL varchar(255) default null,
-    primary key(NAME)
-);

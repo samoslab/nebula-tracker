@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	pb "nebula-tracker/api/collector/pb"
+
 	tcc_pb "github.com/samoslab/nebula/tracker/collector/client/pb"
 	tcp_pb "github.com/samoslab/nebula/tracker/collector/provider/pb"
 )
@@ -105,6 +107,51 @@ func SaveFromClient(nodeId string, timestamp uint64, als []*tcc_pb.ActionLog) (e
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	saveFromClient(tx, nodeId, timestamp, als)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func hourySummarizeClient(tx *sql.Tx, start time.Time, end time.Time) []*pb.ClientItem {
+	rows, err := tx.Query("select COALESCE(CLT_TYPE,PVD_TYPE)=1,TICKET_CLIENT_ID,COALESCE(CLT_END_TIME,PVD_END_TIME)::date,(sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE)))::int from action_log where COALESCE(CLT_END_TIME,PVD_END_TIME) between $1 and $2 group by COALESCE(CLT_TYPE,PVD_TYPE)=1,TICKET_CLIENT_ID,COALESCE(CLT_END_TIME,PVD_END_TIME)::date having sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE))>0", start, end)
+	checkErr(err)
+	defer rows.Close()
+	res := make([]*pb.ClientItem, 0, 32)
+	for rows.Next() {
+		ci := &pb.ClientItem{}
+		var day time.Time
+		err = rows.Scan(&ci.Upstream, &ci.NodeId, &day, &ci.Netflow)
+		ci.Day = day.UTC().Format("2006-01-02")
+		checkErr(err)
+		res = append(res, ci)
+	}
+	return res
+}
+
+func hourySummarizeProvider(tx *sql.Tx, start time.Time, end time.Time) []*pb.ProviderItem {
+	rows, err := tx.Query("select COALESCE(PVD_TYPE,CLT_TYPE),TICKET_PROVIDER_ID,COALESCE(PVD_END_TIME,CLT_END_TIME)::date,(sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE)))::int from action_log where COALESCE(PVD_END_TIME,CLT_END_TIME) between $1 and $2 group by COALESCE(PVD_TYPE,CLT_TYPE),TICKET_PROVIDER_ID,COALESCE(PVD_END_TIME,CLT_END_TIME)::date having sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE))>0", start, end)
+	checkErr(err)
+	defer rows.Close()
+	res := make([]*pb.ProviderItem, 0, 32)
+	for rows.Next() {
+		ci := &pb.ProviderItem{}
+		var day time.Time
+		err = rows.Scan(&ci.Type, &ci.NodeId, &day, &ci.Netflow)
+		ci.Day = day.UTC().Format("2006-01-02")
+		checkErr(err)
+		res = append(res, ci)
+	}
+	return res
+}
+
+func HouryNaSummarize(last int64, startTimestamp int64) (hs *pb.HourlySummary) {
+	start := time.Unix(startTimestamp, 0)
+	end := time.Unix(startTimestamp+3600, 0)
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	pis := hourySummarizeProvider(tx, start, end)
+	cis := hourySummarizeClient(tx, start, end)
+	hs = &pb.HourlySummary{Last: last, Start: startTimestamp, ClientItem: cis, ProviderItem: pis}
 	checkErr(tx.Commit())
 	commit = true
 	return

@@ -9,6 +9,8 @@ service ForCollectorService {
     
     rpc HourlyUpdate(HourlyUpdateReq)returns(HourlyUpdateResp){}
 
+    rpc GetLastSummary(GetLastSummaryReq)returns(GetLastSummaryResp){}
+
 }
 
 message ClientPubKeyReq{
@@ -38,5 +40,34 @@ message HourlyUpdateReq{
 }
 
 message HourlyUpdateResp{
-    
+}
+
+message ClientItem{
+    bool upstream=1;
+    string nodeId=2;
+    string day=3;
+    uint64 netflow=4;
+}
+
+message ProviderItem{
+    int32 type=1;
+    string nodeId=2;
+    string day=3;
+    uint64 netflow=4; 
+}
+
+message HourlySummary{
+    int64 last=1;
+    int64 start=2;
+    repeated ClientItem clientItem=3;
+    repeated ProviderItem providerItem=4;
+}
+
+message GetLastSummaryReq{
+    uint64 timestamp=1;
+	bytes auth=2;
+}
+
+message GetLastSummaryResp{
+    int64 lastSummary=1;
 }
