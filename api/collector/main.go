@@ -117,9 +117,9 @@ func (self *ForCollectorService) ProviderPubKey(ctx context.Context, req *pb.Pro
 	}
 }
 
-const KEY_LAST_START string = "collector-last-summarize"
+const KEY_NEXT_START string = "collector-next-analysis-start"
 
-func (self *ForCollectorService) GetLastSummary(ctx context.Context, req *pb.GetLastSummaryReq) (resp *pb.GetLastSummaryResp, err error) {
+func (self *ForCollectorService) NextAnalysisStart(ctx context.Context, req *pb.NextAnalysisStartReq) (resp *pb.NextAnalysisStartResp, err error) {
 	defer func() {
 		if er := recover(); er != nil {
 			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
@@ -130,8 +130,8 @@ func (self *ForCollectorService) GetLastSummary(ctx context.Context, req *pb.Get
 	if err = req.CheckAuth([]byte(conf.AuthToken), int64(conf.AuthValidSec)); err != nil {
 		return
 	}
-	intVal, _, _ := db.GetKvStore(KEY_LAST_START)
-	return &pb.GetLastSummaryResp{LastSummary: intVal}, nil
+	intVal, _, _ := db.GetKvStore(KEY_NEXT_START)
+	return &pb.NextAnalysisStartResp{Start: intVal}, nil
 }
 
 func (self *ForCollectorService) HourlyUpdate(ctx context.Context, req *pb.HourlyUpdateReq) (resp *pb.HourlyUpdateResp, err error) {
@@ -154,6 +154,6 @@ func (self *ForCollectorService) HourlyUpdate(ctx context.Context, req *pb.Hourl
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	db.SaveHourlySummary(KEY_LAST_START, hs)
+	db.SaveHourlySummary(KEY_NEXT_START, hs)
 	return &pb.HourlyUpdateResp{}, nil
 }

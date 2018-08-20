@@ -3,19 +3,25 @@ package db
 import (
 	"database/sql"
 	pb "nebula-tracker/api/collector/pb"
+	"strconv"
 	"time"
 )
 
-func saveClientDailyNetflow(tx *sql.Tx, start time.Time, cis []*pb.ClientItem) {
+const DateAndHourTimeFormat = "2006-01-02 15"
+
+func saveClientDailyNetflow(tx *sql.Tx, cis []*pb.ClientItem) {
 	stmt, err := tx.Prepare("insert into CLIENT_DAILY_NETFLOW(NODE_ID,DAY,SERVICE_SEQ,UPSTREAM,CREATION,LAST_MODIFIED,NETFLOW) values ($1,$2,$3,$4,now(),now(),$5) ON CONFLICT (NODE_ID,DAY,SERVICE_SEQ,UPSTREAM) DO UPDATE SET LAST_MODIFIED=now(),NETFLOW=CLIENT_DAILY_NETFLOW.NETFLOW+excluded.NETFLOW")
 	defer stmt.Close()
 	checkErr(err)
 	serviceSeqMap := make(map[string]uint32, 16)
 	for _, ci := range cis {
-		serviceSeq, ok := serviceSeqMap[ci.NodeId]
+		key := ci.NodeId + " " + ci.Day + " " + strconv.Itoa(int(ci.Hour))
+		serviceSeq, ok := serviceSeqMap[key]
 		if !ok {
-			serviceSeq = getServiceSeq(tx, ci.NodeId, start)
-			serviceSeqMap[ci.NodeId] = serviceSeq
+			hourStart, err := time.Parse(DateAndHourTimeFormat, ci.Day+" "+strconv.Itoa(int(ci.Hour)))
+			checkErr(err)
+			serviceSeq = getServiceSeq(tx, ci.NodeId, hourStart)
+			serviceSeqMap[key] = serviceSeq
 		}
 		_, err = stmt.Exec(ci.NodeId, ci.Day, serviceSeq, ci.Upstream, ci.Netflow)
 		checkErr(err)
@@ -43,11 +49,10 @@ func getClientNetflow(tx *sql.Tx, nodeId string, serviceSeq uint32) (downNetflow
 func SaveHourlySummary(keyName string, hs *pb.HourlySummary) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	if !saveKvStoreCheckOldValue(tx, keyName, hs.Start, hs.Last, "", "") {
+	if !saveKvStoreCheckOldValue(tx, keyName, hs.NextStart, hs.Start, "", "") {
 		return
 	}
-	start := time.Unix(hs.Start, 0)
-	saveClientDailyNetflow(tx, start, hs.ClientItem)
+	saveClientDailyNetflow(tx, hs.ClientItem)
 	saveProviderDailyNetflow(tx, hs.ProviderItem)
 	checkErr(tx.Commit())
 	commit = true

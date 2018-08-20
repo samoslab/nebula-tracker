@@ -62,10 +62,10 @@ func (self *HourlyUpdateReq) CheckAuth(authToken []byte, authValidSec int64) err
 	return checkAuth(self.Timestamp, "", self.Data, self.Auth, authToken, authValidSec)
 }
 
-func (self *GetLastSummaryReq) GenAuth(authToken []byte) {
+func (self *NextAnalysisStartReq) GenAuth(authToken []byte) {
 	self.Auth = genAuth(self.Timestamp, "", nil, authToken)
 }
 
-func (self *GetLastSummaryReq) CheckAuth(authToken []byte, authValidSec int64) error {
+func (self *NextAnalysisStartReq) CheckAuth(authToken []byte, authValidSec int64) error {
 	return checkAuth(self.Timestamp, "", nil, self.Auth, authToken, authValidSec)
 }

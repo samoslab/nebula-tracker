@@ -1,5 +1,5 @@
 init:
-update KV_STORE set INT_VAL=1533888000 where name='collector-last-summarize';
+update KV_STORE set INT_VAL=1533888000 where name='collector-next-analysis-start';
 
 old data stats:
 

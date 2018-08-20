@@ -49,7 +49,7 @@ func main() {
 
 	dbo := db.OpenDb(&conf.Db)
 	defer dbo.Close()
-	analysis()
+	analysis(int64(conf.BatchSecs))
 }
 
 func GetConfig(path string) *Config {
@@ -67,9 +67,10 @@ func GetConfig(path string) *Config {
 type Config struct {
 	Db               config.Db
 	TrackerInterface config.TrackerInterface
+	BatchSecs        int `default:"1800"`
 }
 
-func getLastSummary() (int64, error) {
+func getNextAnalysisStart() (int64, error) {
 	conn, err := grpc.Dial(apiHostAndPort[0], grpc.WithInsecure())
 	if err != nil {
 		return 0, err
@@ -78,13 +79,13 @@ func getLastSummary() (int64, error) {
 	client := pb.NewForCollectorServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	req := &pb.GetLastSummaryReq{Timestamp: uint64(time.Now().Unix())}
+	req := &pb.NextAnalysisStartReq{Timestamp: uint64(time.Now().Unix())}
 	req.GenAuth(apiToken)
-	resp, err := client.GetLastSummary(ctx, req)
+	resp, err := client.NextAnalysisStart(ctx, req)
 	if err != nil {
 		return 0, err
 	}
-	return resp.LastSummary, nil
+	return resp.Start, nil
 }
 
 func hourlyUpdate(data []byte) error {
@@ -102,32 +103,30 @@ func hourlyUpdate(data []byte) error {
 	return err
 }
 
-const KEY_LAST_START string = "collector-last-summarize"
+const KEY_LAST_START string = "collector-next-analysis-start"
 
-func analysis() {
-	var lastSummary int64
+func analysis(batchSecs int64) {
+	var start int64
 	var err error
 	for i := 0; i < 5; i++ {
-		lastSummary, err = getLastSummary()
+		start, err = getNextAnalysisStart()
 		if err == nil {
 			break
 		} else {
-			log.Warnf("getLastSummary, times: %d, error: %v", err)
+			log.Warnf("getNextAnalysisStart, times: %d, error: %v", err)
 		}
 	}
 	if err != nil {
 		panic(err)
 	}
-	if lastSummary == 0 {
+	if start == 0 {
 		// start = 1533891600 //2018/8/10 9:00:00 UTC
-		panic("zero lastSummary")
+		panic("zero start")
 	}
-	start := lastSummary + 3600
-
 	current := time.Now().Unix() - 600
-	for ; start < current; start += 3600 {
-		hs := db.HouryNaSummarize(lastSummary, start)
-		fmt.Printf("Last: %d, Start: %d, Provider Count: %d, Client Count: %d\n", hs.Last, hs.Start, len(hs.ProviderItem), len(hs.ClientItem))
+	for nextStart := start + batchSecs; nextStart < current; nextStart += batchSecs {
+		hs := db.HouryNaSummarize(start, nextStart)
+		fmt.Printf("Start: %d, NextStart: %d, Provider Count: %d, Client Count: %d\n", hs.Start, hs.NextStart, len(hs.ProviderItem), len(hs.ClientItem))
 		data, err := proto.Marshal(hs)
 		if err != nil {
 			panic(err)
@@ -139,7 +138,7 @@ func analysis() {
 		for i := 0; i < 5; i++ {
 			err = hourlyUpdate(en)
 			if err == nil {
-				lastSummary = start
+				start = nextStart
 				break
 			} else {
 				log.Warnf("hourlyUpdate, times: %d, error: %v", i, err)

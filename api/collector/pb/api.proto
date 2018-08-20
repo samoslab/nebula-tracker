@@ -9,7 +9,7 @@ service ForCollectorService {
     
     rpc HourlyUpdate(HourlyUpdateReq)returns(HourlyUpdateResp){}
 
-    rpc GetLastSummary(GetLastSummaryReq)returns(GetLastSummaryResp){}
+    rpc NextAnalysisStart(NextAnalysisStartReq)returns(NextAnalysisStartResp){}
 
 }
 
@@ -46,7 +46,8 @@ message ClientItem{
     bool upstream=1;
     string nodeId=2;
     string day=3;
-    uint64 netflow=4;
+    uint32 hour=4;
+    uint64 netflow=5;
 }
 
 message ProviderItem{
@@ -57,17 +58,17 @@ message ProviderItem{
 }
 
 message HourlySummary{
-    int64 last=1;
-    int64 start=2;
+    int64 start=1;
+    int64 nextStart=2;
     repeated ClientItem clientItem=3;
     repeated ProviderItem providerItem=4;
 }
 
-message GetLastSummaryReq{
+message NextAnalysisStartReq{
     uint64 timestamp=1;
 	bytes auth=2;
 }
 
-message GetLastSummaryResp{
-    int64 lastSummary=1;
+message NextAnalysisStartResp{
+    int64 start=1;
 }
