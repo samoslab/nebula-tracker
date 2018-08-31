@@ -16,20 +16,26 @@
 [[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
-  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
-  version = "v1.1.0"
+  revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
+  version = "v1.1.1"
 
 [[projects]]
-  branch = "master"
   name = "github.com/fatih/camelcase"
   packages = ["."]
   revision = "44e46d280b43ec1531bb25252440e34f1b800b65"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/fatih/structs"
   packages = ["."]
   revision = "a720dfa8df582c51dee1b36feabb906bde1588bd"
   version = "v1.0"
+
+[[projects]]
+  name = "github.com/gogo/protobuf"
+  packages = ["proto"]
+  revision = "636bf0302bc95575d69441b25a2603156ffdddf1"
+  version = "v1.1.1"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -40,8 +46,8 @@
     "ptypes/duration",
     "ptypes/timestamp"
   ]
-  revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
-  version = "v1.1.0"
+  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
+  version = "v1.2.0"
 
 [[projects]]
   branch = "master"
@@ -56,13 +62,13 @@
   revision = "69c27309b2d751c576b59ea9c3726597c2375da3"
 
 [[projects]]
-  branch = "master"
   name = "github.com/lib/pq"
   packages = [
     ".",
     "oid"
   ]
-  revision = "90697d60dd844d5ef6ff15135d0203f65d2f53b8"
+  revision = "4ded0e9383f75c197b3a2aaa6d590ac52df6fd79"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -120,7 +126,7 @@
     "util/num",
     "util/rsa"
   ]
-  revision = "c1e42875e3696dd4733db48725e2d573587b4b58"
+  revision = "ca079d238cf7c0d99fb3a5317d5e9ce4be2b46ff"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -172,13 +178,19 @@
     "leveldb/table",
     "leveldb/util"
   ]
-  revision = "c4c61651e9e37fa117f53c5a906d3b63090d8445"
+  revision = "ae2bd5eed72d46b28834ec3f60db3a3ebedd8dbd"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/yanzay/log"
+  packages = ["."]
+  revision = "87352bb235060cca8427c8f9fdd68c83b38ba461"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "56440b844dfe139a8ac053f4ecac0b20b79058f4"
+  revision = "614d502a4dac94afa3a6ce146bd1736da82514c6"
 
 [[projects]]
   branch = "master"
@@ -192,7 +204,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "f4c29de78a2a91c00474a2e689954305c350adf9"
+  revision = "8a410e7b638dca158bf9e766925842f6651ff828"
 
 [[projects]]
   branch = "master"
@@ -201,7 +213,7 @@
     "unix",
     "windows"
   ]
-  revision = "34b17bdb430002e9db9ae7ddc8480b9fa05edc22"
+  revision = "d99a578cf41bfccdeaf48b0845c823a4b8b0ad5e"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -228,7 +240,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "daca94659cb50e9f37c1b834680f2e46358f10b0"
+  revision = "c66870c02cf823ceb633bcd05be3c7cda29976f4"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -272,6 +284,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "59b92e95c5210af8858d0da2b4801a744e1275e20b088911db5215573922caf0"
+  inputs-digest = "ae8b117c4268cb52b0444403c351ac52c58c53a59ba39093ede7cdeb8aab0a44"
   solver-name = "gps-cdcl"
   solver-version = 1

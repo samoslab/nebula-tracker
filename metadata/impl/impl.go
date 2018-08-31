@@ -320,7 +320,7 @@ func fixFileName(name string) string {
 	return name[0:pos] + "_" + strconv.FormatInt(time.Now().Unix(), 10) + name[pos:]
 }
 
-const verify_sign_expired = 15
+const verify_sign_expired = 300
 
 func (self *MatadataService) UploadFilePrepare(ctx context.Context, req *pb.UploadFilePrepareReq) (resp *pb.UploadFilePrepareResp, err error) {
 	defer func() {
@@ -1022,4 +1022,8 @@ func (self *MatadataService) SpaceSysFile(ctx context.Context, req *pb.SpaceSysF
 	} else {
 		return nil, status.Errorf(codes.NotFound, "not exist")
 	}
+}
+
+func (self *MatadataService) Ping(ctx context.Context, req *pb.PingReq) (resp *pb.PingResp, err error) {
+	return &pb.PingResp{}, nil
 }

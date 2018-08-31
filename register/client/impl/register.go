@@ -109,7 +109,7 @@ func (self *ClientRegisterService) reGenerateVerifyCode(nodeId string, email str
 	self.sendVerifyCodeToContactEmail(nodeId, email, randomCode)
 }
 
-const verify_sign_expired = 15
+const verify_sign_expired = 300
 
 func (self *ClientRegisterService) VerifyContactEmail(ctx context.Context, req *pb.VerifyContactEmailReq) (resp *pb.VerifyContactEmailResp, err error) {
 	defer func() {

@@ -217,8 +217,12 @@ func getMaxServiceSeq(tx *sql.Tx, nodeId string) (seq uint32) {
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
-		err = rows.Scan(&seq)
+		var val sql.NullInt64
+		err = rows.Scan(&val)
 		checkErr(err)
+		if val.Valid {
+			return uint32(val.Int64)
+		}
 		return
 	}
 	return

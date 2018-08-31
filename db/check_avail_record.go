@@ -17,7 +17,7 @@ func saveCheckAvailRecord(tx *sql.Tx, locality string, ps ...*pb.ProviderStatus)
 }
 
 func getProviderOfCheckAvailRecord(tx *sql.Tx, start time.Time, end time.Time) []string {
-	rows, err := tx.Query("SELECT distinct PROVIDER_ID FROM CHECK_AVAIL_RECORD where CHECK_TIME>=$1 and CHECK_TIME<$2", start, end)
+	rows, err := tx.Query("SELECT distinct PROVIDER_ID FROM CHECK_AVAIL_RECORD where CHECK_TIME between $1 and $2", start, end)
 	checkErr(err)
 	defer rows.Close()
 	ps := make([]string, 0, 32)
@@ -40,7 +40,7 @@ func GetProviderOfCheckAvailRecord(start time.Time, end time.Time) (ps []string)
 }
 
 func getByProviderAndCheckTimeBetween(tx *sql.Tx, providerId string, start time.Time, end time.Time) []int64 {
-	rows, err := tx.Query("SELECT CHECK_TIME FROM CHECK_AVAIL_RECORD where PROVIDER_ID=$1 and CHECK_TIME>=$2 and CHECK_TIME<$3 order by CHECK_TIME asc", providerId, start, end)
+	rows, err := tx.Query("SELECT CHECK_TIME FROM CHECK_AVAIL_RECORD where PROVIDER_ID=$1 and CHECK_TIME between $2 and $3 order by CHECK_TIME asc", providerId, start, end)
 	checkErr(err)
 	defer rows.Close()
 	res := make([]int64, 0, 64)

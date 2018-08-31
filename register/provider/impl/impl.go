@@ -225,7 +225,7 @@ func (self *ProviderRegisterService) reGenerateVerifyCode(nodeId string, email s
 	self.sendVerifyCodeToBillEmail(nodeId, email, randomCode)
 }
 
-const verify_sign_expired = 15
+const verify_sign_expired = 300
 
 func (self *ProviderRegisterService) VerifyBillEmail(ctx context.Context, req *pb.VerifyBillEmailReq) (resp *pb.VerifyBillEmailResp, err error) {
 	defer func() {

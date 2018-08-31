@@ -18,6 +18,14 @@ func saveDailyNa(tx *sql.Tx, providerId string, day string, naSection [][2]int64
 	}
 }
 
+func saveDailyCompletelyUnavailable(tx *sql.Tx, day string, start time.Time, end time.Time) {
+	stmt, err := tx.Prepare("insert into daily_na(creation,provider_id,day,start_time,end_time) select now(),node_id, $1, if(creation>$2, creation+(INTERVAL '15m'), $2),$3 from provider where active=true and removed=false and creation+(INTERVAL '15m')<$3 and node_id not in (select provider_id from CHECK_AVAIL_RECORD where CHECK_TIME between $2 and $3);")
+	defer stmt.Close()
+	checkErr(err)
+	_, err = stmt.Exec(day, start, end)
+	checkErr(err)
+}
+
 func getDailyNaByProviderAndDay(tx *sql.Tx, providerId string, day string) (naSection [][2]time.Time) {
 	rows, err := tx.Query("SELECT START_TIME,END_TIME FROM DAILY_NA where PROVIDER_ID=$1 and DAY=$2 order by START_TIME asc", providerId, day)
 	checkErr(err)
@@ -55,7 +63,9 @@ func DailyNaSummarize(naThreshold int64, offset int64) {
 }
 
 func dailySummarize(start int64, naThreshold int64, offset int64) {
-	ps := GetProviderOfCheckAvailRecord(time.Unix(start, 0), time.Unix(start+86400, 0))
+	startTime := time.Unix(start, 0)
+	endTime := time.Unix(start+86400, 0)
+	ps := GetProviderOfCheckAvailRecord(startTime, endTime)
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	day := time.Unix(start, 0).UTC().Format("2006-01-02")
@@ -64,6 +74,7 @@ func dailySummarize(start int64, naThreshold int64, offset int64) {
 		naSection := getNaSection(start, checkTimeSlice, naThreshold, offset)
 		saveDailyNa(tx, pid, day, naSection)
 	}
+	saveDailyCompletelyUnavailable(tx, day, startTime, endTime)
 	saveKvStore(tx, KEY_LAST_START, start+86400, "")
 	checkErr(tx.Commit())
 	commit = true

@@ -1,0 +1,11 @@
+manual for synology NAS:
+Synology NAS is actually a Linux server, you can run the nebula-provider program directly on the synology NAS, no need for other computers.
+1 setup SSH remote access for synology NAS, please reference:
+https://www.synology.com/en-global/knowledgebase/DSM/help/DSM/AdminCenter/system_terminal
+
+2 use SSH client to login synology NAS,
+ follow "Samos Storage Node Test Run Manual(For Providers)" to download nebula-provider for linux OS, AMD64 architecture.
+ then register and run nebula-provider daemon
+
+3 custom triggered task to run nebula-provider when synology NAS boot, please reference:
+https://www.synology.com/en-global/knowledgebase/DSM/help/DSM/AdminCenter/system_taskscheduler

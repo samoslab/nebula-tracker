@@ -39,7 +39,7 @@ func queryIdRecursion(tx *sql.Tx, nodeId string, path string, spaceNo uint32) (f
 func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string, spaceNo uint32) (found bool, id []byte, isFolder bool) {
 	var rows *sql.Rows
 	var err error
-	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and SPACE_NO=$3 and PARENT_ID%s and FOLDER=true and REMOVED=false"
+	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and SPACE_NO=$3 and PARENT_ID%s and REMOVED=false"
 	if parent == nil || len(parent) == 0 {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, folderName, spaceNo)
 	} else {

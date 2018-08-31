@@ -15,3 +15,20 @@ select COALESCE(PVD_TYPE,CLT_TYPE),TICKET_PROVIDER_ID,COALESCE(PVD_END_TIME,CLT_
 
 
 SELECT NODE_ID,UPSTREAM,sum(NETFLOW+FIX_OFFSET)/1048576 FROM CLIENT_DAILY_NETFLOW  group by NODE_ID,UPSTREAM;
+
+select node_id,type,(sum(netflow+fix_offset)/1073741824)::int from provider_daily_netflow group by  node_id,type;
+
+select provider_id,(sum(size)/1073741824)::int from block group by provider_id;
+
+
+
+
+
+select node_id,bill_email,wallet_address,creation from tracker.provider where creation<'2018-08-05 00:00:00' and active=true and removed=false;
+select node_id,type,(sum(netflow+fix_offset)/1073741824)::int from tracker.provider_daily_netflow group by  node_id,type;
+select provider_id,(sum(size)/1073741824)::int from tracker.block group by provider_id;
+select provider_id,((sum(end_time-start_time))::int/60)::int as min from daily_na where day<'2018-08-21' group by provider_id;
+
+select p.node_id,p.bill_email,p.wallet_address,p.creation,COALESCE(storage.storage,0) as storage,COALESCE(upNetflow.netflow,0) as upNetflow,COALESCE(downNetflow.netflow,0) as downNetflow,if(p.creation+(INTERVAL '15m')<'2018-07-29 00:00:00',33120,(('2018-08-21 00:00:00'-p.creation)::int/60)::int-15) as total_mins,COALESCE(na.min,0) as na_mins,1-COALESCE(na.min,0)/if(p.creation+(INTERVAL '15m')<'2018-07-29 00:00:00',33120,(('2018-08-21 00:00:00'-p.creation)::int/60)::int-15) as availability from tracker.provider p left join (select provider_id,(sum(size)/1073741824)::int as storage from tracker.block group by provider_id) storage on storage.provider_id=p.node_id left join (select node_id,(sum(netflow+fix_offset)/1073741824)::int as netflow from tracker.provider_daily_netflow where type=1 group by  node_id) upNetflow on upNetflow.node_id=p.node_id left outer join (select node_id,(sum(netflow+fix_offset)/1073741824)::int as netflow from tracker.provider_daily_netflow where type=2 group by  node_id) downNetflow on downNetflow.node_id=p.node_id  left outer join (select provider_id,((sum(end_time-start_time))::int/60)::int as min from tracker.daily_na where day<'2018-08-21' group by provider_id) na on na.provider_id=p.node_id where p.creation<'2018-08-07 00:00:00' and p.active=true and p.removed=false;
+
+cockroach sql --host=45.77.23.104 --certs-dir=client-certs/ --format=csv -e "" > result-180821.cvs
