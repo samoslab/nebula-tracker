@@ -120,3 +120,28 @@ func GetApiForTellerConfig() *ApiForTellerConfig {
 	initApiForTellerConfig = true
 	return apiForTellerConfig
 }
+
+type TaskConfig struct {
+	Db       Db
+	Server   Server
+	TestMode bool `default:"false"`
+}
+
+var initTaskConfig = false
+var taskConfig *TaskConfig
+
+func GetTaskConfig() *TaskConfig {
+	if initTaskConfig {
+		return taskConfig
+	}
+	m := multiconfig.NewWithPath(config_filename) // supports TOML, JSON and YAML
+	taskConfig = new(TaskConfig)
+	err := m.Load(taskConfig) // Check for error
+	if err != nil {
+		fmt.Printf("GetTaskConfig Error: %s\n", err)
+	}
+	m.MustLoad(taskConfig) // Panic's if there is any error
+	//	fmt.Printf("%+v\n", config)
+	initTaskConfig = true
+	return taskConfig
+}

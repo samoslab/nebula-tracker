@@ -32,6 +32,9 @@ func (self *Batch) hash() []byte {
 		hasher.Write(util_bytes.FromUint64(al.EndTime))
 		hasher.Write(util_bytes.FromUint64(al.TransportSize))
 		hasher.Write([]byte(al.Info))
+		if al.AsClient {
+			hasher.Write(byte_slice_true)
+		}
 	}
 	return hasher.Sum(nil)
 }

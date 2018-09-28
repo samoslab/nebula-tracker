@@ -289,7 +289,7 @@ func ProviderFindAll() (slice []ProviderInfo) {
 }
 
 func providerFindAll(tx *sql.Tx) []ProviderInfo {
-	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME,LAST_CONNECT,LAST_AVAIL from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME,LAST_CONNECT,LAST_AVAIL from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true and PORT<>0")
 	checkErr(err)
 	defer rows.Close()
 	res := make([]ProviderInfo, 0, 32)
@@ -312,7 +312,7 @@ func providerFindAllAvail(tx *sql.Tx) []ProviderInfo {
 	now := time.Now()
 	m, _ := time.ParseDuration("-3m")
 	m1 := now.Add(m)
-	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME,LAST_CONNECT,LAST_AVAIL from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true and LAST_AVAIL>$1", m1)
+	rows, err := tx.Query("SELECT NODE_ID,PUBLIC_KEY,BILL_EMAIL,ENCRYPT_KEY,WALLET_ADDRESS,UP_BANDWIDTH,DOWN_BANDWIDTH,TEST_UP_BANDWIDTH,TEST_DOWN_BANDWIDTH,AVAILABILITY,PORT,HOST,DYNAMIC_DOMAIN,STORAGE_VOLUME,LAST_CONNECT,LAST_AVAIL from PROVIDER where REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true and LAST_AVAIL>$1 and PORT<>0 ", m1)
 	checkErr(err)
 	defer rows.Close()
 	res := make([]ProviderInfo, 0, 32)
@@ -400,15 +400,20 @@ func FindProviderForCheck(locality string) []ProviderInfo {
 
 var giga uint64 = 1024 * 1024 * 1024
 
+type TimeAndVersion struct {
+	Time    time.Time
+	Version uint32
+}
+
 func ProviderUpdateStatus(locality string, ps ...*check_pb.ProviderStatus) {
-	availMap := make(map[string]time.Time, len(ps))
-	connMap := make(map[string]time.Time, len(ps))
+	availMap := make(map[string]*TimeAndVersion, len(ps))
+	connMap := make(map[string]*TimeAndVersion, len(ps))
 	for _, s := range ps {
 		if s.LatencyNs < 2000000000 {
 			t := time.Unix(0, int64(s.CheckTime))
-			connMap[s.NodeId] = t
+			connMap[s.NodeId] = &TimeAndVersion{Time: t, Version: s.Version}
 			if s.AvailFileSize > giga && s.TotalFreeVolume > giga {
-				availMap[s.NodeId] = t
+				availMap[s.NodeId] = &TimeAndVersion{Time: t, Version: s.Version}
 			}
 		}
 	}
@@ -425,22 +430,22 @@ func ProviderUpdateStatus(locality string, ps ...*check_pb.ProviderStatus) {
 	commit = true
 }
 
-func providerUpdateLastAvail(tx *sql.Tx, m map[string]time.Time) {
-	stmt, err := tx.Prepare("update PROVIDER set LAST_MODIFIED=now(),LAST_CONNECT=$2,LAST_AVAIL=$3 where NODE_ID=$1 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
+func providerUpdateLastAvail(tx *sql.Tx, m map[string]*TimeAndVersion) {
+	stmt, err := tx.Prepare("update PROVIDER set LAST_MODIFIED=now(),LAST_CONNECT=$2,LAST_AVAIL=$3,VERSION=$4 where NODE_ID=$1 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
 	defer stmt.Close()
 	checkErr(err)
 	for k, v := range m {
-		_, err := stmt.Exec(k, v, v)
+		_, err := stmt.Exec(k, v.Time, v.Time, v.Version)
 		checkErr(err)
 	}
 }
 
-func providerUpdateLastConn(tx *sql.Tx, m map[string]time.Time) {
-	stmt, err := tx.Prepare("update PROVIDER set LAST_MODIFIED=now(),LAST_CONNECT=$2 where NODE_ID=$1 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
+func providerUpdateLastConn(tx *sql.Tx, m map[string]*TimeAndVersion) {
+	stmt, err := tx.Prepare("update PROVIDER set LAST_MODIFIED=now(),LAST_CONNECT=$2,VERSION=$3 where NODE_ID=$1 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
 	defer stmt.Close()
 	checkErr(err)
 	for k, v := range m {
-		_, err := stmt.Exec(k, v)
+		_, err := stmt.Exec(k, v.Time, v.Version)
 		checkErr(err)
 	}
 }
@@ -462,4 +467,44 @@ func findProviderByEmailAndNodeId(tx *sql.Tx, email string, nodeId string) bool 
 		return true
 	}
 	return false
+}
+
+func providerToPrivate(tx *sql.Tx, nodeId string) bool {
+	stmt, err := tx.Prepare("update PROVIDER set HOST=null,DYNAMIC_DOMAIN=null,PORT=0,LAST_MODIFIED=now() where NODE_ID=$1 and REMOVED=false and PORT<>0")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(nodeId)
+	checkErr(err)
+	count, err := rs.RowsAffected()
+	checkErr(err)
+	return count == 1
+}
+
+func ProviderToPrivate(nodeId string) (success bool) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	success = providerToPrivate(tx, nodeId)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func providerToPublic(tx *sql.Tx, nodeId string, host string, dynamicDomain string, port uint32) (success bool) {
+	stmt, err := tx.Prepare("update PROVIDER set HOST=$2,DYNAMIC_DOMAIN=$3,PORT=$4,LAST_MODIFIED=now() where NODE_ID=$1 and REMOVED=false and PORT=0")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(nodeId, host, dynamicDomain, port)
+	checkErr(err)
+	count, err := rs.RowsAffected()
+	checkErr(err)
+	return count == 1
+}
+
+func ProviderToPublic(nodeId string, host string, dynamicDomain string, port uint32) (success bool) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	success = providerToPublic(tx, nodeId, host, dynamicDomain, port)
+	checkErr(tx.Commit())
+	commit = true
+	return
 }

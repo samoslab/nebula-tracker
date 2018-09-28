@@ -39,3 +39,19 @@ func (_m *chooserMock) Count() int {
 
 	return r0
 }
+
+// Get provides a mock function with given fields: nodeId
+func (_m *chooserMock) Get(nodeId string) *db.ProviderInfo {
+	ret := _m.Called(nodeId)
+
+	var r0 *db.ProviderInfo
+	if rf, ok := ret.Get(0).(func(string) *db.ProviderInfo); ok {
+		r0 = rf(nodeId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*db.ProviderInfo)
+		}
+	}
+
+	return r0
+}

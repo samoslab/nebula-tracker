@@ -206,10 +206,8 @@ func pingProvider(client provider_pb.ProviderServiceClient, nodeIdHash []byte) e
 	if err != nil {
 		return err
 	}
-	if resp != nil && len(resp.NodeIdHash) > 0 {
-		if bytes.Equal(resp.NodeIdHash, nodeIdHash) {
-			return fmt.Errorf("nodeId not same")
-		}
+	if resp != nil && len(resp.NodeIdHash) > 0 && !bytes.Equal(resp.NodeIdHash, nodeIdHash) {
+		return fmt.Errorf("nodeId not same")
 	}
 	return err
 }
@@ -390,4 +388,117 @@ func (self *ProviderRegisterService) RefreshIp(ctx context.Context, req *pb.Refr
 	} else {
 		return &pb.RefreshIpResp{}, nil
 	}
+}
+
+func (self *ProviderRegisterService) SwitchPrivate(ctx context.Context, req *pb.SwitchPrivateReq) (resp *pb.SwitchPrivateResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
+	pubKey := db.ProviderGetPubKey(req.NodeId)
+	if pubKey == nil {
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
+	}
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	if !db.ProviderToPrivate(nodeIdStr) {
+		return nil, status.Errorf(codes.FailedPrecondition, "this node is already a private network node.")
+	} else {
+		return &pb.SwitchPrivateResp{Success: true}, nil
+	}
+}
+
+func (self *ProviderRegisterService) SwitchPublic(ctx context.Context, req *pb.SwitchPublicReq) (resp *pb.SwitchPublicResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			resp = &pb.SwitchPublicResp{Code: 300, ErrMsg: fmt.Sprintf("System error: %s", er)}
+		}
+	}()
+	if len(req.NodeId) == 0 {
+		return &pb.SwitchPublicResp{Code: 2, ErrMsg: "NodeId is required"}, nil
+	}
+	pubKey := db.ProviderGetPubKey(req.NodeId)
+	if pubKey == nil {
+		return &pb.SwitchPublicResp{Code: 4, ErrMsg: "this node id is not been registered"}, nil
+	}
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
+		return &pb.SwitchPublicResp{Code: 10, ErrMsg: "auth info expired， please check your system time"}, nil
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return &pb.SwitchPublicResp{Code: 5, ErrMsg: "Verify Sign failed: " + err.Error()}, nil
+	}
+	if !bytes.Equal(self.PubKeyHash, req.PublicKeyHash) {
+		return &pb.SwitchPublicResp{Code: 500, ErrMsg: "tracker public key expired"}, nil
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	if req.Port < 1 || req.Port > 65535 {
+		return &pb.SwitchPublicResp{Code: 22, ErrMsg: "port must between 1 to 65535."}, nil
+	}
+	host, err := self.decrypt(req.HostEnc)
+	if err != nil {
+		return &pb.SwitchPublicResp{Code: 23, ErrMsg: "decrypt HostEnc error: " + err.Error()}, nil
+	}
+	dynamicDomain, err := self.decrypt(req.DynamicDomainEnc)
+	if err != nil {
+		return &pb.SwitchPublicResp{Code: 24, ErrMsg: "decrypt DynamicDomainEnc error: " + err.Error()}, nil
+	}
+	if (host == nil || len(host) == 0) && (dynamicDomain == nil || len(dynamicDomain) == 0) {
+		return &pb.SwitchPublicResp{Code: 25, ErrMsg: "host is required"}, nil
+	}
+	var hostStr string
+	if host != nil && len(host) > 0 { // prefer
+		hostStr = string(host)
+	} else if dynamicDomain != nil && len(dynamicDomain) > 0 {
+		hostStr = string(dynamicDomain)
+	}
+	providerAddr := fmt.Sprintf("%s:%d", hostStr, req.Port)
+	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+	if err != nil {
+		return &pb.SwitchPublicResp{Code: 26, ErrMsg: "can not connect, error: " + err.Error()}, nil
+	}
+	defer conn.Close()
+	psc := provider_pb.NewProviderServiceClient(conn)
+	err = pingProvider(psc, util_hash.Sha1(req.NodeId))
+	if err != nil {
+		return &pb.SwitchPublicResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
+	}
+	if !db.ProviderToPublic(nodeIdStr, string(host), string(dynamicDomain), req.Port) {
+		return &pb.SwitchPublicResp{Code: 28, ErrMsg: "this node is already a public network node."}, nil
+	} else {
+		return &pb.SwitchPublicResp{Code: 0}, nil
+	}
+}
+
+func (self *ProviderRegisterService) PrivateAlive(ctx context.Context, req *pb.PrivateAliveReq) (resp *pb.PrivateAliveResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
+	pubKey := db.ProviderGetPubKey(req.NodeId)
+	if pubKey == nil {
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
+	}
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	db.SavePrivateAliveRecord(nodeIdStr, req.Timestamp, req.Total, req.MaxFileSize, req.Version)
+	return &pb.PrivateAliveResp{}, nil
+
 }

@@ -234,6 +234,7 @@ func FileSaveDone(existId []byte, nodeId string, hash string, name string, fileT
 	}
 	saveFileVersion(tx, existId, nodeId, hash, fileType)
 	saveBlocks(tx, fileId, time.Now().UTC(), partitions)
+	saveProofMetadata(tx, fileId, time.Now().UTC(), partitions)
 	updateClientUsageAmount(tx, nodeId, size)
 	checkErr(tx.Commit())
 	commit = true

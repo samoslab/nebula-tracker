@@ -20,10 +20,13 @@ func saveFromProvider(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcp_pb
 		"ON CONFLICT (TICKET) DO UPDATE SET LAST_MODIFIED=now(),PVD_NODE_ID=$4,PVD_TYPE=$5,PVD_TIMESTAMP=$6,PVD_SUCCESS=$7," +
 		"PVD_FILE_HASH=$8,PVD_FILE_SIZE=$9,PVD_BLOCK_HASH=$10,PVD_BLOCK_SIZE=$11,PVD_BEGIN_TIME=$12," +
 		"PVD_END_TIME=$13,PVD_TRANSPORT_SIZE=$14,PVD_ERROR_INFO=$15")
-	defer stmt.Close()
 	checkErr(err)
+	defer stmt.Close()
 	crs := make([]*CheatingRecord, 0, 4)
 	for _, al := range als {
+		if al.AsClient {
+			continue
+		}
 		pass, cltId, prvId := parseAndCheck(al.Ticket)
 		if !pass {
 			crs = append(crs, &CheatingRecord{NodeId: nodeId,
@@ -44,6 +47,40 @@ func saveFromProvider(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcp_pb
 	saveProviderCheatingRecord(tx, crs...)
 }
 
+func saveFromProviderAsClient(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcp_pb.ActionLog) {
+	stmt, err := tx.Prepare("insert into ACTION_LOG(PVD_FIRST,CREATION,LAST_MODIFIED,TICKET,TICKET_CLIENT_ID,TICKET_PROVIDER_ID,CLT_NODE_ID,CLT_TYPE,CLT_TIMESTAMP," +
+		"CLT_SUCCESS,CLT_FILE_HASH,CLT_FILE_SIZE,CLT_BLOCK_HASH,CLT_BLOCK_SIZE,CLT_BEGIN_TIME,CLT_END_TIME," +
+		"CLT_TRANSPORT_SIZE,CLT_ERROR_INFO,FROM_PROVIDER) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true) " +
+		"ON CONFLICT (TICKET) DO UPDATE SET LAST_MODIFIED=now(),CLT_NODE_ID=$4,CLT_TYPE=$5,CLT_TIMESTAMP=$6,CLT_SUCCESS=$7," +
+		"CLT_FILE_HASH=$8,CLT_FILE_SIZE=$9,CLT_BLOCK_HASH=$10,CLT_BLOCK_SIZE=$11,CLT_BEGIN_TIME=$12," +
+		"CLT_END_TIME=$13,CLT_TRANSPORT_SIZE=$14,CLT_ERROR_INFO=$15,FROM_PROVIDER=true")
+	checkErr(err)
+	defer stmt.Close()
+	crs := make([]*CheatingRecord, 0, 4)
+	for _, al := range als {
+		if !al.AsClient {
+			continue
+		}
+		pass, cltId, prvId := parseAndCheck(al.Ticket)
+		if !pass {
+			crs = append(crs, &CheatingRecord{NodeId: nodeId,
+				ActionTime: time.Unix(0, int64(al.EndTime)),
+				Type:       CHEATING_TYPE_WRONG_TICKET,
+				Confirm:    true,
+				Ticket:     al.Ticket})
+			continue
+		}
+		if len(al.Info) > 250 {
+			al.Info = al.Info[:250]
+		}
+		_, err = stmt.Exec(al.Ticket, cltId, prvId, nodeId, al.Type, time.Unix(0, int64(timestamp)), al.Success,
+			base64.StdEncoding.EncodeToString(al.FileHash), al.FileSize, base64.StdEncoding.EncodeToString(al.BlockHash), al.BlockSize, time.Unix(0, int64(al.BeginTime)), time.Unix(0, int64(al.EndTime)),
+			al.TransportSize, al.Info, nil, nil, nil)
+		checkErr(err)
+	}
+	saveProviderCheatingRecord(tx, crs...)
+}
+
 func saveFromClient(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcc_pb.ActionLog) {
 	stmt, err := tx.Prepare("insert into ACTION_LOG(PVD_FIRST,CREATION,LAST_MODIFIED,TICKET,TICKET_CLIENT_ID,TICKET_PROVIDER_ID,CLT_NODE_ID,CLT_TYPE,CLT_TIMESTAMP," +
 		"CLT_SUCCESS,CLT_FILE_HASH,CLT_FILE_SIZE,CLT_BLOCK_HASH,CLT_BLOCK_SIZE,CLT_BEGIN_TIME,CLT_END_TIME," +
@@ -51,8 +88,8 @@ func saveFromClient(tx *sql.Tx, nodeId string, timestamp uint64, als []*tcc_pb.A
 		"ON CONFLICT (TICKET) DO UPDATE SET LAST_MODIFIED=now(),CLT_NODE_ID=$4,CLT_TYPE=$5,CLT_TIMESTAMP=$6,CLT_SUCCESS=$7," +
 		"CLT_FILE_HASH=$8,CLT_FILE_SIZE=$9,CLT_BLOCK_HASH=$10,CLT_BLOCK_SIZE=$11,CLT_BEGIN_TIME=$12," +
 		"CLT_END_TIME=$13,CLT_TRANSPORT_SIZE=$14,CLT_ERROR_INFO=$15,PARTITION_SEQ=$16,CHECKSUM=$17,BLOCK_SEQ=$18")
-	defer stmt.Close()
 	checkErr(err)
+	defer stmt.Close()
 	crs := make([]*CheatingRecord, 0, 4)
 	for _, al := range als {
 		pass, cltId, prvId := parseAndCheck(al.Ticket)
@@ -93,6 +130,7 @@ func SaveFromProvider(nodeId string, timestamp uint64, als []*tcp_pb.ActionLog) 
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	saveFromProvider(tx, nodeId, timestamp, als)
+	saveFromProviderAsClient(tx, nodeId, timestamp, als)
 	checkErr(tx.Commit())
 	commit = true
 	return
@@ -113,7 +151,7 @@ func SaveFromClient(nodeId string, timestamp uint64, als []*tcc_pb.ActionLog) (e
 }
 
 func hourySummarizeClient(tx *sql.Tx, start time.Time, end time.Time) []*pb.ClientItem {
-	rows, err := tx.Query("select COALESCE(CLT_TYPE,PVD_TYPE)=1,TICKET_CLIENT_ID,COALESCE(CLT_END_TIME,PVD_END_TIME)::date,extract('hour',COALESCE(CLT_END_TIME,PVD_END_TIME)),(sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE)))::int from action_log where CREATION between $1 and $2 group by COALESCE(CLT_TYPE,PVD_TYPE)=1,TICKET_CLIENT_ID,COALESCE(CLT_END_TIME,PVD_END_TIME)::date,extract('hour',COALESCE(CLT_END_TIME,PVD_END_TIME)) having sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE))>0", start, end)
+	rows, err := tx.Query("select COALESCE(CLT_TYPE,PVD_TYPE)=1,TICKET_CLIENT_ID,COALESCE(CLT_END_TIME,PVD_END_TIME)::date,extract('hour',COALESCE(CLT_END_TIME,PVD_END_TIME)),(sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE)))::int from action_log where CREATION between $1 and $2 and FROM_PROVIDER=false group by COALESCE(CLT_TYPE,PVD_TYPE)=1,TICKET_CLIENT_ID,COALESCE(CLT_END_TIME,PVD_END_TIME)::date,extract('hour',COALESCE(CLT_END_TIME,PVD_END_TIME)) having sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE))>0", start, end)
 	checkErr(err)
 	defer rows.Close()
 	res := make([]*pb.ClientItem, 0, 32)

@@ -48,6 +48,7 @@ message ProviderStatus{
 	uint64 latencyNs=3;
 	uint64 totalFreeVolume=4;
 	uint64 availFileSize=5;
+	uint32 version=6;
 }
 
 message BatchProviderStatus{

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/robfig/cron"
 	provider_pb "github.com/samoslab/nebula/provider/pb"
 	util_aes "github.com/samoslab/nebula/util/aes"
+	util_hash "github.com/samoslab/nebula/util/hash"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -67,13 +69,14 @@ func check() {
 			hostStr = pi.DynamicDomain
 		}
 		start := time.Now().UnixNano()
-		total, maxFileSize, err := checkProvider(hostStr, pi.Port, pi.PublicKey)
+		total, maxFileSize, version, err := checkProvider(pi.NodeId, hostStr, pi.Port, pi.PublicKey)
 		if err == nil {
 			pss = append(pss, &pb.ProviderStatus{NodeId: pi.NodeId,
 				CheckTime:       uint64(start),
 				LatencyNs:       uint64(time.Now().UnixNano() - start),
 				TotalFreeVolume: total,
-				AvailFileSize:   maxFileSize})
+				AvailFileSize:   maxFileSize,
+				Version:         version})
 		} else {
 			ts := time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
 			st, ok := status.FromError(err)
@@ -117,7 +120,7 @@ func getProvider(tries int) ([]*pb.Provider, error) {
 		return nil, err
 	}
 	defer conn.Close()
-	client := pb.NewCheckavAilabilityServiceClient(conn)
+	client := pb.NewCheckAvailabilityServiceClient(conn)
 	return FindProvider(client)
 }
 
@@ -129,7 +132,7 @@ func updateStatus(tries int, data []byte) bool {
 		return false
 	}
 	defer conn.Close()
-	client := pb.NewCheckavAilabilityServiceClient(conn)
+	client := pb.NewCheckAvailabilityServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req := &pb.UpdateStatusReq{Timestamp: uint64(time.Now().Unix()),
@@ -149,7 +152,7 @@ func updateStatus(tries int, data []byte) bool {
 	return true
 }
 
-func FindProvider(client pb.CheckavAilabilityServiceClient) (ps []*pb.Provider, err error) {
+func FindProvider(client pb.CheckAvailabilityServiceClient) (ps []*pb.Provider, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req := &pb.FindProviderReq{Timestamp: uint64(time.Now().Unix()),
@@ -170,22 +173,26 @@ func FindProvider(client pb.CheckavAilabilityServiceClient) (ps []*pb.Provider, 
 	return batch.P, nil
 }
 
-func checkProvider(hostStr string, port uint32, pubKey []byte) (total uint64, maxFileSize uint64, err error) {
+func checkProvider(nodeIdStr string, hostStr string, port uint32, pubKey []byte) (total uint64, maxFileSize uint64, version uint32, err error) {
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", hostStr, port), grpc.WithInsecure())
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 	defer conn.Close()
 	psc := provider_pb.NewProviderServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	req := &provider_pb.CheckAvailableReq{Timestamp: uint64(time.Now().Unix())}
+	nodeId, err := base64.StdEncoding.DecodeString(nodeIdStr)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	req := &provider_pb.CheckAvailableReq{Timestamp: uint64(time.Now().Unix()), NodeIdHash: util_hash.Sha1(nodeId)}
 	req.GenAuth(pubKey)
 	resp, err := psc.CheckAvailable(ctx, req)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
-	return resp.Total, resp.MaxFileSize, nil
+	return resp.Total, resp.MaxFileSize, resp.Version, nil
 }
 
 const config_filename = "config.toml"

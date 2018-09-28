@@ -250,6 +250,7 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 	conf := config.GetTrackerConfig()
 	if req.FileSize <= multi_replica_max_file_size || (!conf.TestMode && providerCnt < 12) || (conf.TestMode && providerCnt < 3) {
 		resp.StoreType = pb.FileStoreType_MultiReplica
+		resp.ChunkSize = getChunkSize(req.FileSize)
 		resp.ReplicaCount = 5
 		if providerCnt < 5 {
 			resp.ReplicaCount = uint32(providerCnt)
@@ -276,12 +277,33 @@ func (self *MatadataService) CheckFileExist(ctx context.Context, req *pb.CheckFi
 			resp.DataPieceCount = 2
 			resp.VerifyPieceCount = 1
 		}
+		resp.ChunkSize = getChunkSize(req.FileSize / uint64(resp.DataPieceCount))
 		if len(id) == 0 {
 			self.d.FileSaveStep1(nodeIdStr, hashStr, req.FileType, req.FileSize, 0, req.Parent.SpaceNo)
 		}
 	}
 	return resp, nil
 
+}
+
+func getChunkSize(fileSize uint64) uint32 {
+	if fileSize < 32768 {
+		return 2048
+	} else if fileSize < 131072 {
+		return 4096
+	} else if fileSize < 524288 {
+		return 8192
+	} else if fileSize < 4194304 {
+		return 16384
+	} else if fileSize < 16777216 {
+		return 32768
+	} else if fileSize < 33554432 {
+		return 65536
+	} else if fileSize < 67108864 {
+		return 131072
+	} else {
+		return 262144
+	}
 }
 
 const done_expired = 1800
@@ -787,9 +809,12 @@ func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte,
 			if v, ok := providerMap[n]; ok {
 				pro = v
 			} else {
-				pro = self.d.ProviderFindOne(n)
+				pro = self.c.Get(n)
 				if pro == nil {
 					return nil, errors.New("can not find provider, nodeId: " + n)
+				}
+				if pro.Port == 0 {
+					continue
 				}
 				providerMap[n] = pro
 			}
