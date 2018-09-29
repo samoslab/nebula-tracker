@@ -14,9 +14,16 @@ func savePrivateAliveRecord(tx *sql.Tx, nodeId string, timestamp uint64, total u
 }
 
 func SavePrivateAliveRecord(nodeId string, timestamp uint64, total uint64, maxFileSize uint64, version uint32) {
+	m := map[string]*timeAndVersion{nodeId: &timeAndVersion{Time: time.Unix(0, int64(timestamp)),
+		Version: version}}
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	savePrivateAliveRecord(tx, nodeId, timestamp, total, maxFileSize, version)
+	if maxFileSize > giga && total > giga {
+		providerUpdateLastAvail(tx, m)
+	} else {
+		providerUpdateLastConn(tx, m)
+	}
 	checkErr(tx.Commit())
 	commit = true
 	return

@@ -182,3 +182,36 @@ func (self *NullUint64Slice) Scan(value interface{}) error {
 	}
 	return nil
 }
+
+type NullUint32Slice struct {
+	Uint32Slice []uint32
+	Valid       bool
+}
+
+// Scan implements the Scanner interface.
+func (self *NullUint32Slice) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	var t []byte
+	t, self.Valid = value.([]byte)
+	if len(t) < 2 {
+		return nil
+	}
+	str := string(t)
+	l := len(str)
+	if str[0:1] != `{` || str[l-1:l] != `}` {
+		panic(errors.New(str + " format wrong"))
+	}
+	strSlice := strings.Split(str[1:l-1], `,`)
+	self.Uint32Slice = make([]uint32, len(strSlice))
+	var err error
+	for i, _ := range strSlice {
+		v, err := strconv.ParseUint(strSlice[i], 10, 0)
+		if err != nil {
+			panic(err)
+		}
+		self.Uint32Slice[i] = uint32(v)
+	}
+	return nil
+}

@@ -98,6 +98,12 @@ UploadFileDone
 28, ErrMsg: "multiple block have same hash"
 29, ErrMsg: "StoreNodeId can not be empty"
 30, ErrMsg: "the block have multiple same StoreNodeId, block hash: "
+31, ErrMsg: "ChunkSize can not be zero"
+32, ErrMsg: "ParamStr can not be empty"
+33, ErrMsg: "Generator can not be empty"
+34, ErrMsg: "PubKey can not be empty"
+35, ErrMsg: "Random can not be empty"
+36, ErrMsg: "Phi can not be empty"
 
 ListFiles
 300, ErrMsg: "System error: %s"

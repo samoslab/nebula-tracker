@@ -319,7 +319,7 @@ func (self *MatadataService) prepareReplicaProvider(nodeId string, num int, file
 	res := make([]*pb.ReplicaProvider, 0, len(pis))
 	ts := uint64(time.Now().Unix())
 	for _, pi := range pis {
-		ticket := nodeId + ticket_sep + pi.NodeId + ticket_sep + uuidStr()
+		ticket := GenTicket(nodeId, pi.NodeId)
 		res = append(res, &pb.ReplicaProvider{NodeId: pi.NodeIdBytes,
 			Port:      pi.Port,
 			Server:    pi.Server(),
@@ -442,7 +442,7 @@ func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash 
 		proAuth := make([]*pb.BlockProviderAuth, 0, len(pis))
 		for i, piece := range part.Piece {
 			pi := pis[i]
-			ticket := nodeId + ticket_sep + pi.NodeId + ticket_sep + uuidStr()
+			ticket := GenTicket(nodeId, pi.NodeId)
 			proAuth = append(proAuth, &pb.BlockProviderAuth{NodeId: pi.NodeIdBytes,
 				Server: pi.Server(),
 				Port:   pi.Port,
@@ -477,7 +477,7 @@ func (self *MatadataService) prepareErasureCodeProvider(nodeId string, fileHash 
 			pi := pis[pieceCnt+i/each]
 			bpa := proAuth[pieceCnt+i/each]
 			piece := part.Piece[i%pieceCnt]
-			ticket := nodeId + ticket_sep + pi.NodeId + ticket_sep + uuidStr()
+			ticket := GenTicket(nodeId, pi.NodeId)
 			bpa.HashAuth = append(bpa.HashAuth, &pb.PieceHashAuth{Hash: piece.Hash,
 				Size:   piece.Size,
 				Ticket: ticket,
@@ -582,6 +582,24 @@ func (self *MatadataService) UploadFileDone(ctx context.Context, req *pb.UploadF
 			}
 			if len(b.StoreNodeId) == 0 {
 				return &pb.UploadFileDoneResp{Code: 29, ErrMsg: "StoreNodeId can not be empty"}, nil
+			}
+			if b.ChunkSize == 0 {
+				return &pb.UploadFileDoneResp{Code: 31, ErrMsg: "ChunkSize can not be zero"}, nil
+			}
+			if len(b.ParamStr) == 0 {
+				return &pb.UploadFileDoneResp{Code: 32, ErrMsg: "ParamStr can not be empty"}, nil
+			}
+			if len(b.Generator) == 0 {
+				return &pb.UploadFileDoneResp{Code: 33, ErrMsg: "Generator can not be empty"}, nil
+			}
+			if len(b.PubKey) == 0 {
+				return &pb.UploadFileDoneResp{Code: 34, ErrMsg: "PubKey can not be empty"}, nil
+			}
+			if len(b.Random) == 0 {
+				return &pb.UploadFileDoneResp{Code: 35, ErrMsg: "Random can not be empty"}, nil
+			}
+			if len(b.Phi) == 0 {
+				return &pb.UploadFileDoneResp{Code: 36, ErrMsg: "Phi can not be empty"}, nil
 			}
 			if len(b.StoreNodeId) > 1 {
 				nodeIdMap := make(map[string]bool, len(b.StoreNodeId))
@@ -757,6 +775,10 @@ func (self *MatadataService) RetrieveFile(ctx context.Context, req *pb.RetrieveF
 	return &pb.RetrieveFileResp{Code: 0, Partition: parts, Timestamp: ts, FileType: fileType, EncryptKey: encryptKey}, nil
 }
 
+func GenTicket(clientId string, providerId string) string {
+	return clientId + ticket_sep + providerId + ticket_sep + uuidStr()
+}
+
 func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte, fileSize uint64, blocks []string, partitionsCount int, ts uint64) ([]*pb.RetrievePartition, error) {
 	if partitionsCount == 0 {
 		return nil, errors.New("empty blocks")
@@ -818,7 +840,7 @@ func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte,
 				}
 				providerMap[n] = pro
 			}
-			ticket := nodeId + ticket_sep + n + ticket_sep + uuidStr()
+			ticket := GenTicket(nodeId, n)
 			store = append(store, &pb.RetrieveNode{NodeId: bytes,
 				Server: pro.Server(),
 				Port:   pro.Port,

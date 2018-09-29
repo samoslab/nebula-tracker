@@ -400,20 +400,20 @@ func FindProviderForCheck(locality string) []ProviderInfo {
 
 var giga uint64 = 1024 * 1024 * 1024
 
-type TimeAndVersion struct {
+type timeAndVersion struct {
 	Time    time.Time
 	Version uint32
 }
 
 func ProviderUpdateStatus(locality string, ps ...*check_pb.ProviderStatus) {
-	availMap := make(map[string]*TimeAndVersion, len(ps))
-	connMap := make(map[string]*TimeAndVersion, len(ps))
+	availMap := make(map[string]*timeAndVersion, len(ps))
+	connMap := make(map[string]*timeAndVersion, len(ps))
 	for _, s := range ps {
 		if s.LatencyNs < 2000000000 {
 			t := time.Unix(0, int64(s.CheckTime))
-			connMap[s.NodeId] = &TimeAndVersion{Time: t, Version: s.Version}
+			connMap[s.NodeId] = &timeAndVersion{Time: t, Version: s.Version}
 			if s.AvailFileSize > giga && s.TotalFreeVolume > giga {
-				availMap[s.NodeId] = &TimeAndVersion{Time: t, Version: s.Version}
+				availMap[s.NodeId] = &timeAndVersion{Time: t, Version: s.Version}
 			}
 		}
 	}
@@ -430,7 +430,7 @@ func ProviderUpdateStatus(locality string, ps ...*check_pb.ProviderStatus) {
 	commit = true
 }
 
-func providerUpdateLastAvail(tx *sql.Tx, m map[string]*TimeAndVersion) {
+func providerUpdateLastAvail(tx *sql.Tx, m map[string]*timeAndVersion) {
 	stmt, err := tx.Prepare("update PROVIDER set LAST_MODIFIED=now(),LAST_CONNECT=$2,LAST_AVAIL=$3,VERSION=$4 where NODE_ID=$1 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
 	defer stmt.Close()
 	checkErr(err)
@@ -440,7 +440,7 @@ func providerUpdateLastAvail(tx *sql.Tx, m map[string]*TimeAndVersion) {
 	}
 }
 
-func providerUpdateLastConn(tx *sql.Tx, m map[string]*TimeAndVersion) {
+func providerUpdateLastConn(tx *sql.Tx, m map[string]*timeAndVersion) {
 	stmt, err := tx.Prepare("update PROVIDER set LAST_MODIFIED=now(),LAST_CONNECT=$2,VERSION=$3 where NODE_ID=$1 and REMOVED=false and EMAIL_VERIFIED=true and ACTIVE=true")
 	defer stmt.Close()
 	checkErr(err)
