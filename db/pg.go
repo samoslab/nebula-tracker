@@ -205,7 +205,6 @@ func (self *NullUint32Slice) Scan(value interface{}) error {
 	}
 	strSlice := strings.Split(str[1:l-1], `,`)
 	self.Uint32Slice = make([]uint32, len(strSlice))
-	var err error
 	for i, _ := range strSlice {
 		v, err := strconv.ParseUint(strSlice[i], 10, 0)
 		if err != nil {

@@ -15,7 +15,7 @@ import (
 
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
-	"github.com/yanzay/log"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	util_hash "github.com/samoslab/nebula/util/hash"

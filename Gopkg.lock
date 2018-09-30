@@ -140,7 +140,7 @@
 
 [[projects]]
   branch = "develop"
-  digest = "1:2653c8f9a3575f280cb89659fc859e7691742bf24f38f5526410c8701976c425"
+  digest = "1:2b520baa7a9a0395b5fe4f03468e309b5c948fd83e98ebf5c2a7e6b027cd760e"
   name = "github.com/samoslab/nebula"
   packages = [
     "provider/config",
@@ -161,7 +161,7 @@
     "util/rsa",
   ]
   pruneopts = "UT"
-  revision = "3a6c5bc5351ab97c0bb17d0e06485a360ebe8e4b"
+  revision = "c867bdf0cd29a8dd568c97284ac6381e821a1e39"
 
 [[projects]]
   digest = "1:274f67cb6fed9588ea2521ecdac05a6d62a8c51c074c1fccc6a49a40ba80e925"

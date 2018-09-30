@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	task_pb "github.com/samoslab/nebula/tracker/task/pb"
 )
@@ -21,13 +22,15 @@ func buildTask(rows *sql.Rows) (task *task_pb.Task, err error) {
 	task = &task_pb.Task{}
 	var typeStr string
 	var oppositeId NullStrSlice
-	err = rows.Scan(&task.Id, &task.Creation, &typeStr, &task.FileId, &task.FileHash, &task.FileSize, &task.BlockHash, &task.BlockSize, &oppositeId, &task.ProofId)
+	var creation time.Time
+	err = rows.Scan(&task.Id, &creation, &typeStr, &task.FileId, &task.FileHash, &task.FileSize, &task.BlockHash, &task.BlockSize, &oppositeId, &task.ProofId)
 	checkErr(err)
 	t, ok := task_pb.TaskType_value[typeStr]
 	if !ok {
 		return nil, fmt.Errorf("wront task type: %s, id: %x", typeStr, task.Id)
 	}
 	task.Type = task_pb.TaskType(t)
+	task.Creation = uint64(creation.Unix())
 	if oppositeId.Valid {
 		task.OppositeId = oppositeId.StrSlice
 	}
@@ -75,10 +78,10 @@ func GetTask(taskId []byte, nodeId string) (task *task_pb.Task) {
 }
 
 func taskFinish(tx *sql.Tx, taskId []byte, nodeId string, finishedTime uint64, success bool, remark string) {
-	stmt, err := tx.Prepare("update TASK set FINISHED=true,FINISHED_TIME=$3,SUCCESS=$4,REMARK=$5 where ID=$2 and PROVIDER_ID=$1 and REMOVED=false and FINISHED=false")
+	stmt, err := tx.Prepare("update TASK set FINISHED=true,FINISHED_TIME=$3,SUCCESS=$4,REMARK=$5 where ID=$2 and PROVIDER_ID=$1 and FINISHED=false")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(nodeId, taskId, finishedTime, success, remark)
+	rs, err := stmt.Exec(nodeId, taskId, time.Unix(int64(finishedTime), 0), success, remark)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -91,6 +94,37 @@ func TaskFinish(taskId []byte, nodeId string, finishedTime uint64, success bool,
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	taskFinish(tx, taskId, nodeId, finishedTime, success, remark)
+	checkErr(tx.Commit())
+	commit = true
+	return
+}
+
+func taskUpdateProofId(tx *sql.Tx, taskId []byte, proofId []byte) bool {
+	stmt, err := tx.Prepare("update TASK set PROOF_ID=$2 where ID=$1 and type='PROVE' and PROOF_ID is null and REMOVED=false and FINISHED=false")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(taskId, proofId)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	return cnt == 1
+}
+
+func taskRemove(tx *sql.Tx, taskId []byte, nodeId string, typeStr string) bool {
+	stmt, err := tx.Prepare("update TASK set PROOF_ID=$2 where ID=$1 and PROVIDER_ID=$2 and type=$3 and REMOVED=false and FINISHED=false")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(taskId, nodeId, typeStr)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	return cnt == 1
+}
+
+func TaskRemove(taskId []byte, nodeId string, typeStr string) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	taskRemove(tx, taskId, nodeId, typeStr)
 	checkErr(tx.Commit())
 	commit = true
 	return

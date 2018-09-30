@@ -25,7 +25,7 @@ import (
 	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
-	"github.com/yanzay/log"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -149,39 +149,8 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 	if req.DownBandwidth < 4000000 || req.TestDownBandwidth < 2000000 {
 		return &pb.RegisterResp{Code: 20, ErrMsg: "download bandwidth is too low"}, nil
 	}
-	if req.Availability < 0.98 {
-		return &pb.RegisterResp{Code: 21, ErrMsg: "availability must more than 98%."}, nil
-	}
-	if req.Port < 1 || req.Port > 65535 {
-		return &pb.RegisterResp{Code: 22, ErrMsg: "port must between 1 to 65535."}, nil
-	}
-	host, err := self.decrypt(req.HostEnc)
-	if err != nil {
-		return &pb.RegisterResp{Code: 23, ErrMsg: "decrypt HostEnc error: " + err.Error()}, nil
-	}
-	dynamicDomain, err := self.decrypt(req.DynamicDomainEnc)
-	if err != nil {
-		return &pb.RegisterResp{Code: 24, ErrMsg: "decrypt DynamicDomainEnc error: " + err.Error()}, nil
-	}
-	if (host == nil || len(host) == 0) && (dynamicDomain == nil || len(dynamicDomain) == 0) {
-		return &pb.RegisterResp{Code: 25, ErrMsg: "host is required"}, nil
-	}
-	var hostStr string
-	if host != nil && len(host) > 0 { // prefer
-		hostStr = string(host)
-	} else if dynamicDomain != nil && len(dynamicDomain) > 0 {
-		hostStr = string(dynamicDomain)
-	}
-	providerAddr := fmt.Sprintf("%s:%d", hostStr, req.Port)
-	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
-	if err != nil {
-		return &pb.RegisterResp{Code: 26, ErrMsg: "can not connect, error: " + err.Error()}, nil
-	}
-	defer conn.Close()
-	psc := provider_pb.NewProviderServiceClient(conn)
-	err = pingProvider(psc, util_hash.Sha1(nodeId))
-	if err != nil {
-		return &pb.RegisterResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
+	if req.Availability < 0.97 {
+		return &pb.RegisterResp{Code: 21, ErrMsg: "availability must more than 97%."}, nil
 	}
 	storageVolume := []uint64{req.MainStorageVolume}
 	if req.ExtraStorageVolume != nil && len(req.ExtraStorageVolume) > 0 {
@@ -189,6 +158,40 @@ func (self *ProviderRegisterService) Register(ctx context.Context, req *pb.Regis
 		storageVolume[0] = req.MainStorageVolume
 		for i, v := range req.ExtraStorageVolume {
 			storageVolume[i+1] = v
+		}
+	}
+	var host, dynamicDomain []byte
+	if !req.ConfirmInner {
+		if req.Port < 1 || req.Port > 65535 {
+			return &pb.RegisterResp{Code: 22, ErrMsg: "port must between 1 to 65535."}, nil
+		}
+		host, err = self.decrypt(req.HostEnc)
+		if err != nil {
+			return &pb.RegisterResp{Code: 23, ErrMsg: "decrypt HostEnc error: " + err.Error()}, nil
+		}
+		dynamicDomain, err = self.decrypt(req.DynamicDomainEnc)
+		if err != nil {
+			return &pb.RegisterResp{Code: 24, ErrMsg: "decrypt DynamicDomainEnc error: " + err.Error()}, nil
+		}
+		if len(host) == 0 && len(dynamicDomain) == 0 {
+			return &pb.RegisterResp{Code: 25, ErrMsg: "host is required"}, nil
+		}
+		var hostStr string
+		if host != nil && len(host) > 0 { // prefer
+			hostStr = string(host)
+		} else if dynamicDomain != nil && len(dynamicDomain) > 0 {
+			hostStr = string(dynamicDomain)
+		}
+		providerAddr := fmt.Sprintf("%s:%d", hostStr, req.Port)
+		conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+		if err != nil {
+			return &pb.RegisterResp{Code: 26, ErrMsg: "can not connect, error: " + err.Error()}, nil
+		}
+		defer conn.Close()
+		psc := provider_pb.NewProviderServiceClient(conn)
+		err = pingProvider(psc, util_hash.Sha1(nodeId))
+		if err != nil {
+			return &pb.RegisterResp{Code: 27, ErrMsg: "ping failed, error: " + err.Error()}, nil
 		}
 	}
 	randomCode := random.RandomStr(8)
