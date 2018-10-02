@@ -96,10 +96,16 @@ func (self *ProviderTaskService) GetOppositeInfo(ctx context.Context, req *pb.Ge
 			continue
 		}
 		ticket := impl.GenTicket(nodeIdStr, pid)
+		var auth []byte
+		if task.Type == pb.TaskType_REPLICATE {
+			auth = provider_pb.GenRetrieveAuth(pro.PublicKey, task.FileHash, task.FileSize, task.BlockHash, task.BlockSize, ts, ticket)
+		} else if task.Type == pb.TaskType_SEND {
+			auth = provider_pb.GenStoreAuth(pro.PublicKey, task.FileHash, task.FileSize, task.BlockHash, task.BlockSize, ts, ticket)
+		}
 		info = append(info, &pb.OppositeInfo{NodeId: pid,
 			Host:   pro.Server(),
 			Port:   pro.Port,
-			Auth:   provider_pb.GenRetrieveAuth(pro.PublicKey, task.FileHash, task.FileSize, task.BlockHash, task.BlockSize, ts, ticket),
+			Auth:   auth,
 			Ticket: ticket})
 	}
 	return &pb.GetOppositeInfoResp{Timestamp: ts, Info: info}, nil
@@ -128,7 +134,19 @@ func (self *ProviderTaskService) FinishTask(ctx context.Context, req *pb.FinishT
 	if len(remark) > 250 {
 		remark = remark[:250]
 	}
-	db.TaskFinish(req.TaskId, nodeIdStr, req.FinishedTime, req.Success, remark)
+	task := db.GetTask(req.TaskId, nodeIdStr)
+	if task == nil {
+		return nil, status.Errorf(codes.NotFound, "not found or task expired")
+	}
+	storeNodeId := ""
+	if req.Success {
+		if task.Type == pb.TaskType_REPLICATE || task.Type == pb.TaskType_REMOVE {
+			storeNodeId = nodeIdStr
+		} else if task.Type == pb.TaskType_SEND {
+			storeNodeId = task.OppositeId[0]
+		}
+	}
+	db.TaskFinish(req.TaskId, nodeIdStr, req.FinishedTime, req.Success, remark, task.FileId, task.FileHash, task.BlockHash, task.BlockSize, storeNodeId, task.Type == pb.TaskType_REMOVE)
 	return &pb.FinishTaskResp{}, nil
 }
 
@@ -178,8 +196,8 @@ func (self *ProviderTaskService) GetProveInfo(ctx context.Context, req *pb.GetPr
 			fmt.Println(err)
 			return
 		}
-		db.SaveProofInfo(task.Id, nodeIdStr, task.FileId, task.BlockHash, task.BlockSize, seq, randNum)
-		return &pb.GetProveInfoResp{ProofId: task.ProofId,
+		proofId := db.SaveProofInfo(task.Id, nodeIdStr, task.FileId, task.BlockHash, task.BlockSize, seq, randNum)
+		return &pb.GetProveInfoResp{ProofId: proofId,
 			ChunkSize: chunkSize,
 			ChunkSeq:  m}, nil
 	}
@@ -200,8 +218,8 @@ func challenge(paramStr string, count int, choose int) (q map[uint32][]byte, seq
 	randomNum = make([][]byte, 0, choose)
 	for _, i := range rand.Perm(count)[0:choose] {
 		bs := pairing.NewZr().Rand().Bytes()
-		q[uint32(i)] = bs
-		seq = append(seq, uint32(i))
+		q[uint32(i+1)] = bs
+		seq = append(seq, uint32(i+1))
 		randomNum = append(randomNum, bs)
 	}
 	return
@@ -230,6 +248,9 @@ func (self *ProviderTaskService) FinishProve(ctx context.Context, req *pb.Finish
 	if task == nil {
 		return nil, status.Errorf(codes.NotFound, "not found or task expired")
 	}
+	if len(req.ProofId) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "proof id can not be empty")
+	}
 	if !bytes.Equal(req.ProofId, task.ProofId) {
 		return nil, status.Errorf(codes.InvalidArgument, "task proof id not same")
 	}
@@ -253,7 +274,7 @@ func (self *ProviderTaskService) FinishProve(ctx context.Context, req *pb.Finish
 	if len(remark) > 250 {
 		remark = remark[:250]
 	}
-	db.ProofFinish(req.TaskId, nodeIdStr, req.FinishedTime, pass, remark, req.ProofId, req.Result)
+	db.ProofFinish(req.TaskId, nodeIdStr, task.FileId, base64.StdEncoding.EncodeToString(task.BlockHash), req.FinishedTime, pass, remark, req.ProofId, req.Result)
 	return &pb.FinishProveResp{}, nil
 }
 func verify(paramStr string, generator []byte, pubKey []byte, d [][]byte, q map[uint32][]byte, u []byte, proveRes []byte) (pass bool, err error) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	pb "github.com/samoslab/nebula/tracker/metadata/pb"
@@ -362,4 +363,63 @@ func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
 		}
 	}
 	return res, nil
+}
+
+func fileGetBlock(tx *sql.Tx, fileId []byte, fileHash string) []string {
+	rows, err := tx.Query("SELECT BLOCKS FROM FILE where ID=$1 and HASH=$2", fileId, fileHash)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		var blocks NullStrSlice
+		rows.Scan(&blocks)
+		checkErr(err)
+		if blocks.Valid {
+			return blocks.StrSlice
+		}
+		return nil
+	}
+	return nil
+}
+
+func fileUpdateSingleBlock(tx *sql.Tx, fileId []byte, fileHash string, old string, new string) {
+	stmt, err := tx.Prepare("update FILE set BLOCKS=array_replace(BLOCKS,$3,$4),LAST_MODIFIED=now() where ID=$1 and HASH=$2")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(fileId, fileHash, old, new)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	if cnt == 0 {
+		panic(errors.New("no record found"))
+	}
+}
+
+func fileUpdateBlockNodeId(tx *sql.Tx, fileId []byte, fileHash string, blockHash string, blockSize uint64, nodeId string, isRemove bool) {
+	blocks := fileGetBlock(tx, fileId, fileHash)
+	for _, str := range blocks {
+		if strings.HasPrefix(str, blockHash+BlockSep+strconv.Itoa(int(blockSize))+BlockSep) {
+			if isRemove {
+				if strings.Contains(str, nodeId) {
+					if strings.HasSuffix(str, nodeId) {
+						n := strings.Replace(str, nodeId, "", 1)
+						if strings.HasSuffix(n, BlockNodeIdSep) {
+							n = n[:(len(n) - len(BlockNodeIdSep))]
+						}
+						fileUpdateSingleBlock(tx, fileId, fileHash, str, n)
+					} else {
+						fileUpdateSingleBlock(tx, fileId, fileHash, str, strings.Replace(str, nodeId+BlockNodeIdSep, "", 1))
+					}
+				}
+			} else {
+				if !strings.Contains(str, nodeId) {
+					if strings.HasSuffix(str, BlockSep) {
+						fileUpdateSingleBlock(tx, fileId, fileHash, str, str+nodeId)
+					} else {
+						fileUpdateSingleBlock(tx, fileId, fileHash, str, str+BlockNodeIdSep+nodeId)
+					}
+				}
+			}
+			return
+		}
+	}
 }

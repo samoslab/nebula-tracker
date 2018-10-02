@@ -3,13 +3,16 @@ package db
 import (
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"time"
 
 	pb "github.com/samoslab/nebula/tracker/metadata/pb"
 )
 
+const sql_save_block = "insert into BLOCK(HASH,SIZE,FILE_ID,CREATION,REMOVED,PROVIDER_ID) values($1,$2,$3,$4,false,$5)"
+
 func saveBlocks(tx *sql.Tx, fileId []byte, creation time.Time, partitions []*pb.StorePartition) {
-	stmt, err := tx.Prepare("insert into BLOCK(HASH,SIZE,FILE_ID,CREATION,REMOVED,PROVIDER_ID) values($1,$2,$3,$4,false,$5)")
+	stmt, err := tx.Prepare(sql_save_block)
 	defer stmt.Close()
 	checkErr(err)
 	for _, sp := range partitions {
@@ -19,6 +22,51 @@ func saveBlocks(tx *sql.Tx, fileId []byte, creation time.Time, partitions []*pb.
 				checkErr(err)
 			}
 		}
+	}
+}
+
+func restoreBlock(tx *sql.Tx, fileId []byte, blockHash string, nodeId string) bool {
+	stmt, err := tx.Prepare("update BLOCK set REMOVED=false,REMOVE_TIME=NULL where FILE_ID=$1 and HASH=$2 and PROVIDER_ID=$3 ")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(fileId, blockHash, nodeId)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	return cnt == 1
+}
+
+func saveBlock(tx *sql.Tx, fileId []byte, creation time.Time, blockHash string, size uint64, nodeId string) {
+	stmt, err := tx.Prepare(sql_save_block)
+	defer stmt.Close()
+	checkErr(err)
+	_, err = stmt.Exec(blockHash, size, fileId, creation, nodeId)
+	checkErr(err)
+}
+
+func removeBlock(tx *sql.Tx, fileId []byte, blockHash string, nodeId string, timestamp time.Time) {
+	stmt, err := tx.Prepare("update BLOCK set REMOVED=true,REMOVE_TIME=$4 where FILE_ID=$1 and HASH=$2 and PROVIDER_ID=$3 and REMOVED=false")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(fileId, blockHash, nodeId, timestamp)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	if cnt == 0 {
+		panic(errors.New("no record found"))
+	}
+}
+
+func updateBlockLastProved(tx *sql.Tx, fileId []byte, blockHash string, nodeId string, timestamp time.Time) {
+	stmt, err := tx.Prepare("update BLOCK set LAST_PROOVED=$4 where FILE_ID=$1 and HASH=$2 and PROVIDER_ID=$3")
+	defer stmt.Close()
+	checkErr(err)
+	rs, err := stmt.Exec(fileId, blockHash, nodeId, timestamp)
+	checkErr(err)
+	cnt, err := rs.RowsAffected()
+	checkErr(err)
+	if cnt == 0 {
+		panic(errors.New("no record found"))
 	}
 }
 

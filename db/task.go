@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
@@ -23,11 +24,20 @@ func buildTask(rows *sql.Rows) (task *task_pb.Task, err error) {
 	var typeStr string
 	var oppositeId NullStrSlice
 	var creation time.Time
-	err = rows.Scan(&task.Id, &creation, &typeStr, &task.FileId, &task.FileHash, &task.FileSize, &task.BlockHash, &task.BlockSize, &oppositeId, &task.ProofId)
+	var fileHash, blockHash string
+	err = rows.Scan(&task.Id, &creation, &typeStr, &task.FileId, &fileHash, &task.FileSize, &blockHash, &task.BlockSize, &oppositeId, &task.ProofId)
 	checkErr(err)
 	t, ok := task_pb.TaskType_value[typeStr]
 	if !ok {
 		return nil, fmt.Errorf("wront task type: %s, id: %x", typeStr, task.Id)
+	}
+	task.FileHash, err = base64.StdEncoding.DecodeString(fileHash)
+	if err != nil {
+		return nil, fmt.Errorf("wront task fileHash: %s, id: %x", fileHash, task.Id)
+	}
+	task.BlockHash, err = base64.StdEncoding.DecodeString(blockHash)
+	if err != nil {
+		return nil, fmt.Errorf("wront task blockHash: %s, id: %x", blockHash, task.Id)
 	}
 	task.Type = task_pb.TaskType(t)
 	task.Creation = uint64(creation.Unix())
@@ -38,7 +48,7 @@ func buildTask(rows *sql.Rows) (task *task_pb.Task, err error) {
 }
 
 func getTasksByProviderId(tx *sql.Tx, nodeId string) []*task_pb.Task {
-	rows, err := tx.Query("SELECT ID,CREATION,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,PROOF_ID FROM TASK where PROVIDER_ID=$1 and REMOVED=false and FINISHED=false and (EXPIRE_TIME is null or now()<EXPIRE_TIME)", nodeId)
+	rows, err := tx.Query("SELECT ID,CREATION,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,PROOF_ID FROM TASK where PROVIDER_ID=$1 and REMOVED=false and FINISHED=false and (EXPIRE_TIME is null or now()<EXPIRE_TIME) order by creation asc limit 320", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	taskList := make([]*task_pb.Task, 0, 16)
@@ -90,10 +100,21 @@ func taskFinish(tx *sql.Tx, taskId []byte, nodeId string, finishedTime uint64, s
 	}
 }
 
-func TaskFinish(taskId []byte, nodeId string, finishedTime uint64, success bool, remark string) {
+func TaskFinish(taskId []byte, nodeId string, finishedTime uint64, success bool, remark string, fileId []byte, fileHash []byte, blockHash []byte, blockSize uint64, storeNodeId string, isRemove bool) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
 	taskFinish(tx, taskId, nodeId, finishedTime, success, remark)
+	if success {
+		blockHashStr := base64.StdEncoding.EncodeToString(blockHash)
+		fileUpdateBlockNodeId(tx, fileId, base64.StdEncoding.EncodeToString(fileHash), blockHashStr, blockSize, storeNodeId, isRemove)
+		if isRemove {
+			removeBlock(tx, fileId, blockHashStr, nodeId, time.Unix(int64(finishedTime), 0))
+		} else {
+			if !restoreBlock(tx, fileId, blockHashStr, storeNodeId) {
+				saveBlock(tx, fileId, time.Unix(int64(finishedTime), 0), blockHashStr, blockSize, storeNodeId)
+			}
+		}
+	}
 	checkErr(tx.Commit())
 	commit = true
 	return

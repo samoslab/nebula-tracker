@@ -27,7 +27,7 @@ func saveProofMetadata(tx *sql.Tx, fileId []byte, creation time.Time, partitions
 }
 
 func getProofMetadata(tx *sql.Tx, fileId []byte, hash string) (chunkSize uint32, paramStr string, generator []byte, pubKey []byte, random []byte, phi [][]byte) {
-	rows, err := tx.Query("select CHUNK_SIZE,PARAM_STR,GENERATOR,PUB_KEY,RANDOM,PHI_LENGTH,PHI_DATA where FILE_ID=$1 and HASH=$2 and REMOVED=false", fileId, hash)
+	rows, err := tx.Query("select CHUNK_SIZE,PARAM_STR,GENERATOR,PUB_KEY,RANDOM,PHI_LENGTH,PHI_DATA from PROOF_METADATA where FILE_ID=$1 and HASH=$2 and REMOVED=false", fileId, hash)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {

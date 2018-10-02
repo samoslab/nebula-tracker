@@ -1,2 +1,12 @@
 insert into TASK(CREATION,EXPIRE_TIME,PROVIDER_ID,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID) select now(), now()+(INTERVAL '1day'), 'gO25LJSmGAWaX6I3wgQt96EHnSk=','REPLICATE',d.FILE_ID,f.HASH,f.SIZE,d.HASH,d.SIZE,d.PRO_ID from  (select m.FILE_ID as FILE_ID,m.HASH as HASH,m.SIZE as SIZE,array_agg(b.PROVIDER_ID) as PRO_ID from BLOCK b,PROOF_METADATA m where b.FILE_ID = m.FILE_ID and b.HASH=m.HASH group by m.FILE_ID,m.HASH,m.SIZE) d,FILE f where f.ID=d.FILE_ID;
 
+
+
+insert into TASK(CREATION,EXPIRE_TIME,PROVIDER_ID,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID) select now(), now()+(INTERVAL '1day'), PROVIDER_ID,'PROVE',FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,null from task where id='084a1877-4b32-4b8a-9294-69768faef540';
+
+
+gD6gvvUXEcMAW9AcN7iOnGJQehk=  
+array_length
+
+
+insert into TASK(CREATION,EXPIRE_TIME,PROVIDER_ID,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID) select now(), now()+(INTERVAL '1day'), 'gO25LJSmGAWaX6I3wgQt96EHnSk=','REPLICATE',d.FILE_ID,f.HASH,f.SIZE,d.HASH,d.SIZE,d.PRO_ID from (select m.FILE_ID as FILE_ID,m.HASH as HASH,m.SIZE as SIZE,array_agg(m.PROVIDER_ID) as PRO_ID from BLOCK m where m.file_id in (select id from file where array_length(blocks,1)=1 and id not in (select distinct file_id from block where provider_id='gO25LJSmGAWaX6I3wgQt96EHnSk=')) group by m.FILE_ID,m.HASH,m.SIZE) d,FILE f where f.ID=d.FILE_ID;

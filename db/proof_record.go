@@ -3,6 +3,7 @@ package db
 import (
 	"bytes"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -46,7 +47,7 @@ func GetProofInfo(id []byte) (chunkSize uint32, seq []uint32, randomNum [][]byte
 
 func saveProofInfo(tx *sql.Tx, providerId string, fileId []byte, blockHash []byte, blockSize uint64, chunkSeq []uint32, randomNum [][]byte) (id []byte) {
 	args := make([]interface{}, 5, len(chunkSeq)+len(randomNum)+5)
-	args[0], args[1], args[2], args[3], args[4] = providerId, fileId, blockHash, blockSize, bytes.Join(randomNum, []byte{})
+	args[0], args[1], args[2], args[3], args[4] = providerId, fileId, base64.StdEncoding.EncodeToString(blockHash), blockSize, bytes.Join(randomNum, []byte{})
 	for _, el := range randomNum {
 		args = append(args, len(el))
 	}
@@ -59,10 +60,10 @@ func saveProofInfo(tx *sql.Tx, providerId string, fileId []byte, blockHash []byt
 	return
 }
 
-func SaveProofInfo(taskId []byte, providerId string, fileId []byte, blockHash []byte, blockSize uint64, chunkSeq []uint32, randomNum [][]byte) {
+func SaveProofInfo(taskId []byte, providerId string, fileId []byte, blockHash []byte, blockSize uint64, chunkSeq []uint32, randomNum [][]byte) (id []byte) {
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	id := saveProofInfo(tx, providerId, fileId, blockHash, blockSize, chunkSeq, randomNum)
+	id = saveProofInfo(tx, providerId, fileId, blockHash, blockSize, chunkSeq, randomNum)
 	if !taskUpdateProofId(tx, taskId, id) {
 		panic("update task proof id failed, task id: " + hex.EncodeToString(taskId))
 	}
@@ -71,11 +72,11 @@ func SaveProofInfo(taskId []byte, providerId string, fileId []byte, blockHash []
 	return
 }
 
-func proofFinish(tx *sql.Tx, proofId []byte, nodeId string, finishedTime uint64, pass bool, remark string, result []byte) {
+func proofFinish(tx *sql.Tx, proofId []byte, nodeId string, finished time.Time, pass bool, remark string, result []byte) {
 	stmt, err := tx.Prepare("update PROOF_RECORD set FINISHED=true,FINISHED_TIME=$3,PASS=$4,REMARK=$5,PROVE_RESULT=$6 where ID=$2 and PROVIDER_ID=$1 and FINISHED=false")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(nodeId, proofId, time.Unix(int64(finishedTime), 0), pass, remark, result)
+	rs, err := stmt.Exec(nodeId, proofId, finished, pass, remark, result)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -84,10 +85,12 @@ func proofFinish(tx *sql.Tx, proofId []byte, nodeId string, finishedTime uint64,
 	}
 }
 
-func ProofFinish(taskId []byte, nodeId string, finishedTime uint64, pass bool, remark string, proofId []byte, result []byte) {
+func ProofFinish(taskId []byte, nodeId string, fileId []byte, blockHash string, finishedTime uint64, pass bool, remark string, proofId []byte, result []byte) {
+	finished := time.Unix(int64(finishedTime), 0)
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	proofFinish(tx, proofId, nodeId, finishedTime, pass, remark, result)
+	proofFinish(tx, proofId, nodeId, finished, pass, remark, result)
+	updateBlockLastProved(tx, fileId, blockHash, nodeId, finished)
 	taskFinish(tx, taskId, nodeId, finishedTime, pass, remark)
 	checkErr(tx.Commit())
 	commit = true

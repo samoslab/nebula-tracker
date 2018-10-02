@@ -75,7 +75,7 @@ func saveFromProviderAsClient(tx *sql.Tx, nodeId string, timestamp uint64, als [
 		}
 		_, err = stmt.Exec(al.Ticket, cltId, prvId, nodeId, al.Type, time.Unix(0, int64(timestamp)), al.Success,
 			base64.StdEncoding.EncodeToString(al.FileHash), al.FileSize, base64.StdEncoding.EncodeToString(al.BlockHash), al.BlockSize, time.Unix(0, int64(al.BeginTime)), time.Unix(0, int64(al.EndTime)),
-			al.TransportSize, al.Info, nil, nil, nil)
+			al.TransportSize, al.Info)
 		checkErr(err)
 	}
 	saveProviderCheatingRecord(tx, crs...)
