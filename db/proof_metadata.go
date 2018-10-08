@@ -16,7 +16,7 @@ func saveProofMetadata(tx *sql.Tx, fileId []byte, creation time.Time, partitions
 			checkErr(err)
 			defer stmt.Close()
 			args := make([]interface{}, 10, len(block.Phi)+10)
-			args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9] = base64.StdEncoding.EncodeToString(block.Hash), block.Size, fileId, creation, block.ChunkSize, block.ParamStr, block.Generator, block.PubKey, block.Random, bytes.Join(block.Phi, []byte{})
+			args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9] = base64.StdEncoding.EncodeToString(block.Hash), block.Size, bytesToUuid(fileId), creation, block.ChunkSize, block.ParamStr, block.Generator, block.PubKey, block.Random, bytes.Join(block.Phi, []byte{})
 			for _, el := range block.Phi {
 				args = append(args, len(el))
 			}
@@ -27,7 +27,7 @@ func saveProofMetadata(tx *sql.Tx, fileId []byte, creation time.Time, partitions
 }
 
 func getProofMetadata(tx *sql.Tx, fileId []byte, hash string) (chunkSize uint32, paramStr string, generator []byte, pubKey []byte, random []byte, phi [][]byte) {
-	rows, err := tx.Query("select CHUNK_SIZE,PARAM_STR,GENERATOR,PUB_KEY,RANDOM,PHI_LENGTH,PHI_DATA from PROOF_METADATA where FILE_ID=$1 and HASH=$2 and REMOVED=false", fileId, hash)
+	rows, err := tx.Query("select CHUNK_SIZE,PARAM_STR,GENERATOR,PUB_KEY,RANDOM,PHI_LENGTH,PHI_DATA from PROOF_METADATA where FILE_ID=$1 and HASH=$2 and REMOVED=false", bytesToUuid(fileId), hash)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {

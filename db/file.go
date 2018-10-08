@@ -41,7 +41,7 @@ func fileChangeCreatorNodeId(tx *sql.Tx, id []byte, nodeId string) {
 	stmt, err := tx.Prepare("update FILE set CREATOR_NODE_ID=$2,REMOVED=false,LAST_MODIFIED=now() where ID=$1")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(id, nodeId)
+	rs, err := stmt.Exec(bytesToUuid(id), nodeId)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -54,7 +54,7 @@ func fileChangeRemoved(tx *sql.Tx, id []byte, removed bool) {
 	stmt, err := tx.Prepare("update FILE set REMOVED=$2,LAST_MODIFIED=now() where ID=$1 and REMOVED=$3")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(id, removed, !removed)
+	rs, err := stmt.Exec(bytesToUuid(id), removed, !removed)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -65,7 +65,7 @@ func fileChangeRemoved(tx *sql.Tx, id []byte, removed bool) {
 
 func fileCheckExist(tx *sql.Tx, nodeId string, hash string, spaceNo uint32) (id []byte, active bool, removed bool, done bool, fileType string, size uint64, creatorNodeId string, lastModified time.Time) {
 	if spaceNo > 0 {
-		rows, err := tx.Query("SELECT ID,ACTIVE,REMOVED,DONE,TYPE,SIZE,CREATOR_NODE_ID,LAST_MODIFIED FROM FILE where HASH=$1 and PRIVATE=true and CREATOR_NODE_ID=$2", hash, nodeId)
+		rows, err := tx.Query("SELECT ID::bytes,ACTIVE,REMOVED,DONE,TYPE,SIZE,CREATOR_NODE_ID,LAST_MODIFIED FROM FILE where HASH=$1 and PRIVATE=true and CREATOR_NODE_ID=$2", hash, nodeId)
 		checkErr(err)
 		defer rows.Close()
 		for rows.Next() {
@@ -74,7 +74,7 @@ func fileCheckExist(tx *sql.Tx, nodeId string, hash string, spaceNo uint32) (id 
 		}
 		return
 	} else {
-		rows, err := tx.Query("SELECT ID,ACTIVE,REMOVED,DONE,TYPE,SIZE,CREATOR_NODE_ID,LAST_MODIFIED FROM FILE where HASH=$1 and PRIVATE=false and (INVALID=false or (INVALID=true and CREATOR_NODE_ID=$2)) and (SHARE=true or (SHARE=false and CREATOR_NODE_ID=$3))", hash, nodeId, nodeId)
+		rows, err := tx.Query("SELECT ID::bytes,ACTIVE,REMOVED,DONE,TYPE,SIZE,CREATOR_NODE_ID,LAST_MODIFIED FROM FILE where HASH=$1 and PRIVATE=false and (INVALID=false or (INVALID=true and CREATOR_NODE_ID=$2)) and (SHARE=true or (SHARE=false and CREATOR_NODE_ID=$3))", hash, nodeId, nodeId)
 		checkErr(err)
 		defer rows.Close()
 		crs := make([]*fileCheckRow, 0, 6)
@@ -125,7 +125,7 @@ func incrementRefCount(tx *sql.Tx, id []byte) {
 	stmt, err := tx.Prepare("update FILE set REF_COUNT=REF_COUNT+1,REMOVED=false,LAST_MODIFIED=now() where ID=$1")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(id)
+	rs, err := stmt.Exec(bytesToUuid(id))
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -185,7 +185,7 @@ func fileSaveDone(tx *sql.Tx, nodeId string, hash string, partitionCount int, bl
 	defer stmt.Close()
 	checkErr(err)
 	args := make([]interface{}, 7, len(blocks)+7)
-	args[0], args[1], args[2], args[3], args[4], args[5], args[6] = fileId, hash, nodeId, partitionCount, storeVolume, fileType, encryptKey
+	args[0], args[1], args[2], args[3], args[4], args[5], args[6] = bytesToUuid(fileId), hash, nodeId, partitionCount, storeVolume, fileType, encryptKey
 	for _, str := range blocks {
 		args = append(args, str)
 	}
@@ -243,7 +243,7 @@ func FileSaveDone(existId []byte, nodeId string, hash string, name string, fileT
 }
 
 func fileFindId(tx *sql.Tx, nodeId string, hash string, spaceNo uint32, done bool) (id []byte) {
-	rows, err := tx.Query("SELECT ID FROM FILE where HASH=$1 and CREATOR_NODE_ID=$2 and PRIVATE=$3 and DONE=$4", hash, nodeId, spaceNo > 0, done)
+	rows, err := tx.Query("SELECT ID::bytes FROM FILE where HASH=$1 and CREATOR_NODE_ID=$2 and PRIVATE=$3 and DONE=$4", hash, nodeId, spaceNo > 0, done)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
@@ -284,7 +284,7 @@ func (self *fileRetrieveRow) fileRetrieveRes() (id []byte, active bool, fileData
 }
 func fileRetrieve(tx *sql.Tx, nodeId string, hash string, spaceNo uint32) (id []byte, active bool, fileData []byte, partitionCount int, blocks []string, size uint64, fileType string, encryptKey []byte) {
 	if spaceNo > 0 {
-		rows, err := tx.Query("SELECT ID,ACTIVE,DATA,PARTITION_COUNT,BLOCKS,SIZE,TYPE,ENCRYPT_KEY,CREATOR_NODE_ID FROM FILE where HASH=$1 and PRIVATE=true and CREATOR_NODE_ID=$2 and DONE=true", hash, nodeId)
+		rows, err := tx.Query("SELECT ID::bytes,ACTIVE,DATA,PARTITION_COUNT,BLOCKS,SIZE,TYPE,ENCRYPT_KEY,CREATOR_NODE_ID FROM FILE where HASH=$1 and PRIVATE=true and CREATOR_NODE_ID=$2 and DONE=true", hash, nodeId)
 		checkErr(err)
 		defer rows.Close()
 		for rows.Next() {
@@ -293,7 +293,7 @@ func fileRetrieve(tx *sql.Tx, nodeId string, hash string, spaceNo uint32) (id []
 		}
 		return
 	} else {
-		rows, err := tx.Query("SELECT ID,ACTIVE,DATA,PARTITION_COUNT,BLOCKS,SIZE,TYPE,ENCRYPT_KEY,CREATOR_NODE_ID FROM FILE where HASH=$1 and PRIVATE=false and DONE=true and (INVALID=false or (INVALID=true and CREATOR_NODE_ID=$2)) and (SHARE=true or (SHARE=false and CREATOR_NODE_ID=$3))", hash, nodeId, nodeId)
+		rows, err := tx.Query("SELECT ID::bytes,ACTIVE,DATA,PARTITION_COUNT,BLOCKS,SIZE,TYPE,ENCRYPT_KEY,CREATOR_NODE_ID FROM FILE where HASH=$1 and PRIVATE=false and DONE=true and (INVALID=false or (INVALID=true and CREATOR_NODE_ID=$2)) and (SHARE=true or (SHARE=false and CREATOR_NODE_ID=$3))", hash, nodeId, nodeId)
 		checkErr(err)
 		defer rows.Close()
 		rrs := make([]*fileRetrieveRow, 0, 6)
@@ -366,7 +366,7 @@ func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
 }
 
 func fileGetBlock(tx *sql.Tx, fileId []byte, fileHash string) []string {
-	rows, err := tx.Query("SELECT BLOCKS FROM FILE where ID=$1 and HASH=$2", fileId, fileHash)
+	rows, err := tx.Query("SELECT BLOCKS FROM FILE where ID=$1 and HASH=$2", bytesToUuid(fileId), fileHash)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
@@ -385,7 +385,7 @@ func fileUpdateSingleBlock(tx *sql.Tx, fileId []byte, fileHash string, old strin
 	stmt, err := tx.Prepare("update FILE set BLOCKS=array_replace(BLOCKS,$3,$4),LAST_MODIFIED=now() where ID=$1 and HASH=$2")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(fileId, fileHash, old, new)
+	rs, err := stmt.Exec(bytesToUuid(fileId), fileHash, old, new)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)

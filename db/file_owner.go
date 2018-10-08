@@ -39,11 +39,11 @@ func queryIdRecursion(tx *sql.Tx, nodeId string, path string, spaceNo uint32) (f
 func queryId(tx *sql.Tx, nodeId string, parent []byte, folderName string, spaceNo uint32) (found bool, id []byte, isFolder bool) {
 	var rows *sql.Rows
 	var err error
-	sqlStr := "SELECT ID,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and SPACE_NO=$3 and PARENT_ID%s and REMOVED=false"
+	sqlStr := "SELECT ID::bytes,FOLDER FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and SPACE_NO=$3 and PARENT_ID%s and REMOVED=false"
 	if parent == nil || len(parent) == 0 {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, folderName, spaceNo)
 	} else {
-		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$4"), nodeId, folderName, spaceNo, parent)
+		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$4"), nodeId, folderName, spaceNo, bytesToUuid(parent))
 	}
 	checkErr(err)
 	defer rows.Close()
@@ -69,11 +69,11 @@ func FileOwnerFileExists(nodeId string, spaceNo uint32, parent []byte, name stri
 func fileOwnerFileExists(tx *sql.Tx, nodeId string, spaceNo uint32, parent []byte, name string) (id []byte, isFolder bool, hash string) {
 	var rows *sql.Rows
 	var err error
-	sqlStr := "SELECT ID,FOLDER,HASH FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and SPACE_NO=$3 and PARENT_ID%s and REMOVED=false"
+	sqlStr := "SELECT ID::bytes,FOLDER,HASH FROM FILE_OWNER where NODE_ID=$1 and NAME=$2 and SPACE_NO=$3 and PARENT_ID%s and REMOVED=false"
 	if parent == nil || len(parent) == 0 {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null"), nodeId, name, spaceNo)
 	} else {
-		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$4"), nodeId, name, spaceNo, parent)
+		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$4"), nodeId, name, spaceNo, bytesToUuid(parent))
 	}
 	checkErr(err)
 	defer rows.Close()
@@ -102,7 +102,7 @@ func fileOwnerBatchFileExists(tx *sql.Tx, nodeId string, spaceNo uint32, parent 
 		args = append(args, name)
 	}
 	if len(parent) > 0 {
-		args = append(args, parent)
+		args = append(args, bytesToUuid(parent))
 	}
 	rows, err := tx.Query(sqlStr, args...)
 	checkErr(err)
@@ -122,10 +122,10 @@ func fileOwnerBatchFileExists(tx *sql.Tx, nodeId string, spaceNo uint32, parent 
 func saveFileOwner(tx *sql.Tx, nodeId string, isFolder bool, name string, spaceNo uint32, parent []byte, fileType string, modTime uint64, hash *sql.NullString, size uint64) []byte {
 	var parentId interface{} = nil
 	if len(parent) > 0 {
-		parentId = parent
+		parentId = bytesToUuid(parent)
 	}
 	var lastInsertId []byte
-	err := tx.QueryRow("insert into FILE_OWNER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,FOLDER,NAME,SPACE_NO,PARENT_ID,TYPE,MOD_TIME,HASH,SIZE) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ID", nodeId, isFolder, name, spaceNo, parentId, fileType, time.Unix(int64(modTime), 0), hash, size).Scan(&lastInsertId)
+	err := tx.QueryRow("insert into FILE_OWNER(REMOVED,CREATION,LAST_MODIFIED,NODE_ID,FOLDER,NAME,SPACE_NO,PARENT_ID,TYPE,MOD_TIME,HASH,SIZE) values (false,now(),now(),$1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ID::bytes", nodeId, isFolder, name, spaceNo, parentId, fileType, time.Unix(int64(modTime), 0), hash, size).Scan(&lastInsertId)
 	checkErr(err)
 	return lastInsertId
 }
@@ -134,7 +134,7 @@ func updateFileOwnerNewVersion(tx *sql.Tx, existId []byte, nodeId string, modTim
 	stmt, err := tx.Prepare("update FILE_OWNER set MOD_TIME=$3,HASH=$4,SIZE=$5 where ID=$1 and NODE_ID=$2 and FOLDER=false")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(existId, nodeId, time.Unix(int64(modTime), 0), hash, size)
+	rs, err := stmt.Exec(bytesToUuid(existId), nodeId, time.Unix(int64(modTime), 0), hash, size)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -182,7 +182,7 @@ func fileOwnerListOfPathCount(tx *sql.Tx, nodeId string, spaceNo uint32, parent 
 	if parent == nil || len(parent) == 0 {
 		rows, err = tx.Query(fmt.Sprintf(sqlStr, " is null and NAME<>'"+SpaceSysFilename+"'"), nodeId, spaceNo)
 	} else {
-		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$3"), nodeId, spaceNo, parent)
+		rows, err = tx.Query(fmt.Sprintf(sqlStr, "=$3"), nodeId, spaceNo, bytesToUuid(parent))
 	}
 	checkErr(err)
 	defer rows.Close()
@@ -196,13 +196,13 @@ func fileOwnerListOfPathCount(tx *sql.Tx, nodeId string, spaceNo uint32, parent 
 
 func fileOwnerListOfPath(tx *sql.Tx, nodeId string, spaceNo uint32, parent []byte, pageSize uint32, pageNum uint32, sortField string, asc bool) []*Fof {
 	var args []interface{}
-	sqlStr := "SELECT ID,FOLDER,NAME,TYPE,MOD_TIME,HASH,SIZE FROM FILE_OWNER where NODE_ID=$1 and SPACE_NO=$2 and PARENT_ID%s"
+	sqlStr := "SELECT ID::bytes,FOLDER,NAME,TYPE,MOD_TIME,HASH,SIZE FROM FILE_OWNER where NODE_ID=$1 and SPACE_NO=$2 and PARENT_ID%s"
 	if parent == nil || len(parent) == 0 {
 		sqlStr = fmt.Sprintf(sqlStr, " is null and NAME<>'"+SpaceSysFilename+"'")
 		args = []interface{}{nodeId, spaceNo}
 	} else {
 		sqlStr = fmt.Sprintf(sqlStr, "=$3")
-		args = []interface{}{nodeId, spaceNo, parent}
+		args = []interface{}{nodeId, spaceNo, bytesToUuid(parent)}
 	}
 	sqlStr += " and REMOVED=false order by FOLDER desc, "
 	sqlStr += sortField
@@ -285,7 +285,7 @@ func fileOwnerRemove(tx *sql.Tx, nodeId string, spaceNo uint32, pathId []byte) {
 	stmt, err := tx.Prepare("update FILE_OWNER set REMOVED=true where ID=$1 and SPACE_NO=$2 and NODE_ID=$3")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(pathId, spaceNo, nodeId)
+	rs, err := stmt.Exec(bytesToUuid(pathId), spaceNo, nodeId)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -295,7 +295,7 @@ func fileOwnerRemove(tx *sql.Tx, nodeId string, spaceNo uint32, pathId []byte) {
 }
 
 func fileOwnerCheckId(tx *sql.Tx, id []byte, spaceNo uint32) (nodeId string, parentId []byte, isFolder bool) {
-	rows, err := tx.Query("SELECT NODE_ID,PARENT_ID,FOLDER FROM FILE_OWNER where ID=$1 and SPACE_NO=$2 and REMOVED=false", id, spaceNo)
+	rows, err := tx.Query("SELECT NODE_ID,PARENT_ID::bytes,FOLDER FROM FILE_OWNER where ID=$1 and SPACE_NO=$2 and REMOVED=false", bytesToUuid(id), spaceNo)
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
@@ -327,7 +327,7 @@ func fileOwnerRename(tx *sql.Tx, nodeId string, id []byte, spaceNo uint32, newNa
 	stmt, err := tx.Prepare("update FILE_OWNER set NAME=$3 where ID=$1 and SPACE_NO=$2 and NODE_ID=$4")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(id, spaceNo, newName, nodeId)
+	rs, err := stmt.Exec(bytesToUuid(id), spaceNo, newName, nodeId)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -348,7 +348,7 @@ func fileOwnerMove(tx *sql.Tx, nodeId string, id []byte, spaceNo uint32, newId [
 	stmt, err := tx.Prepare("update FILE_OWNER set PARENT_ID=$3 where ID=$1 and SPACE_NO=$2 and NODE_ID=$3")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(id, spaceNo, newId)
+	rs, err := stmt.Exec(bytesToUuid(id), spaceNo, bytesToUuid(newId))
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)

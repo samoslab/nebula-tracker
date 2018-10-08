@@ -47,7 +47,7 @@ func GetProofInfo(id []byte) (chunkSize uint32, seq []uint32, randomNum [][]byte
 
 func saveProofInfo(tx *sql.Tx, providerId string, fileId []byte, blockHash []byte, blockSize uint64, chunkSeq []uint32, randomNum [][]byte) (id []byte) {
 	args := make([]interface{}, 5, len(chunkSeq)+len(randomNum)+5)
-	args[0], args[1], args[2], args[3], args[4] = providerId, fileId, base64.StdEncoding.EncodeToString(blockHash), blockSize, bytes.Join(randomNum, []byte{})
+	args[0], args[1], args[2], args[3], args[4] = providerId, bytesToUuid(fileId), base64.StdEncoding.EncodeToString(blockHash), blockSize, bytes.Join(randomNum, []byte{})
 	for _, el := range randomNum {
 		args = append(args, len(el))
 	}
@@ -55,7 +55,7 @@ func saveProofInfo(tx *sql.Tx, providerId string, fileId []byte, blockHash []byt
 		args = append(args, el)
 	}
 
-	err := tx.QueryRow("insert into PROOF_RECORD(CREATION,PROVIDER_ID,FILE_ID,BLOCK_HASH,BLOCK_SIZE,RANDOM_NUM_DATA,RANDOM_NUM_LENGTH,CHUNK_SEQ) values(now(),$1,$2,$3,$4,$5,"+arrayClause(len(randomNum), 6)+","+arrayClause(len(chunkSeq), len(randomNum)+6)+") RETURNING ID", args...).Scan(&id)
+	err := tx.QueryRow("insert into PROOF_RECORD(CREATION,PROVIDER_ID,FILE_ID,BLOCK_HASH,BLOCK_SIZE,RANDOM_NUM_DATA,RANDOM_NUM_LENGTH,CHUNK_SEQ) values(now(),$1,$2,$3,$4,$5,"+arrayClause(len(randomNum), 6)+","+arrayClause(len(chunkSeq), len(randomNum)+6)+") RETURNING ID::bytes", args...).Scan(&id)
 	checkErr(err)
 	return
 }
@@ -76,7 +76,7 @@ func proofFinish(tx *sql.Tx, proofId []byte, nodeId string, finished time.Time, 
 	stmt, err := tx.Prepare("update PROOF_RECORD set FINISHED=true,FINISHED_TIME=$3,PASS=$4,REMARK=$5,PROVE_RESULT=$6 where ID=$2 and PROVIDER_ID=$1 and FINISHED=false")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(nodeId, proofId, finished, pass, remark, result)
+	rs, err := stmt.Exec(nodeId, bytesToUuid(proofId), finished, pass, remark, result)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)

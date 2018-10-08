@@ -93,6 +93,13 @@ func arrayClause(count int, first int) string {
 	return buffer.String()
 }
 
+func bytesToUuid(bts []byte) (res string) {
+	if len(bts) == 16 {
+		res = fmt.Sprintf("%x-%x-%x-%x-%x", bts[:4], bts[4:6], bts[6:8], bts[8:10], bts[10:])
+	}
+	return
+}
+
 type NullTime struct {
 	Time  time.Time
 	Valid bool // Valid is true if Time is not NULL

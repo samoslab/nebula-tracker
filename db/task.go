@@ -48,7 +48,7 @@ func buildTask(rows *sql.Rows) (task *task_pb.Task, err error) {
 }
 
 func getTasksByProviderId(tx *sql.Tx, nodeId string) []*task_pb.Task {
-	rows, err := tx.Query("SELECT ID,CREATION,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,PROOF_ID FROM TASK where PROVIDER_ID=$1 and REMOVED=false and FINISHED=false and (EXPIRE_TIME is null or now()<EXPIRE_TIME) order by creation asc limit 320", nodeId)
+	rows, err := tx.Query("SELECT ID::bytes,CREATION,TYPE,FILE_ID::bytes,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,PROOF_ID::bytes FROM TASK where PROVIDER_ID=$1 and REMOVED=false and FINISHED=false and (EXPIRE_TIME is null or now()<EXPIRE_TIME) order by creation asc limit 320", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	taskList := make([]*task_pb.Task, 0, 16)
@@ -64,7 +64,7 @@ func getTasksByProviderId(tx *sql.Tx, nodeId string) []*task_pb.Task {
 }
 
 func getTask(tx *sql.Tx, taskId []byte, nodeId string) *task_pb.Task {
-	rows, err := tx.Query("SELECT ID,CREATION,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,PROOF_ID FROM TASK where ID=$2 and PROVIDER_ID=$1 and REMOVED=false and FINISHED=false and (EXPIRE_TIME is null or now()<EXPIRE_TIME)", nodeId, taskId)
+	rows, err := tx.Query("SELECT ID::bytes,CREATION,TYPE,FILE_ID::bytes,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,PROOF_ID::bytes FROM TASK where ID=$2 and PROVIDER_ID=$1 and REMOVED=false and FINISHED=false and (EXPIRE_TIME is null or now()<EXPIRE_TIME)", nodeId, bytesToUuid(taskId))
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
@@ -91,7 +91,7 @@ func taskFinish(tx *sql.Tx, taskId []byte, nodeId string, finishedTime uint64, s
 	stmt, err := tx.Prepare("update TASK set FINISHED=true,FINISHED_TIME=$3,SUCCESS=$4,REMARK=$5 where ID=$2 and PROVIDER_ID=$1 and FINISHED=false")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(nodeId, taskId, time.Unix(int64(finishedTime), 0), success, remark)
+	rs, err := stmt.Exec(nodeId, bytesToUuid(taskId), time.Unix(int64(finishedTime), 0), success, remark)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -124,7 +124,7 @@ func taskUpdateProofId(tx *sql.Tx, taskId []byte, proofId []byte) bool {
 	stmt, err := tx.Prepare("update TASK set PROOF_ID=$2 where ID=$1 and type='PROVE' and PROOF_ID is null and REMOVED=false and FINISHED=false")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(taskId, proofId)
+	rs, err := stmt.Exec(bytesToUuid(taskId), bytesToUuid(proofId))
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -132,10 +132,10 @@ func taskUpdateProofId(tx *sql.Tx, taskId []byte, proofId []byte) bool {
 }
 
 func taskRemove(tx *sql.Tx, taskId []byte, nodeId string, typeStr string) bool {
-	stmt, err := tx.Prepare("update TASK set PROOF_ID=$2 where ID=$1 and PROVIDER_ID=$2 and type=$3 and REMOVED=false and FINISHED=false")
+	stmt, err := tx.Prepare("update TASK set REMOVED=true where ID=$1 and PROVIDER_ID=$2 and type=$3 and REMOVED=false and FINISHED=false")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(taskId, nodeId, typeStr)
+	rs, err := stmt.Exec(bytesToUuid(taskId), nodeId, typeStr)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -150,3 +150,67 @@ func TaskRemove(taskId []byte, nodeId string, typeStr string) {
 	commit = true
 	return
 }
+
+// func TaskTest() {
+// 	tx, commit := beginTx()
+// 	defer rollback(tx, &commit)
+// 	a := taskTest1a(tx)
+// 	taskTest1b(tx, a)
+// 	b := taskTest2a(tx)
+// 	taskTest2b(tx, b)
+// 	checkErr(tx.Commit())
+// 	commit = true
+// 	return
+// }
+
+// func taskTest1a(tx *sql.Tx) []byte {
+// 	rows, err := tx.Query("SELECT ID FROM TASK limit 1")
+// 	checkErr(err)
+// 	defer rows.Close()
+// 	for rows.Next() {
+// 		var id []byte
+// 		err = rows.Scan(&id)
+// 		checkErr(err)
+// 		fmt.Printf("taskTest1: %d\n", len(id))
+// 		return id
+// 	}
+// 	return nil
+// }
+
+// func taskTest2a(tx *sql.Tx) []byte {
+// 	rows, err := tx.Query("SELECT ID::bytes FROM TASK limit 1")
+// 	checkErr(err)
+// 	defer rows.Close()
+// 	for rows.Next() {
+// 		var id []byte
+// 		err = rows.Scan(&id)
+// 		checkErr(err)
+// 		fmt.Printf("taskTest2: %d\n", len(id))
+// 		return id
+// 	}
+// 	return nil
+// }
+
+// func taskTest1b(tx *sql.Tx, id []byte) {
+// 	rows, err := tx.Query("SELECT ID FROM TASK where id=$1", id)
+// 	checkErr(err)
+// 	defer rows.Close()
+// 	for rows.Next() {
+// 		var id []byte
+// 		err = rows.Scan(&id)
+// 		checkErr(err)
+// 		fmt.Printf("taskTest1: found\n")
+// 	}
+// }
+
+// func taskTest2b(tx *sql.Tx, id []byte) {
+// 	rows, err := tx.Query("SELECT ID::bytes FROM TASK where id=$1", bytesToUuid(id))
+// 	checkErr(err)
+// 	defer rows.Close()
+// 	for rows.Next() {
+// 		var id []byte
+// 		err = rows.Scan(&id)
+// 		checkErr(err)
+// 		fmt.Printf("taskTest2: found\n")
+// 	}
+// }

@@ -12,13 +12,14 @@ import (
 const sql_save_block = "insert into BLOCK(HASH,SIZE,FILE_ID,CREATION,REMOVED,PROVIDER_ID) values($1,$2,$3,$4,false,$5)"
 
 func saveBlocks(tx *sql.Tx, fileId []byte, creation time.Time, partitions []*pb.StorePartition) {
+	fileUuid := bytesToUuid(fileId)
 	stmt, err := tx.Prepare(sql_save_block)
 	defer stmt.Close()
 	checkErr(err)
 	for _, sp := range partitions {
 		for _, block := range sp.Block {
 			for _, pid := range block.StoreNodeId {
-				_, err = stmt.Exec(base64.StdEncoding.EncodeToString(block.Hash), block.Size, fileId, creation, base64.StdEncoding.EncodeToString(pid))
+				_, err = stmt.Exec(base64.StdEncoding.EncodeToString(block.Hash), block.Size, fileUuid, creation, base64.StdEncoding.EncodeToString(pid))
 				checkErr(err)
 			}
 		}
@@ -29,7 +30,7 @@ func restoreBlock(tx *sql.Tx, fileId []byte, blockHash string, nodeId string) bo
 	stmt, err := tx.Prepare("update BLOCK set REMOVED=false,REMOVE_TIME=NULL where FILE_ID=$1 and HASH=$2 and PROVIDER_ID=$3 ")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(fileId, blockHash, nodeId)
+	rs, err := stmt.Exec(bytesToUuid(fileId), blockHash, nodeId)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -40,7 +41,7 @@ func saveBlock(tx *sql.Tx, fileId []byte, creation time.Time, blockHash string, 
 	stmt, err := tx.Prepare(sql_save_block)
 	defer stmt.Close()
 	checkErr(err)
-	_, err = stmt.Exec(blockHash, size, fileId, creation, nodeId)
+	_, err = stmt.Exec(blockHash, size, bytesToUuid(fileId), creation, nodeId)
 	checkErr(err)
 }
 
@@ -48,7 +49,7 @@ func removeBlock(tx *sql.Tx, fileId []byte, blockHash string, nodeId string, tim
 	stmt, err := tx.Prepare("update BLOCK set REMOVED=true,REMOVE_TIME=$4 where FILE_ID=$1 and HASH=$2 and PROVIDER_ID=$3 and REMOVED=false")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(fileId, blockHash, nodeId, timestamp)
+	rs, err := stmt.Exec(bytesToUuid(fileId), blockHash, nodeId, timestamp)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -61,7 +62,7 @@ func updateBlockLastProved(tx *sql.Tx, fileId []byte, blockHash string, nodeId s
 	stmt, err := tx.Prepare("update BLOCK set LAST_PROOVED=$4 where FILE_ID=$1 and HASH=$2 and PROVIDER_ID=$3")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(fileId, blockHash, nodeId, timestamp)
+	rs, err := stmt.Exec(bytesToUuid(fileId), blockHash, nodeId, timestamp)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
