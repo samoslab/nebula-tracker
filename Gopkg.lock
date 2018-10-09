@@ -10,6 +10,14 @@
   version = "v0.3.1"
 
 [[projects]]
+  branch = "master"
+  digest = "1:2ca896615a485f84d0509cab13cf95e08e99ac7305934eb79fbcda48570eabd7"
+  name = "github.com/Nik-U/pbc"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "12f3f0abc76db4319de8036959dc3a6d060838fe"
+
+[[projects]]
   digest = "1:0f98f59e9a2f4070d66f0c9c39561f68fcd1dc837b22a852d28d0003aebd1b1e"
   name = "github.com/boltdb/bolt"
   packages = ["."]
@@ -123,14 +131,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:ba96ff983cfaa0f98b4644257c741719f57545c4b6dbe2d54c767e2239e0e97d"
-  name = "github.com/prestonTao/upnp"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "f4370df5e1093d8987dfdb55a5d8fa23d72a26a6"
-
-[[projects]]
   digest = "1:3f68283c56d93b885f33c679708079e834815138649e9f59ffbc572c2993e0f8"
   name = "github.com/robfig/cron"
   packages = ["."]
@@ -140,7 +140,7 @@
 
 [[projects]]
   branch = "develop"
-  digest = "1:2b520baa7a9a0395b5fe4f03468e309b5c948fd83e98ebf5c2a7e6b027cd760e"
+  digest = "1:af5457b8106bd0ca8b151a3dc29eb30e3fa4236bcf15ecda6dc47baad35a10c3"
   name = "github.com/samoslab/nebula"
   packages = [
     "provider/config",
@@ -161,7 +161,7 @@
     "util/rsa",
   ]
   pruneopts = "UT"
-  revision = "c867bdf0cd29a8dd568c97284ac6381e821a1e39"
+  revision = "b6bf93ef9ac79dd2ddb4d8c193e6b1b6bc7cbd51"
 
 [[projects]]
   digest = "1:274f67cb6fed9588ea2521ecdac05a6d62a8c51c074c1fccc6a49a40ba80e925"
@@ -229,19 +229,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3ab50222388454728c56f646c291365039facbfd371fee7ec47c3469f537f77e"
-  name = "github.com/yanzay/log"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "87352bb235060cca8427c8f9fdd68c83b38ba461"
-
-[[projects]]
-  branch = "master"
   digest = "1:3f3a05ae0b95893d90b9b3b5afdb79a9b3d96e4e36e099d841ae602e4aca0da8"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
   pruneopts = "UT"
-  revision = "5295e8364332db77d75fce11f1d19c053919a9c9"
+  revision = "e3636079e1a4c1f337f212cc5cd2aca108f6c900"
 
 [[projects]]
   branch = "master"
@@ -257,18 +249,18 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "4dfa2610cdf3b287375bbba5b8f2a14d3b01d8de"
+  revision = "146acd28ed5894421fb5aac80ca93bc1b1f46f87"
 
 [[projects]]
   branch = "master"
-  digest = "1:6f82ed211591ecb407897ca46ff6149d618223088aecad72675804f106033629"
+  digest = "1:850d28ab022512e2cd3cf511a77f363c29e22689b4031f2050871f5de47ae4a0"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "e4b3c5e9061176387e7cea65e4dc5853801f3fb7"
+  revision = "4497e2df6f9e69048a54498c7affbbec3294ad47"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -295,11 +287,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1e6b0176e8c5dd8ff551af65c76f8b73a99bcf4d812cedff1b91711b7df4804c"
+  digest = "1:56b0bca90b7e5d1facf5fbdacba23e4e0ce069d25381b8e2f70ef1e7ebfb9c1a"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "c7e5094acea1ca1b899e2259d80a6b0f882f81f8"
+  revision = "af9cb2a35e7f169ec875002c1829c9b315cddc04"
 
 [[projects]]
   digest = "1:2dab32a43451e320e49608ff4542fdfc653c95dcc35d0065ec9c6c3dd540ed74"
@@ -347,6 +339,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/Nik-U/pbc",
     "github.com/boltdb/bolt",
     "github.com/gogo/protobuf/proto",
     "github.com/golang/protobuf/proto",
@@ -355,7 +348,6 @@
     "github.com/lrita/gosync",
     "github.com/nsqio/go-nsq",
     "github.com/patrickmn/go-cache",
-    "github.com/prestonTao/upnp",
     "github.com/robfig/cron",
     "github.com/samoslab/nebula/provider/node",
     "github.com/samoslab/nebula/provider/pb",
@@ -376,7 +368,6 @@
     "github.com/stretchr/testify/mock",
     "github.com/syndtr/goleveldb/leveldb",
     "github.com/syndtr/goleveldb/leveldb/errors",
-    "github.com/yanzay/log",
     "golang.org/x/net/context",
     "google.golang.org/grpc",
     "google.golang.org/grpc/codes",

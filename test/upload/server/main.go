@@ -6,25 +6,18 @@ import (
 	"nebula-tracker/test/upload/server/pb"
 	"net"
 	"os"
-	"strconv"
-	"time"
 
-	"github.com/prestonTao/upnp"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type UploadService struct {
 }
 
 func (self *UploadService) Upload(stream pb.UploadService_UploadServer) error {
-	file, err := os.OpenFile(
-		strconv.FormatInt(time.Now().Unix(), 16)+".file",
-		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
-		0600)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+	var file *os.File
+	first := true
 	for {
 		req, err := stream.Recv()
 		if err != nil {
@@ -32,6 +25,20 @@ func (self *UploadService) Upload(stream pb.UploadService_UploadServer) error {
 				break
 			}
 			return err
+		}
+		if first {
+			first = false
+			if _, err := os.Stat(req.Name); !os.IsNotExist(err) {
+				fmt.Println("file exist, filename: " + req.Name)
+				return status.Errorf(codes.AlreadyExists, "file exist, filename: %s", req.Name)
+			}
+			if file, err = os.OpenFile(
+				req.Name,
+				os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
+				0600); err != nil {
+				return err
+			}
+			defer file.Close()
 		}
 		if len(req.Data) == 0 {
 			break
@@ -47,7 +54,11 @@ func (self *UploadService) Upload(stream pb.UploadService_UploadServer) error {
 }
 
 func (self *UploadService) Download(req *pb.DownloadReq, stream pb.UploadService_DownloadServer) error {
-	file, err := os.Open("test.file")
+	if _, err := os.Stat(req.Name); os.IsNotExist(err) {
+		fmt.Println("file not exist, filename: " + req.Name)
+		return status.Errorf(codes.NotFound, "file not exist, filename: %s", req.Name)
+	}
+	file, err := os.Open(req.Name)
 	if err != nil {
 		return err
 	}
@@ -71,17 +82,8 @@ func (self *UploadService) Download(req *pb.DownloadReq, stream pb.UploadService
 	return nil
 }
 
-func portMapping(port int) {
-	upnpMan := new(upnp.Upnp)
-	if err := upnpMan.AddPortMapping(port, port, "TCP"); err != nil {
-		fmt.Println("use upnp port mapping failed: " + err.Error())
-	} else {
-		fmt.Println("use upnp port mapping success.")
-	}
-}
-
 func main() {
-	portMapping(6666)
+	// portMapping(6666)
 	listen := ":6666"
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {

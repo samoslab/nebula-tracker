@@ -54,7 +54,7 @@ func (self *ProviderTaskService) TaskList(ctx context.Context, req *pb.TaskListR
 		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	resp = &pb.TaskListResp{Task: db.GetTasksByProviderId(nodeIdStr), Timestamp: uint64(time.Now().Unix())}
+	resp = &pb.TaskListResp{Task: db.GetTasksByProviderId(nodeIdStr, req.Category), Timestamp: uint64(time.Now().Unix())}
 	resp.GenAuth(x509.MarshalPKCS1PublicKey(pubKey))
 	return
 }

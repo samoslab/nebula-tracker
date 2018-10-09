@@ -5,15 +5,39 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	task_pb "github.com/samoslab/nebula/tracker/task/pb"
 )
 
-func GetTasksByProviderId(nodeId string) (res []*task_pb.Task) {
+func buildTaskTypeClause(cate []string) string {
+	if len(cate) == 0 {
+		return ""
+	}
+	for i, str := range cate {
+		cate[i] = fmt.Sprintf("TYPE='%s'", str)
+	}
+	return " and (" + strings.Join(cate, " OR ") + ")"
+}
+func GetTasksByProviderId(nodeId string, category uint32) (res []*task_pb.Task) {
+	cate := make([]string, 0, 4)
+	if category&0x1 == 0x1 {
+		cate = append(cate, TASK_TYPE_REMOVE)
+	}
+	if category&0x2 == 0x2 {
+		cate = append(cate, TASK_TYPE_PROVE)
+	}
+	if category&0x4 == 0x4 {
+		cate = append(cate, TASK_TYPE_SEND)
+	}
+	if category&0x8 == 0x8 {
+		cate = append(cate, TASK_TYPE_REPLICATE)
+	}
+
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	res = getTasksByProviderId(tx, nodeId)
+	res = getTasksByProviderId(tx, nodeId, cate)
 	checkErr(tx.Commit())
 	commit = true
 	return
@@ -47,8 +71,8 @@ func buildTask(rows *sql.Rows) (task *task_pb.Task, err error) {
 	return
 }
 
-func getTasksByProviderId(tx *sql.Tx, nodeId string) []*task_pb.Task {
-	rows, err := tx.Query("SELECT ID::bytes,CREATION,TYPE,FILE_ID::bytes,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,PROOF_ID::bytes FROM TASK where PROVIDER_ID=$1 and REMOVED=false and FINISHED=false and (EXPIRE_TIME is null or now()<EXPIRE_TIME) order by creation asc limit 320", nodeId)
+func getTasksByProviderId(tx *sql.Tx, nodeId string, cate []string) []*task_pb.Task {
+	rows, err := tx.Query("SELECT ID::bytes,CREATION,TYPE,FILE_ID::bytes,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,PROOF_ID::bytes FROM TASK where PROVIDER_ID=$1 and REMOVED=false and FINISHED=false and (EXPIRE_TIME is null or now()<EXPIRE_TIME) "+buildTaskTypeClause(cate)+" order by creation asc limit 320", nodeId)
 	checkErr(err)
 	defer rows.Close()
 	taskList := make([]*task_pb.Task, 0, 16)
@@ -77,6 +101,13 @@ func getTask(tx *sql.Tx, taskId []byte, nodeId string) *task_pb.Task {
 	}
 	return nil
 }
+
+const (
+	TASK_TYPE_REMOVE    = "REMOVE"
+	TASK_TYPE_PROVE     = "PROVE"
+	TASK_TYPE_SEND      = "SEND"
+	TASK_TYPE_REPLICATE = "REPLICATE"
+)
 
 func GetTask(taskId []byte, nodeId string) (task *task_pb.Task) {
 	tx, commit := beginTx()

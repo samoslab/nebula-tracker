@@ -10,6 +10,7 @@ service UploadService {
 }   
 message UploadReq{
     bytes data=1;
+    string name=2;
 }
 
 message UploadResp{
@@ -17,6 +18,7 @@ message UploadResp{
 
 message DownloadReq{
     uint32 batchSize=1;
+    string name=2;
 }
 
 message DownloadResp{
