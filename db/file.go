@@ -365,8 +365,8 @@ func fromPartitions(partitions []*pb.StorePartition) ([]string, error) {
 	return res, nil
 }
 
-func fileGetBlock(tx *sql.Tx, fileId []byte, fileHash string) []string {
-	rows, err := tx.Query("SELECT BLOCKS FROM FILE where ID=$1 and HASH=$2", bytesToUuid(fileId), fileHash)
+func fileGetBlock(tx *sql.Tx, fileId []byte) []string {
+	rows, err := tx.Query("SELECT BLOCKS FROM FILE where ID=$1", bytesToUuid(fileId))
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
@@ -381,11 +381,11 @@ func fileGetBlock(tx *sql.Tx, fileId []byte, fileHash string) []string {
 	return nil
 }
 
-func fileUpdateSingleBlock(tx *sql.Tx, fileId []byte, fileHash string, old string, new string) {
-	stmt, err := tx.Prepare("update FILE set BLOCKS=array_replace(BLOCKS,$3,$4),LAST_MODIFIED=now() where ID=$1 and HASH=$2")
+func fileUpdateSingleBlock(tx *sql.Tx, fileId []byte, old string, new string) {
+	stmt, err := tx.Prepare("update FILE set BLOCKS=array_replace(BLOCKS,$2,$3),LAST_MODIFIED=now() where ID=$1")
 	defer stmt.Close()
 	checkErr(err)
-	rs, err := stmt.Exec(bytesToUuid(fileId), fileHash, old, new)
+	rs, err := stmt.Exec(bytesToUuid(fileId), old, new)
 	checkErr(err)
 	cnt, err := rs.RowsAffected()
 	checkErr(err)
@@ -394,8 +394,8 @@ func fileUpdateSingleBlock(tx *sql.Tx, fileId []byte, fileHash string, old strin
 	}
 }
 
-func fileUpdateBlockNodeId(tx *sql.Tx, fileId []byte, fileHash string, blockHash string, blockSize uint64, nodeId string, isRemove bool) {
-	blocks := fileGetBlock(tx, fileId, fileHash)
+func fileUpdateBlockNodeId(tx *sql.Tx, fileId []byte, blockHash string, blockSize uint64, nodeId string, isRemove bool) {
+	blocks := fileGetBlock(tx, fileId)
 	for _, str := range blocks {
 		if strings.HasPrefix(str, blockHash+BlockSep+strconv.Itoa(int(blockSize))+BlockSep) {
 			if isRemove {
@@ -405,17 +405,17 @@ func fileUpdateBlockNodeId(tx *sql.Tx, fileId []byte, fileHash string, blockHash
 						if strings.HasSuffix(n, BlockNodeIdSep) {
 							n = n[:(len(n) - len(BlockNodeIdSep))]
 						}
-						fileUpdateSingleBlock(tx, fileId, fileHash, str, n)
+						fileUpdateSingleBlock(tx, fileId, str, n)
 					} else {
-						fileUpdateSingleBlock(tx, fileId, fileHash, str, strings.Replace(str, nodeId+BlockNodeIdSep, "", 1))
+						fileUpdateSingleBlock(tx, fileId, str, strings.Replace(str, nodeId+BlockNodeIdSep, "", 1))
 					}
 				}
 			} else {
 				if !strings.Contains(str, nodeId) {
 					if strings.HasSuffix(str, BlockSep) {
-						fileUpdateSingleBlock(tx, fileId, fileHash, str, str+nodeId)
+						fileUpdateSingleBlock(tx, fileId, str, str+nodeId)
 					} else {
-						fileUpdateSingleBlock(tx, fileId, fileHash, str, str+BlockNodeIdSep+nodeId)
+						fileUpdateSingleBlock(tx, fileId, str, str+BlockNodeIdSep+nodeId)
 					}
 				}
 			}

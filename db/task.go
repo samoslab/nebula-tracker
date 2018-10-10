@@ -137,7 +137,7 @@ func TaskFinish(taskId []byte, nodeId string, finishedTime uint64, success bool,
 	taskFinish(tx, taskId, nodeId, finishedTime, success, remark)
 	if success {
 		blockHashStr := base64.StdEncoding.EncodeToString(blockHash)
-		fileUpdateBlockNodeId(tx, fileId, base64.StdEncoding.EncodeToString(fileHash), blockHashStr, blockSize, storeNodeId, isRemove)
+		fileUpdateBlockNodeId(tx, fileId, blockHashStr, blockSize, storeNodeId, isRemove)
 		if isRemove {
 			removeBlock(tx, fileId, blockHashStr, nodeId, time.Unix(int64(finishedTime), 0))
 		} else {
@@ -180,6 +180,14 @@ func TaskRemove(taskId []byte, nodeId string, typeStr string) {
 	checkErr(tx.Commit())
 	commit = true
 	return
+}
+
+func addReplicateTaskForMiss(tx *sql.Tx, providerId string, fileId []byte, hash string, size uint64) {
+	stmt, err := tx.Prepare("insert into TASK(CREATION,EXPIRE_TIME,PROVIDER_ID,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID) select now()+(INTERVAL '10minutes'), now()+(INTERVAL '2day'), $1,'REPLICATE',d.FILE_ID,f.HASH,f.SIZE,d.HASH,d.SIZE,d.PRO_ID from (select m.FILE_ID as FILE_ID,m.HASH as HASH,m.SIZE as SIZE,array_agg(m.PROVIDER_ID) as PRO_ID from BLOCK m where m.file_id=$2 and m.HASH=$3 and m.SIZE=$4 group by m.FILE_ID,m.HASH,m.SIZE) d,FILE f where f.ID=d.FILE_ID")
+	defer stmt.Close()
+	checkErr(err)
+	_, err = stmt.Exec(providerId, bytesToUuid(fileId), hash, size)
+	checkErr(err)
 }
 
 // func TaskTest() {

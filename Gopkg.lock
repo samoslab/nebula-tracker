@@ -140,7 +140,7 @@
 
 [[projects]]
   branch = "develop"
-  digest = "1:af5457b8106bd0ca8b151a3dc29eb30e3fa4236bcf15ecda6dc47baad35a10c3"
+  digest = "1:5edc27d18a8235aa8821581dd9edaf63f2f95dbc126722bcfe14e922ebb3b8fa"
   name = "github.com/samoslab/nebula"
   packages = [
     "provider/config",
@@ -161,7 +161,7 @@
     "util/rsa",
   ]
   pruneopts = "UT"
-  revision = "b6bf93ef9ac79dd2ddb4d8c193e6b1b6bc7cbd51"
+  revision = "44871e2f1baf401ad8c1a775e68fd200bc843928"
 
 [[projects]]
   digest = "1:274f67cb6fed9588ea2521ecdac05a6d62a8c51c074c1fccc6a49a40ba80e925"
@@ -233,7 +233,7 @@
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
   pruneopts = "UT"
-  revision = "e3636079e1a4c1f337f212cc5cd2aca108f6c900"
+  revision = "7c1a557ab941a71c619514f229f0b27ccb0c27cf"
 
 [[projects]]
   branch = "master"

@@ -10,3 +10,17 @@ array_length
 
 
 insert into TASK(CREATION,EXPIRE_TIME,PROVIDER_ID,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID) select now(), now()+(INTERVAL '1day'), 'gO25LJSmGAWaX6I3wgQt96EHnSk=','REPLICATE',d.FILE_ID,f.HASH,f.SIZE,d.HASH,d.SIZE,d.PRO_ID from (select m.FILE_ID as FILE_ID,m.HASH as HASH,m.SIZE as SIZE,array_agg(m.PROVIDER_ID) as PRO_ID from BLOCK m where m.file_id in (select id from file where array_length(blocks,1)=1 and id not in (select distinct file_id from block where provider_id='gO25LJSmGAWaX6I3wgQt96EHnSk=')) group by m.FILE_ID,m.HASH,m.SIZE) d,FILE f where f.ID=d.FILE_ID;
+
+
+
+insert into TASK(CREATION,EXPIRE_TIME,PROVIDER_ID,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,OPPOSITE_ID,CATEGORY) select now(), now()+(INTERVAL '2day'), 'gD6gvvUXEcMAW9AcN7iOnGJQehk=','REPLICATE',d.FILE_ID,f.HASH,f.SIZE,d.HASH,d.SIZE,d.PRO_ID,'p138' from (select FILE_ID ,HASH,SIZE,array_agg(PROVIDER_ID) as PRO_ID from block where hash in (select HASH from BLOCK where provider_id='0BswHGCy6DWBy98uZYBEcJHv2BU=' and HASH not in (select hash from block where provider_id='gD6gvvUXEcMAW9AcN7iOnGJQehk=')) group by FILE_ID,HASH,SIZE) d,FILE f where f.ID=d.FILE_ID;
+
++------------------------------+-----------+------+
+|           node_id            |   host    | port |
++------------------------------+-----------+------+
+| 0BswHGCy6DWBy98uZYBEcJHv2BU= | 127.0.0.1 | 6665 |
+| C2F0yFaxZP7iAuknOmpdRfpWZsA= | 127.0.0.1 | 6668 |
+| JlCbIUoUyyGxft40eEadOOqEi7g= | 127.0.0.1 | 6669 |
++------------------------------+-----------+------+
+
+insert into TASK(CREATION,EXPIRE_TIME,PROVIDER_ID,TYPE,FILE_ID,FILE_HASH,FILE_SIZE,BLOCK_HASH,BLOCK_SIZE,CATEGORY) select now(), now()+(INTERVAL '2day'), d.provider_id,'REMOVE',d.FILE_ID,f.HASH,f.SIZE,d.HASH,d.SIZE,'p138-del' from block d,FILE f where d.provider_id='0BswHGCy6DWBy98uZYBEcJHv2BU=' and f.ID=d.FILE_ID;

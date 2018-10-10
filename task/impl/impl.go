@@ -87,6 +87,9 @@ func (self *ProviderTaskService) GetOppositeInfo(ctx context.Context, req *pb.Ge
 	info := make([]*pb.OppositeInfo, 0, len(task.OppositeId))
 	ts := uint64(time.Now().Unix())
 	for _, pid := range task.OppositeId {
+		if pid == nodeIdStr {
+			continue
+		}
 		pro := chooser.Get(pid)
 		if pro == nil {
 			fmt.Println("can not find provider, nodeId: " + pid)
@@ -333,4 +336,33 @@ func hash(pubKeyBytes []byte, i uint32) []byte {
 	hasher.Write(pubKeyBytes)
 	hasher.Write(util_bytes.FromUint32(i))
 	return hasher.Sum(nil)
+}
+
+func (self *ProviderTaskService) VerifyBlocks(ctx context.Context, req *pb.VerifyBlocksReq) (resp *pb.VerifyBlocksResp, err error) {
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("Panic Error: %s, detail: %s", er, string(debug.Stack()))
+			err = status.Errorf(codes.Internal, "System error: %s", er)
+		}
+	}()
+	pubKey := db.ProviderGetPubKey(req.NodeId)
+	if pubKey == nil {
+		return nil, status.Error(codes.InvalidArgument, "this node id is not been registered")
+	}
+	interval := time.Now().Unix() - int64(req.Timestamp)
+	if interval > verify_sign_expired || interval < 0-verify_sign_expired {
+		return nil, status.Error(codes.Unauthenticated, "auth info expired， please check your system time")
+	}
+	if err := req.VerifySign(pubKey); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
+	}
+	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
+	db.BlockMissProcess(nodeIdStr, req.Miss, req.Timestamp)
+	if req.Query {
+		blocks, last, hasNext := db.BlockQuery(nodeIdStr, req.Previous)
+		return &pb.VerifyBlocksResp{Last: last,
+			Blocks:  blocks,
+			HasNext: hasNext}, nil
+	}
+	return &pb.VerifyBlocksResp{HasNext: false}, nil
 }

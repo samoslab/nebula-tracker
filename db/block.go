@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"time"
 
 	pb "github.com/samoslab/nebula/tracker/metadata/pb"
+	task_pb "github.com/samoslab/nebula/tracker/task/pb"
 )
 
 const sql_save_block = "insert into BLOCK(HASH,SIZE,FILE_ID,CREATION,REMOVED,PROVIDER_ID) values($1,$2,$3,$4,false,$5)"
@@ -69,6 +71,53 @@ func updateBlockLastProved(tx *sql.Tx, fileId []byte, blockHash string, nodeId s
 	if cnt == 0 {
 		panic(errors.New("no record found"))
 	}
+}
+
+func queryFileId(tx *sql.Tx, providerId string, hash string, size uint64) (fileId []byte) {
+	rows, err := tx.Query("select FILE_ID::bytes from BLOCK where PROVIDER_ID=$1 and HASH=$2 and SIZE=$3", providerId, hash, size)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&fileId)
+		checkErr(err)
+		return
+	}
+	return
+}
+
+func blockQuery(tx *sql.Tx, nodeId string, previous uint64) (blocks []*task_pb.HashAndSize, last uint64, hasNext bool) {
+	const bathSize = 2000
+	rows, err := tx.Query("select HASH,SIZE,CREATION from BLOCK where PROVIDER_ID=$1 and CREATION>$2 and REMOVED=false order by CREATION ASC LIMIT $3", nodeId, time.Unix(0, int64(previous)), bathSize)
+	checkErr(err)
+	defer rows.Close()
+	blocks = make([]*task_pb.HashAndSize, 0, bathSize)
+	for rows.Next() {
+		var ts time.Time
+		var hashStr string
+		var size uint64
+		err = rows.Scan(&hashStr, &size, &ts)
+		checkErr(err)
+		hash, err := base64.StdEncoding.DecodeString(hashStr)
+		if err != nil {
+			fmt.Printf("wrong data, nodeId: %s, hash: %s, size: %d\n", nodeId, hashStr, size)
+			continue
+		}
+		blocks = append(blocks, &task_pb.HashAndSize{Hash: hash, Size: size})
+		last = uint64(ts.UnixNano())
+	}
+	if len(blocks) == bathSize {
+		hasNext = true
+	}
+	return
+}
+
+func BlockQuery(nodeId string, previous uint64) (blocks []*task_pb.HashAndSize, last uint64, hasNext bool) {
+	tx, commit := beginTx()
+	defer rollback(tx, &commit)
+	blocks, last, hasNext = blockQuery(tx, nodeId, previous)
+	checkErr(tx.Commit())
+	commit = true
+	return
 }
 
 // func saveBlock(tx *sql.Tx, fileId []byte, creation time.Time, hash string, size int, pid string) {
