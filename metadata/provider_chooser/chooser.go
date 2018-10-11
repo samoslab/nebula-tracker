@@ -85,7 +85,7 @@ func update() {
 func filter(all []db.ProviderInfo) (*[]db.ProviderInfo, map[string]*db.ProviderInfo) {
 	// slice := make([]db.ProviderInfo, 0, len(all))
 	m := make(map[string]*db.ProviderInfo, len(all))
-	for _, pi := range all {
+	for i, _ := range all {
 		// start := time.Now().UTC()
 		// available := false
 		// if check(&pi, &available) || check(&pi, &available) || check(&pi, &available) {
@@ -95,7 +95,8 @@ func filter(all []db.ProviderInfo) (*[]db.ProviderInfo, map[string]*db.ProviderI
 		// if !available {
 		// 	db.SaveNaRecord(pi.NodeId, start, time.Now().UTC())
 		// }
-		m[pi.NodeId] = &pi
+		pi := &all[i]
+		m[pi.NodeId] = pi
 	}
 	return &all, m
 }

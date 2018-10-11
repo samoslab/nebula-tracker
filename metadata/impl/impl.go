@@ -789,7 +789,7 @@ func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte,
 	var err error
 	var intVal int
 	slice := make([]*pb.RetrieveBlock, 0, len(blocks))
-	providerMap := make(map[string]*db.ProviderInfo, 50)
+	providerMap := make(map[string]*db.ProviderInfo, 80)
 	for _, str := range blocks {
 		arr := strings.Split(str, db.BlockSep)
 		if len(arr) != 5 {
@@ -835,10 +835,10 @@ func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte,
 				if pro == nil {
 					return nil, errors.New("can not find provider, nodeId: " + n)
 				}
-				if pro.Port == 0 {
-					continue
-				}
 				providerMap[n] = pro
+			}
+			if pro.Port == 0 {
+				continue
 			}
 			ticket := GenTicket(nodeId, n)
 			store = append(store, &pb.RetrieveNode{NodeId: bytes,
@@ -847,6 +847,7 @@ func (self *MatadataService) toRetrievePartition(nodeId string, fileHash []byte,
 				Ticket: ticket,
 				Auth:   provider_pb.GenRetrieveAuth(pro.PublicKey, fileHash, fileSize, b.Hash, b.Size, ts, ticket)})
 		}
+
 		b.StoreNode = store
 		slice = append(slice, &b)
 	}
