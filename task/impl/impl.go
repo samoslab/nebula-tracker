@@ -357,7 +357,9 @@ func (self *ProviderTaskService) VerifyBlocks(ctx context.Context, req *pb.Verif
 		return nil, status.Errorf(codes.Unauthenticated, "verify sign failed， error: %s", err)
 	}
 	nodeIdStr := base64.StdEncoding.EncodeToString(req.NodeId)
-	db.BlockMissProcess(nodeIdStr, req.Miss, req.Timestamp)
+	if len(req.Miss) > 0 {
+		db.BlockMissProcess(nodeIdStr, req.Miss, req.Timestamp)
+	}
 	if req.Query {
 		blocks, last, hasNext := db.BlockQuery(nodeIdStr, req.Previous)
 		return &pb.VerifyBlocksResp{Last: last,
