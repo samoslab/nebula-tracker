@@ -85,7 +85,7 @@ func myAllOrder(tx *sql.Tx, nodeId string, onlyNotExpired bool) []*OrderInfo {
 }
 
 func getOrderInfo(tx *sql.Tx, nodeId string, id []byte) (oi *OrderInfo) {
-	rows, err := tx.Query("select o.ID::bytes,o.REMOVED,o.CREATION,o.LAST_MODIFIED,o.NODE_ID,o.PACKAGE_ID,o.QUANTITY,o.TOTAL_AMOUNT,o.UPGRADED,o.DISCOUNT,o.VOLUME,o.NETFLOW,o.UP_NETFLOW,o.DOWN_NETFLOW,o.VALID_DAYS,o.START_TIME,o.END_TIME,o.PAY_TIME,o.REMARK,p.ID,p.NAME,p.PRICE,p.CREATION,p.LAST_MODIFIED,p.REMOVED,p.VOLUME,p.NETFLOW,p.UP_NETFLOW,p.DOWN_NETFLOW,p.VALID_DAYS,p.REMARK from CLIENT_ORDER o,PACKAGE p where o.ID=$2 and o.NODE_ID=$1 and o.PACKAGE_ID=p.ID and o.REMOVED=false", nodeId, id)
+	rows, err := tx.Query("select o.ID::bytes,o.REMOVED,o.CREATION,o.LAST_MODIFIED,o.NODE_ID,o.PACKAGE_ID,o.QUANTITY,o.TOTAL_AMOUNT,o.UPGRADED,o.DISCOUNT,o.VOLUME,o.NETFLOW,o.UP_NETFLOW,o.DOWN_NETFLOW,o.VALID_DAYS,o.START_TIME,o.END_TIME,o.PAY_TIME,o.REMARK,p.ID,p.NAME,p.PRICE,p.CREATION,p.LAST_MODIFIED,p.REMOVED,p.VOLUME,p.NETFLOW,p.UP_NETFLOW,p.DOWN_NETFLOW,p.VALID_DAYS,p.REMARK from CLIENT_ORDER o,PACKAGE p where o.ID=$2 and o.NODE_ID=$1 and o.PACKAGE_ID=p.ID and o.REMOVED=false", nodeId, bytesToUuid(id))
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
