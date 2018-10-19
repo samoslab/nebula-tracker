@@ -61,11 +61,12 @@ func Choose(num int) []db.ProviderInfo {
 }
 
 func Get(nodeId string) *db.ProviderInfo {
-	if v, ok := providerMap[nodeId]; ok {
-		return v
-	} else {
-		return db.ProviderFindOne(nodeId)
-	}
+	// TODO providerMap will be wrong
+	// if v, ok := providerMap[nodeId]; ok {
+	// 	return v
+	// } else {
+	return db.ProviderFindOne(nodeId)
+	// }
 }
 
 var running gosync.Mutex = gosync.NewMutex()
@@ -78,6 +79,9 @@ func update() {
 	}
 	all := db.ProviderFindAllAvail()
 	providers, providerMap = filter(all)
+	// for k, v := range providerMap {
+	// 	fmt.Printf("node %s: %s:%d\n", k, v.Host, v.Port)
+	// }
 	initialized = true
 	fmt.Printf("%s found %d available provider.\n", time.Now().UTC().Format("2006-01-02 15:04 UTC"), len(*providers))
 }
