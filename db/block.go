@@ -11,17 +11,17 @@ import (
 	task_pb "github.com/samoslab/nebula/tracker/task/pb"
 )
 
-const sql_save_block = "insert into BLOCK(HASH,SIZE,FILE_ID,CREATION,REMOVED,PROVIDER_ID) values($1,$2,$3,$4,false,$5)"
+const sql_save_block = "insert into BLOCK(HASH,SIZE,FILE_ID,CREATION,REMOVED,PROVIDER_ID,PARTITION_SEQ,BLOCK_SEQ,CHECKSUM) values($1,$2,$3,$4,false,$5,$6,$7,$8)"
 
 func saveBlocks(tx *sql.Tx, fileId []byte, creation time.Time, partitions []*pb.StorePartition) {
 	fileUuid := bytesToUuid(fileId)
 	stmt, err := tx.Prepare(sql_save_block)
 	defer stmt.Close()
 	checkErr(err)
-	for _, sp := range partitions {
+	for pi, sp := range partitions {
 		for _, block := range sp.Block {
 			for _, pid := range block.StoreNodeId {
-				_, err = stmt.Exec(base64.StdEncoding.EncodeToString(block.Hash), block.Size, fileUuid, creation, base64.StdEncoding.EncodeToString(pid))
+				_, err = stmt.Exec(base64.StdEncoding.EncodeToString(block.Hash), block.Size, fileUuid, creation, base64.StdEncoding.EncodeToString(pid), pi, block.BlockSeq, block.Checksum)
 				checkErr(err)
 			}
 		}
@@ -39,11 +39,23 @@ func restoreBlock(tx *sql.Tx, fileId []byte, blockHash string, nodeId string) bo
 	return cnt == 1
 }
 
-func saveBlock(tx *sql.Tx, fileId []byte, creation time.Time, blockHash string, size uint64, nodeId string) {
+func queryBlockInfo(tx *sql.Tx, fileId []byte, blockHash string, nodeId string) (partitionSeq int32, blockSeq int32, checksum bool) {
+	rows, err := tx.Query("select PARTITION_SEQ,BLOCK_SEQ,CHECKSUM from BLOCK where FILE_ID=$1 and HASH=$2 and PROVIDER_ID=$3 limit 1", bytesToUuid(fileId), blockHash, nodeId)
+	checkErr(err)
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&partitionSeq, &blockSeq, &checksum)
+		checkErr(err)
+		return
+	}
+	return
+}
+
+func saveBlock(tx *sql.Tx, fileId []byte, creation time.Time, blockHash string, size uint64, nodeId string, partitionSeq int32, blockSeq int32, checksum bool) {
 	stmt, err := tx.Prepare(sql_save_block)
 	defer stmt.Close()
 	checkErr(err)
-	_, err = stmt.Exec(blockHash, size, bytesToUuid(fileId), creation, nodeId)
+	_, err = stmt.Exec(blockHash, size, bytesToUuid(fileId), creation, nodeId, partitionSeq, blockSeq, checksum)
 	checkErr(err)
 }
 

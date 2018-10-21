@@ -166,6 +166,22 @@ func hourySummarizeClient(tx *sql.Tx, start time.Time, end time.Time) []*pb.Clie
 	return res
 }
 
+func hourySummarizeProviderAsClient(tx *sql.Tx, start time.Time, end time.Time) []*pb.ProviderItem {
+	rows, err := tx.Query("select 3-COALESCE(CLT_TYPE,PVD_TYPE),TICKET_CLIENT_ID,COALESCE(CLT_END_TIME,PVD_END_TIME)::date,(sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE)))::int from action_log where CREATION between $1 and $2 and FROM_PROVIDER=true group by 3-COALESCE(CLT_TYPE,PVD_TYPE),TICKET_CLIENT_ID,COALESCE(CLT_END_TIME,PVD_END_TIME)::date having sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE))>0", start, end)
+	checkErr(err)
+	defer rows.Close()
+	res := make([]*pb.ProviderItem, 0, 32)
+	for rows.Next() {
+		ci := &pb.ProviderItem{}
+		var day time.Time
+		err = rows.Scan(&ci.Type, &ci.NodeId, &day, &ci.Netflow)
+		ci.Day = day.UTC().Format("2006-01-02")
+		checkErr(err)
+		res = append(res, ci)
+	}
+	return res
+}
+
 func hourySummarizeProvider(tx *sql.Tx, start time.Time, end time.Time) []*pb.ProviderItem {
 	rows, err := tx.Query("select COALESCE(PVD_TYPE,CLT_TYPE),TICKET_PROVIDER_ID,COALESCE(PVD_END_TIME,CLT_END_TIME)::date,(sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE)))::int from action_log where CREATION between $1 and $2 group by COALESCE(PVD_TYPE,CLT_TYPE),TICKET_PROVIDER_ID,COALESCE(PVD_END_TIME,CLT_END_TIME)::date having sum(COALESCE(PVD_TRANSPORT_SIZE,CLT_TRANSPORT_SIZE))>0", start, end)
 	checkErr(err)
@@ -187,7 +203,16 @@ func HouryNaSummarize(startTimestamp int64, nextStartTimestamp int64) (hs *pb.Ho
 	nextStart := time.Unix(nextStartTimestamp, 0)
 	tx, commit := beginTx()
 	defer rollback(tx, &commit)
-	pis := hourySummarizeProvider(tx, start, nextStart)
+	pis1 := hourySummarizeProvider(tx, start, nextStart)
+	pis2 := hourySummarizeProviderAsClient(tx, start, nextStart)
+	pis := make([]*pb.ProviderItem, 0, len(pis1)+len(pis2))
+	for _, pi := range pis1 {
+		pis = append(pis, pi)
+	}
+	for _, pi := range pis2 {
+		pis = append(pis, pi)
+	}
+	// TODO merge pis1 and pis2
 	cis := hourySummarizeClient(tx, start, nextStart)
 	hs = &pb.HourlySummary{Start: startTimestamp, NextStart: nextStartTimestamp, ClientItem: cis, ProviderItem: pis}
 	checkErr(tx.Commit())

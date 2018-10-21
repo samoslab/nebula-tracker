@@ -142,7 +142,8 @@ func TaskFinish(taskId []byte, nodeId string, finishedTime uint64, success bool,
 			removeBlock(tx, fileId, blockHashStr, nodeId, time.Unix(int64(finishedTime), 0))
 		} else {
 			if !restoreBlock(tx, fileId, blockHashStr, storeNodeId) {
-				saveBlock(tx, fileId, time.Unix(int64(finishedTime), 0), blockHashStr, blockSize, storeNodeId)
+				partitionSeq, blockSeq, checksum := queryBlockInfo(tx, fileId, blockHashStr, storeNodeId)
+				saveBlock(tx, fileId, time.Unix(int64(finishedTime), 0), blockHashStr, blockSize, storeNodeId, partitionSeq, blockSeq, checksum)
 			}
 		}
 	}
