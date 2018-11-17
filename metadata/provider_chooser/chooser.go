@@ -3,11 +3,13 @@ package provider_chooser
 import (
 	"fmt"
 	"nebula-tracker/db"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
 	gosync "github.com/lrita/gosync"
 	"github.com/robfig/cron"
+	log "github.com/sirupsen/logrus"
 )
 
 var cronRunner *cron.Cron
@@ -77,6 +79,11 @@ func update() {
 	} else {
 		return
 	}
+	defer func() {
+		if er := recover(); er != nil {
+			log.Errorf("chooser.update() panic error: %s, detail: %s", er, string(debug.Stack()))
+		}
+	}()
 	all := db.ProviderFindAllAvail()
 	providers, providerMap = filter(all)
 	// for k, v := range providerMap {
