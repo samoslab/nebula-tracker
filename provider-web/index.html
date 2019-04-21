@@ -36,7 +36,7 @@
     {{if not .Login}}
     <div id="contentWrap">
         <div class="container">
-            <h1>Current Status:<span id="status" {{if .Online}}class="onlineStatus"{{else}}class="offlineStatus"{{end}}>{{if .Online}}online{{else}}offline{{end}}</span>{{if .Found}}<span class="endTime">last online check：<span id="last">{{.Last.Format "2006-01-02 15:04:05 UTC"}}</span></span>{{end}}</h1>
+            <h1>Current Status:<span id="status" {{if .Online}}class="onlineStatus"{{else}}class="offlineStatus"{{end}}>{{if .Online}}online{{else}}offline{{end}}</span>{{if .Found}}<span class="endTime">last online within a week check：<span id="last">{{.Last.Format "2006-01-02 15:04:05 UTC"}}</span></span>{{end}}</h1>
             <script>
             window.setInterval(function(){
                 $.ajax({ url: '/status/', method: 'POST', dataType: 'json', success: function(obj){

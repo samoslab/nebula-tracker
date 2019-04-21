@@ -54,7 +54,10 @@ func getByProviderAndCheckTimeBetween(tx *sql.Tx, providerId string, start time.
 }
 
 func getLastCheckAvailRecord(tx *sql.Tx, providerId string) (found bool, last time.Time) {
-	rows, err := tx.Query("SELECT CHECK_TIME FROM CHECK_AVAIL_RECORD where PROVIDER_ID=$1 order by CHECK_TIME desc limit 1", providerId)
+	weekAgo, _ := time.ParseDuration("-168h")
+	now := time.Now()
+	zeroClock := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	rows, err := tx.Query("SELECT CHECK_TIME FROM CHECK_AVAIL_RECORD where PROVIDER_ID=$1 and CHECK_TIME>$2 order by CHECK_TIME desc limit 1", providerId, zeroClock.Add(weekAgo))
 	checkErr(err)
 	defer rows.Close()
 	for rows.Next() {
